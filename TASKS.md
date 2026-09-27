@@ -43,7 +43,7 @@ fresh, shop-agnostic base with a new Astro storefront.
 - [x] Rewrite CLAUDE.md and README.md for Akai
 - [x] `.env.example` storefront section for Astro
 - [x] typecheck, lint, test, build green locally (15 projects)
-- [ ] CI green on GitHub (api-e2e under testcontainers has only run against a local Postgres so far)
+- [x] CI green on GitHub (Verify + Integration against real Postgres)
 
 ## 6. Before launch
 - [ ] Confirm the production domain (placeholder `akai.shop`) and `SESSION_COOKIE_DOMAIN`
