@@ -52,9 +52,9 @@ const blog = esMessages.admin.blog;
 function post(overrides: Record<string, unknown> = {}): AdminBlogPost {
   return adminBlogPostSchema.parse({
     id: "7c9e6679-7425-40de-944b-e07fc1f90ae7",
-    slug: "que-es-bpc-157",
+    slug: "como-combinar-un-oversize",
     status: "PUBLISHED",
-    category: "PEPTIDES",
+    category: "STYLE_GUIDES",
     publishedAt: ISO,
     coverObjectKey: null,
     coverUrl: null,
@@ -64,7 +64,7 @@ function post(overrides: Record<string, unknown> = {}): AdminBlogPost {
     translations: [
       {
         locale: "es",
-        title: "Qué es BPC-157",
+        title: "Qué es Hoodie Kumo",
         excerpt: "Resumen",
         bodyHtml: "<p>x</p>",
         metaTitle: null,
@@ -131,7 +131,7 @@ describe("AdminBlogPage", () => {
     expect(table.getByText(blog.categories.NEWS)).toBeInTheDocument();
     expect(table.getAllByText("ES")).toHaveLength(2);
     expect(
-      screen.getByRole("link", { name: "Editar el artículo Qué es BPC-157" }),
+      screen.getByRole("link", { name: "Editar el artículo Qué es Hoodie Kumo" }),
     ).toHaveAttribute("href", "/admin/blog/7c9e6679-7425-40de-944b-e07fc1f90ae7");
   });
 
@@ -150,7 +150,7 @@ describe("AdminBlogPage", () => {
     const user = userEvent.setup();
 
     await renderPage();
-    const toggle = screen.getByRole("switch", { name: "Publicar «Qué es BPC-157»" });
+    const toggle = screen.getByRole("switch", { name: "Publicar «Qué es Hoodie Kumo»" });
     expect(toggle).toBeChecked();
     await user.click(toggle);
 
@@ -169,7 +169,7 @@ describe("AdminBlogPage", () => {
     await user.click(screen.getByRole("button", { name: blog.delete.rowTrigger }));
 
     const dialog = await screen.findByRole("alertdialog");
-    expect(within(dialog).getByText("Qué es BPC-157")).toBeInTheDocument();
+    expect(within(dialog).getByText("Qué es Hoodie Kumo")).toBeInTheDocument();
     expect(deleteBlogPostAction).not.toHaveBeenCalled();
 
     await user.click(within(dialog).getByRole("button", { name: blog.delete.confirm }));

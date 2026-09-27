@@ -129,9 +129,8 @@ function lineLabel(item: EmailOrderLine): string {
 // web-font load: a mail client cannot be trusted to fetch one, so Schibsted
 // Grotesk/Instrument Serif/JetBrains Mono are approximated with safe system
 // fallbacks that carry the same character (sans body, serif display,
-// monospace for anything numeric or code-like — "prices, purity figures and
-// REF/batch metadata" is this file's own rule for that font, applied here
-// too, to order numbers, invoice numbers, dates and the sign-in code).
+// monospace for anything numeric or code-like — prices, SKUs and references,
+// applied here to order numbers, invoice numbers, dates and the sign-in code).
 // ---------------------------------------------------------------------------
 
 const COLOR_INK = "#0d0f15";

@@ -20,7 +20,7 @@ import { Notice } from "@/components/ui/notice";
  * state a pack component can be left in, so ticking a candidate immediately
  * pins its first active variant rather than leaving the entry unresolved —
  * the selection COUNT is validated 2–6 inline, which `AddOnPicker` has no
- * reason to do — and each entry carries its own QUANTITY ("5x Reta 20mg" as
+ * reason to do — and each entry carries its own QUANTITY ("5x Tee Black M" as
  * one slot, not five identical slots), defaulting to 1, which weights the
  * running total hint below and, server-side, the pro-rata price allocation.
  *
@@ -51,7 +51,7 @@ export interface PackComponentCandidateVariant {
 export interface PackComponentSelection {
   readonly id: string;
   readonly variantId: string;
-  /** How many of this component one pack contains — "5x Reta 20mg" as one slot. */
+  /** How many of this component one pack contains — "3x Tee Black M" as one slot. */
   readonly quantity: number;
 }
 

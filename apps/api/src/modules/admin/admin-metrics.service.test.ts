@@ -138,13 +138,13 @@ describe("AdminMetricsService — revenue", () => {
 describe("AdminMetricsService — top products and low stock", () => {
   it("maps top-product rows and sums revenue as an aggregate", async () => {
     const { service } = buildService([
-      { sku: "BPC-10", productName: "BPC-157", unitsSold: 42n, revenueGross: 209_958n },
+      { sku: "HOOD-M", productName: "Hoodie Kumo", unitsSold: 42n, revenueGross: 209_958n },
     ]);
 
     const top = await service.topProducts(WINDOW, 10);
 
     expect(top).toEqual([
-      { sku: "BPC-10", productName: "BPC-157", unitsSold: 42, revenueGross: 209_958 },
+      { sku: "HOOD-M", productName: "Hoodie Kumo", unitsSold: 42, revenueGross: 209_958 },
     ]);
   });
 
@@ -175,7 +175,7 @@ describe("AdminMetricsService — top products and low stock", () => {
     const { service } = buildService([
       {
         variantId: "v-1",
-        sku: "BPC-10",
+        sku: "HOOD-M",
         onHand: 4,
         reserved: 2,
         available: 2,
@@ -184,7 +184,7 @@ describe("AdminMetricsService — top products and low stock", () => {
     ]);
 
     const low = await service.lowStock(20);
-    expect(low[0]).toMatchObject({ sku: "BPC-10", available: 2 });
+    expect(low[0]).toMatchObject({ sku: "HOOD-M", available: 2 });
   });
 });
 

@@ -53,7 +53,7 @@ const TEST_ENV: NodeJS.ProcessEnv = {
   EMAIL_FROM: "no-reply@example.com",
   S3_ENDPOINT: "http://localhost:9000",
   S3_BUCKET: "akai-media",
-  S3_BUCKET_COA: "akai-coa",
+  S3_BUCKET_PRIVATE: "akai-private",
   S3_ACCESS_KEY_ID: "key",
   S3_SECRET_ACCESS_KEY: "secret",
   CORS_ALLOWED_ORIGINS: "http://localhost:3000",
@@ -201,9 +201,9 @@ describe.skipIf(!isDockerAvailable())("Sendcloud tracking — webhook → shipme
           create: [
             {
               id: ORDER_ITEM_ID,
-              productName: "Creatine Monohydrate",
-              variantName: "500 g",
-              sku: "AK-CRE-500",
+              productName: "Oversized Tee",
+              variantName: "L",
+              sku: "AK-TEE-BLK-L",
               quantity: 2,
               unitPriceNet: 4131,
               unitPriceGross: 4999,

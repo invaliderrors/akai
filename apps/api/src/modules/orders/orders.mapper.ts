@@ -126,7 +126,6 @@ export function toOrderItemDto(row: OrderWithDetail["items"][number]): OrderItem
     taxAmount: toMinor(row.taxAmount),
     lineTotalNet: toMinor(row.lineTotalNet),
     lineTotalGross: toMinor(row.lineTotalGross),
-    batchLotCode: row.batchLotCode,
     packProductId: row.packProductId,
     packInstanceId: row.packInstanceId,
   };

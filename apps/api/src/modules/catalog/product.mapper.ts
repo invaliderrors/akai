@@ -2,7 +2,6 @@ import { z } from "zod";
 import { Prisma } from "@akai/db";
 import {
   localeSchema,
-  type Batch,
   type Category,
   type InventoryItem,
   type MediaAsset,
@@ -10,7 +9,6 @@ import {
   type Product,
   type ProductTranslation,
   type ProductVariant,
-  type PublicBatch,
   type PublicProduct,
 } from "@akai/contracts";
 import { toMinor } from "@akai/money";
@@ -127,9 +125,6 @@ export const productInclude = {
       // ASCENDING, so the resolver and the page both read them in the order a
       // shopper sees them and neither has to sort.
       priceTiers: { orderBy: { minQuantity: "asc" } },
-      // Newest tested lot only. The contract exposes ONE batch (the one that
-      // would ship), not the full lot history, which is an admin concern.
-      batches: { orderBy: { testedAt: "desc" }, take: 1 },
     },
   },
 } satisfies Prisma.ProductInclude;
@@ -197,45 +192,7 @@ function mapInventory(variant: HydratedVariant): InventoryItem {
   };
 }
 
-/**
- * `objectKey` is a private-bucket key (`S3_BUCKET_COA`), never public — the
- * caller is trusted to turn it into a short-lived SIGNED url, never to echo it
- * back or build a bare `${endpoint}/${bucket}/${key}` string the way public
- * media does. Defaults to "no signer configured" (always `null`), which is
- * exactly today's behaviour for every existing caller that does not pass one.
- */
-type CoaUrlSigner = (objectKey: string) => string | null;
-const NO_COA_SIGNER: CoaUrlSigner = () => null;
-
-function signOptional(objectKey: string | null, sign: CoaUrlSigner): string | null {
-  return objectKey === null ? null : sign(objectKey);
-}
-
-function mapBatch(variant: HydratedVariant, signCoaUrl: CoaUrlSigner): Batch | null {
-  const [batch] = variant.batches;
-  if (batch === undefined) {
-    return null;
-  }
-
-  return {
-    id: batch.id,
-    lotCode: batch.lotCode,
-    // Decimal(5,2) → number. Purity is a measurement, not money, so a float is
-    // correct here; the integer-minor-units rule governs money only.
-    purityPercent: batch.purityPercent.toNumber(),
-    testedAt: toIso(batch.testedAt),
-    testMethod: batch.testMethod,
-    // NOT the raw S3 key, ever — only what `signCoaUrl` returns for it. A COA
-    // not yet uploaded (`coaObjectKey: null`) stays null with no call at all.
-    coaUrl: batch.coaObjectKey === null ? null : signCoaUrl(batch.coaObjectKey),
-    expiresAt: batch.expiresAt === null ? null : toIso(batch.expiresAt),
-  };
-}
-
-export function mapVariant(
-  variant: HydratedVariant,
-  signCoaUrl: CoaUrlSigner = NO_COA_SIGNER,
-): ProductVariant {
+export function mapVariant(variant: HydratedVariant): ProductVariant {
   const name = variant.name === null ? null : narrowJson(variant.name, localizedTextSchema, {});
 
   return {
@@ -247,7 +204,6 @@ export function mapVariant(
     price: mapPrice(variant),
     weightGrams: variant.weightGrams,
     inventory: mapInventory(variant),
-    batch: mapBatch(variant, signCoaUrl),
     // Same wire shape as a gallery image, and objectKey is dropped by the same
     // mapper — a variant image is not a different kind of asset, only a
     // differently-scoped one.
@@ -334,20 +290,10 @@ export function toPublicProduct(
   product: Product,
   packAvailability: PackAvailability | null = null,
 ): PublicProduct {
-  // The admin's switch and the signed URL are taken OUT of the spread, so
-  // neither can reach the JSON; what remains of them is one derived boolean.
-  const { showCoa, coaUrl, ...shared } = product;
   return {
-    ...shared,
-    // Offered exactly when a file is uploaded AND the admin switched it on.
-    // `coaUrl` is non-null exactly when the row has an object key and the
-    // caller passed a signer — every public read in `ProductsService` does
-    // (`toPublic`). Never the key, never the URL: the storefront links to the
-    // stable `GET /v1/products/:slug/coa` redirect, which signs at click time.
-    hasCoa: showCoa && coaUrl !== null,
+    ...product,
     variants: product.variants.map((variant) => ({
       ...variant,
-      batch: toPublicBatch(variant.batch),
       inventory:
         packAvailability === null
           ? {
@@ -363,29 +309,6 @@ export function toPublicProduct(
               allowBackorder: packAvailability.allowBackorder,
             },
     })),
-  };
-}
-
-/**
- * The shopper-safe batch: everything but the signed `coaUrl`. A one-hour
- * signed URL embedded in an ISR-cached page is a dead link waiting to happen,
- * and the certificate the shop offers is the PRODUCT's anyway (see `hasCoa`
- * above) — a lot's own certificate is admin data.
- *
- * Built field by field rather than by spreading and deleting, so the signed
- * URL is absent from the JSON as well as from the type.
- */
-function toPublicBatch(batch: Batch | null): PublicBatch | null {
-  if (batch === null) {
-    return null;
-  }
-  return {
-    id: batch.id,
-    lotCode: batch.lotCode,
-    purityPercent: batch.purityPercent,
-    testedAt: batch.testedAt,
-    testMethod: batch.testMethod,
-    expiresAt: batch.expiresAt,
   };
 }
 
@@ -451,7 +374,6 @@ export function derivePackAvailability(product: HydratedProduct): PackAvailabili
 export function mapProduct(
   product: HydratedProduct,
   options: { readonly activeVariantsOnly: boolean },
-  signCoaUrl: CoaUrlSigner = NO_COA_SIGNER,
 ): Product {
   const variants = options.activeVariantsOnly
     ? product.variants.filter((variant) => variant.isActive)
@@ -463,7 +385,7 @@ export function mapProduct(
     status: product.status,
     taxClass: product.taxClass,
     translations: product.translations.map(mapTranslation),
-    variants: variants.map((variant) => mapVariant(variant, signCoaUrl)),
+    variants: variants.map((variant) => mapVariant(variant)),
     media: product.media.map(mapMedia),
     categories: product.categories.map(mapCategory),
     addOns: product.addOns.map((edge) => ({
@@ -501,14 +423,6 @@ export function mapProduct(
       variantId: edge.componentVariantId,
       quantity: edge.quantity,
     })),
-    form: product.form,
-    showCoa: product.showCoa ?? false,
-    // Signed fresh on every read, like a batch's `coaUrl`, so the dashboard
-    // always links to the CURRENT file. `toPublicProduct` strips it.
-    // `?? null` rather than `=== null`: a hydrated row built by hand (the
-    // service tests' fixtures predate the column) must read as "no file",
-    // never be handed to the signer as `undefined`.
-    coaUrl: signOptional(product.coaObjectKey ?? null, signCoaUrl),
     createdAt: toIso(product.createdAt),
     updatedAt: toIso(product.updatedAt),
     deletedAt: product.deletedAt === null ? null : toIso(product.deletedAt),

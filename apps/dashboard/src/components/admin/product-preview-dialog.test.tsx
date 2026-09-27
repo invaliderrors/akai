@@ -13,7 +13,7 @@ function variant(overrides: Partial<PreviewVariant> = {}): PreviewVariant {
   return {
     key: "v1",
     sku: "AK-5",
-    label: "5 mg",
+    label: "S",
     priceGross: toMinor(4999),
     compareAtGross: null,
     imageUrl: null,
@@ -31,7 +31,7 @@ function renderPreview(overrides: Partial<Parameters<typeof ProductPreviewDialog
         onClose={() => {}}
         locale="es"
         currency={EUR}
-        name="Peptido 1"
+        name="Sudadera 1"
         shortDescription="Resumen"
         description="<p>Descripción</p>"
         images={[]}
@@ -47,7 +47,7 @@ describe("<ProductPreviewDialog />", () => {
   it("draws the copy the operator has not saved yet", () => {
     renderPreview();
 
-    expect(screen.getByText("Peptido 1")).toBeInTheDocument();
+    expect(screen.getByText("Sudadera 1")).toBeInTheDocument();
     expect(screen.getByText("Resumen")).toBeInTheDocument();
     // Through the same sanitiser the shop uses, so what is drawn here is what
     // will be stored — the region, not the raw markup.
@@ -82,15 +82,15 @@ describe("<ProductPreviewDialog />", () => {
   it("shows the picker once two variants carry a size", () => {
     renderPreview({
       variants: [
-        variant({ key: "a", label: "5 mg" }),
-        variant({ key: "b", label: "10 mg" }),
+        variant({ key: "a", label: "S" }),
+        variant({ key: "b", label: "M" }),
       ],
     });
 
     expect(
       screen.getByRole("group", { name: form.preview.variantHeading }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "10 mg" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "M" })).toBeInTheDocument();
   });
 
   it("says the buttons do nothing rather than looking live", () => {
@@ -148,7 +148,7 @@ describe("<ProductPreviewDialog /> — volume pricing", () => {
 describe("<ProductPreviewDialog /> — add-ons in the buy column", () => {
   const WATER = {
     id: "ao-1",
-    name: "Agua bacteriostática",
+    name: "Bolsa tote",
     priceGross: 1250,
     currency: "EUR",
   } as const;
@@ -158,7 +158,7 @@ describe("<ProductPreviewDialog /> — add-ons in the buy column", () => {
     // too — this is the half of the page that was missing entirely before.
     renderPreview({ addOns: [WATER] });
 
-    expect(screen.getByText("Agua bacteriostática")).toBeInTheDocument();
+    expect(screen.getByText("Bolsa tote")).toBeInTheDocument();
     expect(screen.getByText(/12,50/)).toBeInTheDocument();
     expect(screen.getByText(form.preview.addOnsHeading)).toBeInTheDocument();
   });
@@ -246,6 +246,6 @@ describe("<ProductPreviewDialog /> — add-ons in the buy column", () => {
     // named rather than silently dropped from their own selection.
     renderPreview({ addOns: [{ ...WATER, priceGross: null, currency: null }] });
 
-    expect(screen.getByText("Agua bacteriostática")).toBeInTheDocument();
+    expect(screen.getByText("Bolsa tote")).toBeInTheDocument();
   });
 });

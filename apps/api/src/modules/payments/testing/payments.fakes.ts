@@ -63,9 +63,9 @@ export function orderSnapshot(overrides: Partial<OrderSnapshot> = {}): OrderSnap
 export function orderLine(overrides: Partial<OrderLineSnapshot> = {}): OrderLineSnapshot {
   const base: OrderLineSnapshot = {
     id: "22222222-2222-4222-8222-222222222222",
-    productName: "BPC-157",
-    variantName: "10 mg",
-    sku: "AK-BPC-10",
+    productName: "Hoodie Kumo",
+    variantName: "M",
+    sku: "AK-HOOD-M",
     imageUrl: null,
     quantity: 1,
     unitPriceGross: toMinor(4999),

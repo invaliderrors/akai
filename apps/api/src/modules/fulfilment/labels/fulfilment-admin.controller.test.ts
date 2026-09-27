@@ -69,7 +69,7 @@ const serviceStub = {
     count: 1,
     skippedOrderIds: ["22222222-2222-4222-8222-222222222222"],
   })),
-  labelUrl: vi.fn(async () => "https://s3.test/akai-coa/labels/o/1.pdf?X-Amz-Signature=abc"),
+  labelUrl: vi.fn(async () => "https://s3.test/akai-private/labels/o/1.pdf?X-Amz-Signature=abc"),
   cancel: vi.fn(async () => ({ shipmentId: SHIPMENT, status: "CANCELLED", orderStatus: "PAID" })),
   retry: vi.fn(async () => ({ accepted: ["AK-2026-000001"], skipped: [] })),
 };
@@ -221,7 +221,7 @@ describe("FulfilmentAdminController — staff", () => {
 
     expect(response.status).toBe(302);
     expect(response.headers["location"]).toBe(
-      "https://s3.test/akai-coa/labels/o/1.pdf?X-Amz-Signature=abc",
+      "https://s3.test/akai-private/labels/o/1.pdf?X-Amz-Signature=abc",
     );
     expect(response.headers["cache-control"]).toBe("no-store");
   });

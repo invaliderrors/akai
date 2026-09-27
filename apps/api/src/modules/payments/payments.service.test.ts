@@ -46,7 +46,7 @@ const TEST_ENV: NodeJS.ProcessEnv = {
   EMAIL_FROM: "no-reply@example.com",
   S3_ENDPOINT: "http://localhost:9000",
   S3_BUCKET: "akai-media",
-  S3_BUCKET_COA: "akai-coa",
+  S3_BUCKET_PRIVATE: "akai-private",
   S3_ACCESS_KEY_ID: "key",
   S3_SECRET_ACCESS_KEY: "secret",
   CORS_ALLOWED_ORIGINS: "http://localhost:3000",
@@ -168,7 +168,7 @@ describe("PaymentsService.startCheckout", () => {
     });
     repository.seedOrder(order, [
       // 2 x 4999 = 9998, less the 1500 discount = 8498.
-      orderLine({ id: "line-1", sku: "AK-CRE-500", quantity: 2, unitPriceGross: toMinor(4999), lineTotalGross: toMinor(8498), taxAmount: toMinor(1475) }),
+      orderLine({ id: "line-1", sku: "AK-TEE-BLK-L", quantity: 2, unitPriceGross: toMinor(4999), lineTotalGross: toMinor(8498), taxAmount: toMinor(1475) }),
       orderLine({ id: "line-2", sku: "AK-WHE-1000", quantity: 1, unitPriceGross: toMinor(2450), lineTotalGross: toMinor(2450), taxAmount: toMinor(425) }),
       orderLine({ id: "line-3", sku: "AK-BCAA-200", quantity: 3, unitPriceGross: toMinor(1200), lineTotalGross: toMinor(3600), taxAmount: toMinor(625) }),
     ]);

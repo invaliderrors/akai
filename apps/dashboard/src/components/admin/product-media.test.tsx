@@ -30,8 +30,8 @@ vi.mock("@/i18n/navigation", () => ({
 
 const ITEM: ProductMediaItem = {
   id: "9f1c6c5e-0000-4000-8000-000000000001",
-  url: "https://cdn.example.test/products/creatina-front.jpg",
-  alt: { es: "Bote de creatina", en: "Tub of creatine" },
+  url: "https://cdn.example.test/products/camiseta-front.jpg",
+  alt: { es: "Bote de camiseta", en: "Tub of tee" },
   width: 1200,
   height: 1200,
   sortOrder: 0,

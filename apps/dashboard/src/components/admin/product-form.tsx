@@ -6,7 +6,6 @@ import { z } from "zod";
 import {
   computeStackDiscountTiers,
   createProductSchema,
-  productFormSchema,
   STACK_DISCOUNT_BEST_PRICE_QUANTITY,
   type Category,
   type CreateProduct,
@@ -43,8 +42,6 @@ import {
   type PreviewVariant,
 } from "./product-preview-dialog";
 import { VariantImageField, type VariantImageSupport } from "./variant-image";
-import { BatchCoaField, type BatchCoaUploads } from "./batch-coa-field";
-import { ProductCoaField, type ProductCoaUploads } from "./product-coa-field";
 
 /**
  * Create/edit form for a product and its variants — the largest form in the app.
@@ -145,20 +142,18 @@ interface VariantDraft {
   readonly nameEs: string;
   readonly nameEn: string;
   /**
-   * The size on the label — "5" + "mg", "300" + "g" — as typed.
+   * The size on the label — "M", "XL", "42", "One size" — and an optional
+   * colour ("Black"), both free text as typed.
    *
    * THIS IS WHAT MAKES A VARIANT PICKER APPEAR. The storefront hides the picker
    * when every variant label is null (`product-purchase-panel.tsx`), and the
    * label comes from `variant.name`, which this form never had an input for. So
    * every product built here shipped with unnamed variants and no way to choose
-   * between them. Size fills that name, in both locales, on submit.
-   *
-   * NOT `weightGrams`, three fields below. That is the SHIPPING weight and it
-   * feeds shipping-bracket selection; a 5 mg vial still posts as ~20 g of glass
-   * and packaging. One number goes on the product page, the other buys postage.
+   * between them. Size (and colour, when set) fills that name, in both locales,
+   * on submit, and becomes the variant's `options` — `{ size, color }`.
    */
-  readonly sizeAmount: string;
-  readonly sizeUnit: SizeUnit | "";
+  readonly size: string;
+  readonly color: string;
   /** MAJOR units as typed, e.g. "49.99". Converted on submit, never on keystroke. */
   readonly priceGross: string;
   readonly compareAtGross: string;
@@ -236,19 +231,6 @@ export interface ProductFormValues {
    */
   readonly kind: "SIMPLE" | "PACK";
   /**
-   * The FORMA cell of the storefront's spec table — a closed enum, so the
-   * shop always shows a translated label rather than an operator's string.
-   */
-  readonly form: ProductFormKind;
-  /**
-   * "Mostrar certificado de análisis": whether the shop offers the product's
-   * certificate. Saved WITH the product, like every other field here — the
-   * PDF itself is uploaded separately (`ProductCoaField`), and the shop shows
-   * the button only when a file exists AND this is on. There is no purity
-   * field any more: the shop's purity claim is fixed at "≥99% HPLC".
-   */
-  readonly showCoa: boolean;
-  /**
    * The 2–6 products a PACK is made of, each with its pinned variant. Always
    * `[]` for a SIMPLE product — `buildPayload` never sends it unless
    * `kind === "PACK"`, so this array existing on a SIMPLE product's draft
@@ -303,7 +285,6 @@ export interface ProductFormMessages {
   readonly notWholeGrams: string;
   readonly sizeRequired: string;
   readonly sizeDuplicate: string;
-  readonly sizeNotANumber: string;
   readonly tierQuantityInvalid: string;
   readonly tierDuplicate: string;
   readonly tierPriceTooHigh: string;
@@ -475,25 +456,6 @@ export interface ProductFormProps {
    */
   readonly variantImages?: VariantImageSupport;
   /**
-   * Turns on the variant table's certificate-of-analysis column.
-   *
-   * ABSENT MEANS NO COLUMN, same reasoning as `variantImages`. UNLIKE
-   * `variantImages`, there is no staged mode at all: a batch is keyed by
-   * `variantId`, and a variant not yet saved has none — so this column renders
-   * a control only for a variant `product-form.tsx` can already resolve to a
-   * real, stored id, and nothing for a row still being created.
-   */
-  readonly batchUploads?: BatchCoaUploads;
-  /**
-   * The PRODUCT's certificate upload control, in the certificate panel.
-   *
-   * ABSENT MEANS NO CONTROL, same convention as `batchUploads`: the object key
-   * is derived from the product id, so only an EXISTING product can take a
-   * file, and the caller supplies this only then. The "show" checkbox beside
-   * it is a form value and renders either way.
-   */
-  readonly coaUploads?: ProductCoaUploads;
-  /**
    * Product-level images the caller has STAGED but not uploaded, for the eye
    * preview. Only ever set while creating — an existing product's pictures are
    * read from `product.media`, which this form already receives.
@@ -555,41 +517,6 @@ const LANGUAGE_NAME: Readonly<Record<Locale, string>> = {
   en: "English",
 };
 
-/**
- * The units a variant's size may be given in. Mass, volume and count, because a
- * peptide is dosed in mg, a solvent in ml and a supplement in capsules.
- */
-export const SIZE_UNITS = [
-  "mg", "g", "kg", "ml", "l", "lb", "oz", "capsules", "servings",
-] as const;
-export type SizeUnit = (typeof SIZE_UNITS)[number];
-
-/**
- * How each unit is written, per locale — a module constant and NOT a message
- * lookup, and that distinction is load-bearing.
- *
- * `useTranslations` resolves the OPERATOR's locale, and this label is not chrome
- * for the operator: it is written into `variant.name` for BOTH locales at once,
- * so a shopper on the Spanish site reads "60 cápsulas" and one on the English
- * site reads "60 capsules" from the same save. A message lookup can only produce
- * whichever language the operator happened to be using. Same shape and same
- * reasoning as `LANGUAGE_NAME` above.
- *
- * The SI symbols are deliberately identical in both: "mg" is "mg" everywhere,
- * and translating a unit symbol would be a bug wearing a localisation.
- */
-const UNIT_LABEL: Readonly<Record<SizeUnit, Readonly<Record<Locale, string>>>> = {
-  mg: { es: "mg", en: "mg" },
-  g: { es: "g", en: "g" },
-  kg: { es: "kg", en: "kg" },
-  ml: { es: "ml", en: "ml" },
-  l: { es: "l", en: "l" },
-  lb: { es: "lb", en: "lb" },
-  oz: { es: "oz", en: "oz" },
-  capsules: { es: "cápsulas", en: "capsules" },
-  servings: { es: "raciones", en: "servings" },
-};
-
 /** Spanish first, because it is the storefront's default and the source copy. */
 const LOCALE_ORDER: readonly Locale[] = ["es", "en"];
 
@@ -631,20 +558,9 @@ const LISTING_MODES = ["LISTED", "ADDON"] as const;
  */
 const PRODUCT_KINDS = ["SIMPLE", "PACK"] as const;
 
-/**
- * The physical form a product ships in, as the shop's FORMA cell shows it.
- * Mirrors `productFormSchema`; derived from it so a new member is a compile
- * error in the option labels rather than a silently missing option.
- */
-const PRODUCT_FORMS = productFormSchema.options;
-type ProductFormKind = (typeof PRODUCT_FORMS)[number];
-
-
 export function ProductForm({
   mediaSlot,
   variantImages,
-  batchUploads,
-  coaUploads,
   previewImages,
   addOnCandidates,
   packComponentCandidates,
@@ -736,7 +652,6 @@ export function ProductForm({
     notWholeGrams: t("fieldErrors.NOT_WHOLE_GRAMS"),
     sizeRequired: t("fieldErrors.SIZE_REQUIRED"),
     sizeDuplicate: t("fieldErrors.SIZE_DUPLICATE"),
-    sizeNotANumber: t("fieldErrors.SIZE_NOT_A_NUMBER"),
     tierQuantityInvalid: t("fieldErrors.TIER_QUANTITY_INVALID"),
     tierDuplicate: t("fieldErrors.TIER_DUPLICATE"),
     tierPriceTooHigh: t("fieldErrors.TIER_PRICE_TOO_HIGH"),
@@ -794,7 +709,7 @@ export function ProductForm({
       sku: variant.sku.trim(),
       label:
         size !== null
-          ? buildSizeLabel(size.amount, size.unit, activeLocale)
+          ? sizeLabel(size)
           : carried === ""
             ? null
             : carried,
@@ -954,39 +869,6 @@ export function ProductForm({
         variantId={stored.id}
         asset={stored.image}
         uploads={variantImages.uploads}
-      />
-    );
-  }
-
-  /**
-   * One row's certificate-of-analysis control, or nothing when this form
-   * cannot store one.
-   *
-   * NO STAGED BRANCH, unlike `variantImageCell` above — a batch is keyed by
-   * `variantId`, so a row with no stored variant yet (still being created, or
-   * added on the edit page and not yet saved) has nothing to attach a batch
-   * to. It appears the moment the row IS a saved variant, same as the image
-   * column already becomes live-mode at that point.
-   */
-  function batchCoaCell(variant: VariantDraft, index: number): ReactNode {
-    if (batchUploads === undefined) {
-      return null;
-    }
-
-    const stored = storedVariants.get(variant.key);
-    if (stored === undefined) {
-      return null;
-    }
-
-    const sku = variant.sku.trim();
-    const variantName = sku === "" ? t("variantHeading", { index: index + 1 }) : sku;
-
-    return (
-      <BatchCoaField
-        variantName={variantName}
-        variantId={stored.id}
-        batch={stored.batch}
-        uploads={batchUploads}
       />
     );
   }
@@ -1242,8 +1124,8 @@ export function ProductForm({
               {machineFilled.includes(activeLocale) && (
                 // WHO WROTE THIS TEXT, stated where the text is. An operator who
                 // cannot tell their own copy from a vendor's guess publishes the
-                // guess — and this is EU food-supplement copy, where the claim
-                // on the label is the regulated thing.
+                // guess — and this is the copy customers read and the shop
+                // stands behind.
                 <Notice
                   tone="warning"
                   placement="inline"
@@ -1392,7 +1274,6 @@ export function ProductForm({
 
                     <div className="flex items-start gap-2">
                       {variantImageCell(variant, index)}
-                      {batchCoaCell(variant, index)}
                       {values.variants.length > 1 && (
                         <IconButton
                           label={t("removeVariant")}
@@ -1409,34 +1290,18 @@ export function ProductForm({
                       {sizesShown && (
                         <>
                           <TextField
-                            label={t("sizeAmountLabel")}
-                        name={`size-amount-${variant.key}`}
-                        value={variant.sizeAmount}
-                        inputMode="decimal"
-                        onChange={(value) =>
-                          updateVariant(variant.key, { sizeAmount: value })
-                        }
-                        {...optionalError(errors[`variants.${index}.sizeAmount`])}
-                      />
-                      <PopupButton<SizeUnit | "">
-                        label={t("sizeUnitLabel")}
-                        name={`size-unit-${variant.key}`}
-                        value={variant.sizeUnit}
-                        options={[
-                          { value: "", label: t("sizeUnitNone") },
-                          ...SIZE_UNITS.map((unit) => ({
-                            value: unit,
-                            // The word the SHOPPER will read, in the language
-                            // currently being edited — "cápsulas" while the
-                            // Spanish copy is on screen. The unit is shared by
-                            // both locales; only its spelling differs.
-                            label: UNIT_LABEL[unit][activeLocale],
-                          })),
-                        ]}
-                            onChange={(unit) =>
-                              updateVariant(variant.key, { sizeUnit: unit })
-                            }
-                            {...optionalError(errors[`variants.${index}.sizeUnit`])}
+                            label={t("sizeLabel")}
+                            name={`size-${variant.key}`}
+                            value={variant.size}
+                            onChange={(value) => updateVariant(variant.key, { size: value })}
+                            {...optionalError(errors[`variants.${index}.size`])}
+                          />
+                          <TextField
+                            label={t("colorLabel")}
+                            name={`color-${variant.key}`}
+                            value={variant.color}
+                            onChange={(value) => updateVariant(variant.key, { color: value })}
+                            {...optionalError(errors[`variants.${index}.color`])}
                           />
                         </>
                       )}
@@ -1733,7 +1598,7 @@ export function ProductForm({
               pack's own variant is never sold (the picker below is what the
               pack actually needs), but the pack PRODUCT ITSELF can still
               offer add-ons on its own page exactly like any SIMPLE product —
-              "would you also like a shaker with this pack?" is a perfectly
+              "would you also like a sticker pack with this pack?" is a perfectly
               normal upsell. `ProductAddOn` and `ProductPackComponent` are
               independent tables end to end (see `ProductPackComponent`'s
               schema comment), so there is no backend reason to keep these
@@ -1926,35 +1791,7 @@ export function ProductForm({
                 onChange={(kind) => setValues((current) => ({ ...current, kind }))}
               />
 
-              {/* THE SHOP'S SPEC TABLE. A product fact, not a per-variant
-                  one. The other two cells are sitewide copy: purity is fixed
-                  at "≥99% HPLC" and dispatch is same-day, so neither has a
-                  field here. */}
-              <PopupButton
-                label={t("formLabel")}
-                name="form"
-                value={values.form}
-                hint={t("formHint")}
-                options={PRODUCT_FORMS.map((option) => ({
-                  value: option,
-                  label: t(`formOptions.${option}`),
-                }))}
-                onChange={(option) => setValues((current) => ({ ...current, form: option }))}
-              />
             </div>
-          </Panel>
-
-          {/* THE PRODUCT'S CERTIFICATE — file and shop visibility as one
-              two-step section; see `ProductCoaField`. */}
-          <Panel title={t("coaTitle")} description={t("coaHint")} disabled={submitting}>
-            <ProductCoaField
-              uploads={coaUploads}
-              coaUrl={product?.coaUrl ?? null}
-              showCoa={values.showCoa}
-              savedShowCoa={product?.showCoa ?? false}
-              onShowCoaChange={(checked) => setValues((current) => ({ ...current, showCoa: checked }))}
-              disabled={submitting}
-            />
           </Panel>
 
           {mediaSlot !== undefined && (
@@ -2300,7 +2137,7 @@ export interface StagedVariantImage {
  * exists rather than the caller zipping two arrays. The caller has to place each
  * file on a variant the API has just created, and the API is under no obligation
  * to return the variants in the order they were sent: an index match silently
- * attaches the 10 mg photo to the 20 mg variant, and nothing fails.
+ * attaches the black photo to the white variant, and nothing fails.
  */
 export function stagedVariantImages(
   values: ProductFormValues,
@@ -2442,18 +2279,16 @@ export function buildPayload(
     }
 
     const size = variantSize(variant);
-    const amountTyped = variant.sizeAmount.trim().length > 0;
+    const colorTyped = variant.color.trim().length > 0;
 
-    if (amountTyped && !/^\d+(?:[.,]\d+)?$/.test(variant.sizeAmount.trim())) {
-      errors[`variants.${index}.sizeAmount`] = messages.sizeNotANumber;
-    } else if (amountTyped && variant.sizeUnit === "") {
-      errors[`variants.${index}.sizeUnit`] = messages.sizeRequired;
-    } else if (values.variants.length > 1 && size === null) {
+    if (size === null && (colorTyped || values.variants.length > 1)) {
       // ONLY WHEN THERE IS MORE THAN ONE. A single variant needs no label — the
       // storefront shows no picker for it and falls back to the product name —
       // so demanding a size from a plain product would be the form inventing a
       // requirement the shop does not have.
-      errors[`variants.${index}.sizeAmount`] = messages.sizeRequired;
+      // A colour with no size is also refused: the size is the option every
+      // variant is keyed on, and a colour alone would name half an option set.
+      errors[`variants.${index}.size`] = messages.sizeRequired;
     }
 
     if (size !== null) {
@@ -2461,16 +2296,13 @@ export function buildPayload(
       // own words for a constraint the DATABASE enforces as
       // `product_variant_options_unique`, which would otherwise surface as an
       // unexplained CONFLICT after the save round-trips.
-      const token = buildSizeLabel(size.amount, size.unit, "en");
+      const token = sizeToken(size);
       const first = values.variants.findIndex((other) => {
         const otherSize = variantSize(other);
-        return (
-          otherSize !== null &&
-          buildSizeLabel(otherSize.amount, otherSize.unit, "en") === token
-        );
+        return otherSize !== null && sizeToken(otherSize) === token;
       });
       if (first !== index) {
-        errors[`variants.${index}.sizeAmount`] = messages.sizeDuplicate;
+        errors[`variants.${index}.size`] = messages.sizeDuplicate;
       }
     }
 
@@ -2544,9 +2376,9 @@ export function buildPayload(
       // ("productId", "options") for live rows, so two variants both sending {}
       // collide and the second insert fails as an opaque CONFLICT. This form
       // sent {} unconditionally, which is why a two-variant product could not be
-      // created here at all. The size is what makes the rows distinct — the same
-      // shape the seed already stores, e.g. {"size": "300 g"}.
-      options: size === null ? {} : { size: buildSizeLabel(size.amount, size.unit, "en") },
+      // created here at all. Size (and colour) is what makes the rows distinct —
+      // the same shape the seed stores, e.g. {"size": "M", "color": "Black"}.
+      options: variantOptions(size),
       priceGross: price.ok ? price.value : 0,
       compareAtGross: compareAt,
       currency: values.currency,
@@ -2574,8 +2406,6 @@ export function buildPayload(
     newProductDefaultVariantId: values.newProductDefaultVariantId,
     stackDiscountEnabled: values.stackDiscountEnabled,
     kind: values.kind,
-    form: values.form,
-    showCoa: values.showCoa,
     // OMITTED ENTIRELY for a SIMPLE product, not sent as `[]`: the schema's
     // own `.min(3)` rejects an explicit empty array just as it would reject
     // one or two entries, so `undefined` — "not touching this" — is the only
@@ -2825,44 +2655,42 @@ function parseOptionalInteger(raw: string): number | null | "invalid" {
   return Number.isSafeInteger(parsed) ? parsed : "invalid";
 }
 
-/**
- * The size as one locale writes it: "5 mg", "0,5 g" in Spanish, "0.5 g" in
- * English. The separator follows the locale because this string is customer-
- * facing copy, not a serialisation.
- */
-function buildSizeLabel(amount: string, unit: SizeUnit, locale: Locale): string {
-  const trimmed = amount.trim().replace(",", ".");
-  const shown = locale === "es" ? trimmed.replace(".", ",") : trimmed;
-  return `${shown} ${UNIT_LABEL[unit][locale]}`;
+interface VariantSize {
+  readonly size: string;
+  /** Empty when the variant has no colour. */
+  readonly color: string;
 }
 
 /**
- * Read a stored variant name back into the size fields, or decline.
- *
- * DECLINING IS THE IMPORTANT HALF. A legacy name the size grammar cannot express
- * — "Pack de inicio" — must survive an edit untouched, so a name that does not
- * parse leaves the size blank and keeps being carried verbatim.
+ * The label a shopper reads: "M", or "M / Black" when a colour is set. The
+ * same in both locales — sizes and the operator's colour names are not
+ * translated here.
  */
-function parseSizeLabel(label: string): { amount: string; unit: SizeUnit } | null {
-  const match = /^\s*(\d+(?:[.,]\d+)?)\s*(.+?)\s*$/.exec(label);
-  if (match === null) {
-    return null;
+function sizeLabel(size: VariantSize): string {
+  return size.color === "" ? size.size : `${size.size} / ${size.color}`;
+}
+
+/**
+ * The comparison key for "two variants share an option set". Case-insensitive,
+ * so "m / black" and "M / Black" are caught before the database's own
+ * `product_variant_options_unique` turns them into an opaque CONFLICT.
+ */
+function sizeToken(size: VariantSize): string {
+  return `${size.size.toLowerCase()}\u0000${size.color.toLowerCase()}`;
+}
+
+/** The variant's `options`: `{ size }`, `{ size, color }`, or `{}` with no size. */
+function variantOptions(size: VariantSize | null): Record<string, string> {
+  if (size === null) {
+    return {};
   }
-  const [, rawAmount = "", rawUnit = ""] = match;
-  const unit = SIZE_UNITS.find((candidate) =>
-    LOCALE_ORDER.some(
-      (locale) => UNIT_LABEL[candidate][locale].toLowerCase() === rawUnit.toLowerCase(),
-    ),
-  );
-  return unit === undefined ? null : { amount: rawAmount.replace(",", "."), unit };
+  return size.color === "" ? { size: size.size } : { size: size.size, color: size.color };
 }
 
-/** The size fields, when both are filled. Null when the variant has no size. */
-function variantSize(variant: VariantDraft): { amount: string; unit: SizeUnit } | null {
-  const amount = variant.sizeAmount.trim();
-  return amount.length === 0 || variant.sizeUnit === ""
-    ? null
-    : { amount, unit: variant.sizeUnit };
+/** The size fields, when a size is typed. Null when the variant has no size. */
+function variantSize(variant: VariantDraft): VariantSize | null {
+  const size = variant.size.trim();
+  return size.length === 0 ? null : { size, color: variant.color.trim() };
 }
 
 /**
@@ -2886,10 +2714,8 @@ function buildVariantName(
   if (size !== null) {
     // A size OVERRIDES the carried name, because the operator just typed it and
     // the carried value is whatever was stored before they did.
-    return {
-      es: buildSizeLabel(size.amount, size.unit, "es"),
-      en: buildSizeLabel(size.amount, size.unit, "en"),
-    };
+    const label = sizeLabel(size);
+    return { es: label, en: label };
   }
   const name: Partial<Record<Locale, string>> = {};
   if (variant.nameEs.trim().length > 0) {
@@ -2921,9 +2747,6 @@ export function toFormValues(
       listed: true,
       currency,
       kind: initialKind ?? "SIMPLE",
-      form: "LYOPHILIZED",
-      // Hidden until someone decides otherwise, matching the column default.
-      showCoa: false,
       packComponents: [],
       addOns: [],
       categoryIds: [],
@@ -2952,8 +2775,6 @@ export function toFormValues(
     // An EXISTING row's own kind always wins over `initialKind` — that hint is
     // only ever meaningful before the first save.
     kind: product.kind,
-    form: product.form,
-    showCoa: product.showCoa,
     // Already ordered by the edge's `sortOrder`, same as `addOns` below.
     packComponents: product.packComponents.map((ref) => ({
       id: ref.id,
@@ -2984,11 +2805,12 @@ export function toFormValues(
       sku: variant.sku,
       nameEs: variant.name?.es ?? "",
       nameEn: variant.name?.en ?? "",
-      // Read the size back out of the stored name when it is one. A name that is
-      // not a size ("Pack de inicio") leaves these blank and keeps being carried
-      // by `buildVariantName`, so an untouched save cannot erase it.
-      sizeAmount: parseSizeLabel(variant.name?.en ?? variant.name?.es ?? "")?.amount ?? "",
-      sizeUnit: parseSizeLabel(variant.name?.en ?? variant.name?.es ?? "")?.unit ?? "",
+      // Read size and colour back from the variant's OPTIONS, the structured
+      // source the name was built from. A variant with no `size` option (a name
+      // like "Pack de inicio") leaves these blank and its name keeps being
+      // carried by `buildVariantName`, so an untouched save cannot erase it.
+      size: variant.options["size"] ?? "",
+      color: variant.options["size"] === undefined ? "" : (variant.options["color"] ?? ""),
       // Round-trips exactly: formatMinorAsInput is the inverse of
       // parseMajorUnitInput, pinned by a property test in money-input.test.ts.
       // Saving an untouched form must not change the price by a cent.
@@ -3029,8 +2851,8 @@ function emptyVariant(): VariantDraft {
     sku: "",
     nameEs: "",
     nameEn: "",
-    sizeAmount: "",
-    sizeUnit: "",
+    size: "",
+    color: "",
     priceGross: "",
     compareAtGross: "",
     weightGrams: "",

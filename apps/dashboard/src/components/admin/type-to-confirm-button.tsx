@@ -44,7 +44,7 @@ export interface TypeToConfirmButtonProps {
   /** What actually happens, in the operator's language. */
   readonly body: ReactNode;
   /**
-   * The typed-confirmation instruction, e.g. "Escribe bpc-157 para confirmar".
+   * The typed-confirmation instruction, e.g. "Escribe hoodie-kumo para confirmar".
    *
    * A ReactNode rather than a string because the phrase inside it is rendered
    * monospaced, and because a translated version needs `t.rich` to place that

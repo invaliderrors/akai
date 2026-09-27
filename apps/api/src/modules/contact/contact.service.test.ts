@@ -233,8 +233,8 @@ describe("ContactService.submit", () => {
 
 describe("deriveSubject", () => {
   it("uses the first line, which is a better queue handle than a constant", () => {
-    expect(deriveSubject("Batch purity question\nDetails follow.")).toBe(
-      "Batch purity question",
+    expect(deriveSubject("Sizing question\nDetails follow.")).toBe(
+      "Sizing question",
     );
   });
 

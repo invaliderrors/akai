@@ -16,19 +16,19 @@ const POST_ID = "3f2504e0-4f89-41d3-9a0c-0305e82c3301";
 
 const ES = {
   locale: "es",
-  title: "  Qué es BPC-157  ",
+  title: "  Cómo combinar un oversize  ",
   excerpt: "Una introducción.",
   bodyHtml: "<p>Cuerpo</p>",
 };
 
 describe("createBlogPostSchema", () => {
-  const valid = { slug: "que-es-bpc-157", category: "PEPTIDES", translations: [ES] };
+  const valid = { slug: "como-combinar-un-oversize", category: "STYLE_GUIDES", translations: [ES] };
 
   it("accepts a Spanish-only post (D8c) and trims its copy", () => {
     const parsed = createBlogPostSchema.parse(valid);
 
     expect(parsed.translations).toHaveLength(1);
-    expect(parsed.translations[0]?.title).toBe("Qué es BPC-157");
+    expect(parsed.translations[0]?.title).toBe("Cómo combinar un oversize");
     expect(parsed.translations[0]?.metaTitle).toBeNull();
     expect(parsed.translations[0]?.coverAlt).toBe("");
   });
@@ -103,8 +103,8 @@ describe("list and detail queries", () => {
 describe("public shapes", () => {
   const summary = {
     id: POST_ID,
-    slug: "que-es-bpc-157",
-    category: "PEPTIDES",
+    slug: "como-combinar-un-oversize",
+    category: "STYLE_GUIDES",
     publishedAt: "2026-09-24T10:00:00.000Z",
     coverUrl: null,
     translations: [{ locale: "es", title: "T", excerpt: "E", coverAlt: "" }],

@@ -422,7 +422,7 @@ export function toBlogFormValues(post: AdminBlogPost | undefined): BlogFormValue
   if (post === undefined) {
     return {
       slug: "",
-      category: "PEPTIDES",
+      category: "STYLE_GUIDES",
       includeEnglish: false,
       copy: { es: EMPTY_BLOG_COPY, en: EMPTY_BLOG_COPY },
     };

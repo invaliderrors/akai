@@ -350,7 +350,7 @@ export interface TextFieldProps {
   readonly error?: string;
   /** Client-side rule. Runs from the first blur onward. Returns a translated message. */
   readonly validate?: (value: string) => string | undefined;
-  /** Identifiers only — order numbers, SKUs, lot codes, request ids. NEVER money. */
+  /** Identifiers only — order numbers, SKUs, tracking numbers, request ids. NEVER money. */
   readonly mono?: boolean;
   /** Sits inside the ring: a copy button on a read-only value, "Change" on a file. */
   readonly trailing?: ReactNode;

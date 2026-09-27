@@ -177,7 +177,7 @@ export class DeeplTranslationGateway implements TranslationPort {
           source_lang: SOURCE_LANG[request.source],
           target_lang: TARGET_LANG[request.target],
           // Product copy carries deliberate line breaks and unit strings
-          // ("10 mg"); DeepL's default formatting correction moves
+          // ("70 cm", "100% cotton"); DeepL's default formatting correction moves
           // sentence-final punctuation around, which reads as corruption in a
           // spec table.
           preserve_formatting: true,

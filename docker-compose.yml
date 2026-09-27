@@ -69,7 +69,8 @@ services:
       MP_SMTP_AUTH_ALLOW_INSECURE: 1
 
   minio:
-    # S3-compatible object storage for product media and COA documents.
+    # S3-compatible object storage for product media and private documents
+    # (Sendcloud shipping labels).
     # Matches S3_ENDPOINT in .env.example.
     image: minio/minio:latest
     container_name: akai-minio
@@ -108,9 +109,9 @@ services:
       mc alias set local http://minio:9000 akaidev akaidev-secret &&
       mc mb --ignore-existing local/akai-media &&
       mc anonymous set download local/akai-media &&
-      mc mb --ignore-existing local/akai-coa &&
+      mc mb --ignore-existing local/akai-private &&
       echo 'bucket akai-media ready' &&
-      echo 'bucket akai-coa ready (private — no anonymous policy set, on purpose: certificates of analysis are read through a signed URL, never a bare path)'
+      echo 'bucket akai-private ready (private — no anonymous policy set, on purpose: shipping labels are read through a signed URL, never a bare path)'
       "
 
   # ===========================================================================

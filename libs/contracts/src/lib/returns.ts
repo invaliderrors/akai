@@ -7,8 +7,8 @@ import { returnStatusSchema as statusSchema, type ReturnStatus } from "./enums";
  *
  * THE MODEL IS WHOLE-ORDER, NOT PER-LINE, and that is the schema's existing
  * shape rather than a simplification made here: `return_request` has a reason and
- * a status and no line items. For supplements that is defensible — a sealed-tub
- * policy is all-or-nothing far more often than partial — and inventing a
+ * a status and no line items. For a small clothing shop that is a reasonable
+ * starting point — most returns are handled as one parcel — and inventing a
  * `ReturnItem` table to model something the business may not do would be
  * speculative.
  *

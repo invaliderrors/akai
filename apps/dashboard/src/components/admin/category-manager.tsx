@@ -28,9 +28,8 @@ import type { ActionResult } from "@/lib/admin/actions";
  * does.
  *
  * LOCAL STATE IS THE SOURCE OF TRUTH AFTER EVERY WRITE, not a
- * `router.refresh()` the way `batch-coa-field.tsx` uses. That works there
- * because the field reads its one `batch` prop straight from the server; this
- * component holds a REORDERABLE COPY of the list (`rows`), and `useState`
+ * `router.refresh()`. A refresh works for a field that reads one prop straight
+ * from the server; this component holds a REORDERABLE COPY of the list (`rows`), and `useState`
  * only reads its initial value once — a later prop change from a refresh
  * would not reach it. So create, rename and delete each patch `rows`
  * themselves, deterministically, and never depend on Next re-rendering the

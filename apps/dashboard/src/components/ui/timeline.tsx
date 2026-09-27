@@ -178,7 +178,7 @@ function TimelineItem({ entry, hasRail, visibility }: TimelineItemProps) {
 
           {/*
             NOT MONO, though the artboard draws it so. Mono in this system is
-            for IDENTIFIERS — order numbers, SKUs, lot codes, request ids —
+            for IDENTIFIERS — order numbers, SKUs, tracking numbers, request ids —
             things compared character by character; a timestamp is compared by
             position in a column, and `tabular-nums` on the sans face gives the
             digits a common width without making every event read as code. Same

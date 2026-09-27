@@ -47,7 +47,7 @@ interface ColumnSpec {
 
 /**
  * MONEY IS NOT MONO. `identifier` is the only kind that takes the mono face,
- * and it takes it because an order number, a SKU or a lot code is compared
+ * and it takes it because an order number, a SKU or a tracking number is compared
  * character by character against something printed on a label, where B/8 and
  * 0/O must not be a coin toss. An amount is read as a magnitude, so it stays on
  * the sans face with tabular figures and right alignment, which is what

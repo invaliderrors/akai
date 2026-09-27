@@ -83,34 +83,6 @@
         "cwd": ".",
         "command": "tsx --tsconfig apps/api/tsconfig.app.json apps/api/src/seed/seed-shipping.ts"
       }
-    },
-    "seed-shipping-2026-09-19": {
-      "executor": "nx:run-commands",
-      "options": {
-        "cwd": ".",
-        "command": "tsx --tsconfig apps/api/tsconfig.app.json apps/api/src/seed/seed-shipping-2026-09-19.ts"
-      }
-    },
-    "seed-shipping-2026-09-24": {
-      "executor": "nx:run-commands",
-      "options": {
-        "cwd": ".",
-        "command": "tsx --tsconfig apps/api/tsconfig.app.json apps/api/src/seed/seed-shipping-2026-09-24.ts"
-      }
-    },
-    "seed-shipping-sendcloud-2026-09-24": {
-      "executor": "nx:run-commands",
-      "options": {
-        "cwd": ".",
-        "command": "tsx --tsconfig apps/api/tsconfig.app.json apps/api/src/seed/seed-shipping-sendcloud-2026-09-24.ts"
-      }
-    },
-    "seed-shipping-ups-2026-09-25": {
-      "executor": "nx:run-commands",
-      "options": {
-        "cwd": ".",
-        "command": "tsx --tsconfig apps/api/tsconfig.app.json apps/api/src/seed/seed-shipping-ups-2026-09-25.ts"
-      }
     }
   }
 }

@@ -42,7 +42,7 @@ const blog = esMessages.admin.blog;
 function buildPost(overrides: Record<string, unknown> = {}): AdminBlogPost {
   return adminBlogPostSchema.parse({
     id: POST_ID,
-    slug: "que-es-bpc-157",
+    slug: "como-combinar-un-oversize",
     status: "DRAFT",
     category: "NEWS",
     publishedAt: null,
@@ -54,7 +54,7 @@ function buildPost(overrides: Record<string, unknown> = {}): AdminBlogPost {
     translations: [
       {
         locale: "es",
-        title: "Qué es BPC-157",
+        title: "Qué es Hoodie Kumo",
         excerpt: "Resumen",
         bodyHtml: "<p>Hola</p>",
         metaTitle: null,
@@ -91,8 +91,8 @@ beforeEach(() => {
 
 describe("buildBlogPostPayload", () => {
   const values = {
-    slug: "que-es-bpc-157",
-    category: "PEPTIDES" as const,
+    slug: "como-combinar-un-oversize",
+    category: "STYLE_GUIDES" as const,
     includeEnglish: false,
     copy: {
       es: { ...EMPTY_BLOG_COPY, title: " Título ", excerpt: "Resumen", bodyHtml: "<p>x</p>" },
@@ -107,8 +107,8 @@ describe("buildBlogPostPayload", () => {
       ok: true,
       mode: "create",
       value: {
-        slug: "que-es-bpc-157",
-        category: "PEPTIDES",
+        slug: "como-combinar-un-oversize",
+        category: "STYLE_GUIDES",
         translations: [
           {
             locale: "es",
@@ -163,14 +163,14 @@ describe("<BlogPostEditor /> — create", () => {
     renderEditor();
 
     expect(screen.getByText(blog.form.coverAfterCreate)).toBeInTheDocument();
-    await user.type(field("slug"), "que-es-bpc-157");
+    await user.type(field("slug"), "como-combinar-un-oversize");
     await user.type(field("es-title"), "Título");
     await user.type(field("es-excerpt"), "Resumen");
     await user.type(field("es-body"), "Hola");
     await user.click(screen.getByRole("button", { name: blog.form.submitCreate }));
 
     expect(createBlogPostAction).toHaveBeenCalledWith(
-      expect.objectContaining({ slug: "que-es-bpc-157", category: "PEPTIDES" }),
+      expect.objectContaining({ slug: "como-combinar-un-oversize", category: "STYLE_GUIDES" }),
     );
     expect(push).toHaveBeenCalledWith(`/admin/blog/${POST_ID}`);
   });
@@ -229,7 +229,7 @@ describe("<BlogPostEditor /> — English and translation", () => {
   it("prefills English from Spanish, flags it as machine-translated, and never saves", async () => {
     translateBlogCopyAction.mockResolvedValue({
       ok: true,
-      data: { ...EMPTY_BLOG_COPY, title: "What is BPC-157", excerpt: "Summary", bodyHtml: "<p>Hi</p>" },
+      data: { ...EMPTY_BLOG_COPY, title: "What is Hoodie Kumo", excerpt: "Summary", bodyHtml: "<p>Hi</p>" },
     });
     const user = userEvent.setup();
     renderEditor(buildPost());
@@ -241,7 +241,7 @@ describe("<BlogPostEditor /> — English and translation", () => {
     expect(translateBlogCopyAction).toHaveBeenCalledWith(
       expect.objectContaining({ from: "es", to: "en" }),
     );
-    expect(field("en-title")).toHaveValue("What is BPC-157");
+    expect(field("en-title")).toHaveValue("What is Hoodie Kumo");
     expect(english.getByText(blog.machineTranslated)).toBeInTheDocument();
     expect(updateBlogPostAction).not.toHaveBeenCalled();
   });
@@ -284,13 +284,15 @@ describe("<BlogPostEditor /> — English and translation", () => {
 describe("messages", () => {
   it("labels every blog category in both dashboards languages (D8b)", () => {
     expect(esMessages.admin.blog.categories).toEqual({
-      PEPTIDES: "Péptidos",
-      RESEARCH_GUIDES: "Guías de investigación",
+      DROPS: "Drops",
+      LOOKBOOK: "Lookbook",
+      STYLE_GUIDES: "Guías de estilo",
       NEWS: "Noticias",
     });
     expect(enMessages.admin.blog.categories).toEqual({
-      PEPTIDES: "Peptides",
-      RESEARCH_GUIDES: "Research guides",
+      DROPS: "Drops",
+      LOOKBOOK: "Lookbook",
+      STYLE_GUIDES: "Style guides",
       NEWS: "News",
     });
   });

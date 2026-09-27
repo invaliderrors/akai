@@ -47,7 +47,7 @@ describe("escapeLikePattern", () => {
   });
 
   it("leaves ordinary search text untouched", () => {
-    expect(escapeLikePattern("creatina monohidrato")).toBe("creatina monohidrato");
+    expect(escapeLikePattern("camiseta oversize")).toBe("camiseta oversize");
   });
 });
 
@@ -71,11 +71,11 @@ describe("normaliseSearchTerm", () => {
 
 describe("buildProductPageQuery — parameterisation", () => {
   it("binds the search term rather than concatenating it into the SQL", () => {
-    const query = buildProductPageQuery(options({ search: "creatina" }));
+    const query = buildProductPageQuery(options({ search: "camiseta" }));
 
     // The value appears in the parameter list, never in the statement text.
-    expect(query.values).toContain("creatina");
-    expect(normalise(query.sql)).not.toContain("creatina");
+    expect(query.values).toContain("camiseta");
+    expect(normalise(query.sql)).not.toContain("camiseta");
   });
 
   it("binds a hostile search term instead of interpolating it", () => {
@@ -238,7 +238,7 @@ describe("buildProductPageQuery — search matching", () => {
   });
 
   it("accent-folds both sides of every comparison", () => {
-    const sql = normalise(buildProductPageQuery(options({ search: "proteína" })).sql);
+    const sql = normalise(buildProductPageQuery(options({ search: "básica" })).sql);
     expect(sql).toContain("unaccent(t.name)");
     // The bound term itself goes through unaccent before it is escaped.
     expect(sql).toContain("unaccent(s.raw)");

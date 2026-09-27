@@ -66,7 +66,7 @@ import sanitizeHtml from "sanitize-html";
  *     change grows from.
  *
  * TABLES ARE IN, and that is a judgement call worth stating: this is a
- * supplements store, and an amino-acid profile or a per-serving breakdown is a
+ * clothing store, and a size chart or a garment-measurement breakdown is a
  * table. Faking one with paragraphs would cost the semantics that make it
  * readable aloud.
  */

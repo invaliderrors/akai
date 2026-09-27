@@ -342,25 +342,25 @@ describe("setCategoriesSchema", () => {
 describe("createCategorySchema", () => {
   it("accepts a slug and both locale names", () => {
     const parsed = createCategorySchema.parse({
-      slug: "peptidos",
-      name: { es: "Péptidos", en: "Peptides" },
+      slug: "sudaderas",
+      name: { es: "Sudaderas", en: "Hoodies" },
     });
 
-    expect(parsed).toEqual({ slug: "peptidos", name: { es: "Péptidos", en: "Peptides" } });
+    expect(parsed).toEqual({ slug: "sudaderas", name: { es: "Sudaderas", en: "Hoodies" } });
   });
 
   it("rejects a name missing either locale — no half-bilingual category", () => {
     expect(
-      createCategorySchema.safeParse({ slug: "peptidos", name: { es: "Péptidos" } }).success,
+      createCategorySchema.safeParse({ slug: "sudaderas", name: { es: "Sudaderas" } }).success,
     ).toBe(false);
     expect(
-      createCategorySchema.safeParse({ slug: "peptidos", name: { en: "Peptides" } }).success,
+      createCategorySchema.safeParse({ slug: "sudaderas", name: { en: "Hoodies" } }).success,
     ).toBe(false);
   });
 
   it("rejects an empty name in either locale", () => {
     expect(
-      createCategorySchema.safeParse({ slug: "peptidos", name: { es: "", en: "Peptides" } })
+      createCategorySchema.safeParse({ slug: "sudaderas", name: { es: "", en: "Hoodies" } })
         .success,
     ).toBe(false);
   });
@@ -368,8 +368,8 @@ describe("createCategorySchema", () => {
   it("rejects an unknown field — no sortOrder, no id, at create", () => {
     expect(
       createCategorySchema.safeParse({
-        slug: "peptidos",
-        name: { es: "Péptidos", en: "Peptides" },
+        slug: "sudaderas",
+        name: { es: "Sudaderas", en: "Hoodies" },
         sortOrder: 0,
       }).success,
     ).toBe(false);
@@ -379,7 +379,7 @@ describe("createCategorySchema", () => {
     expect(
       createCategorySchema.safeParse({
         slug: "../../etc/passwd",
-        name: { es: "Péptidos", en: "Peptides" },
+        name: { es: "Sudaderas", en: "Hoodies" },
       }).success,
     ).toBe(false);
   });
@@ -455,7 +455,7 @@ describe("publicAddOnListQuerySchema", () => {
   });
 
   it("rejects the merchandising filters an add-on strip has no use for", () => {
-    expect(publicAddOnListQuerySchema.safeParse({ search: "creatina" }).success).toBe(false);
+    expect(publicAddOnListQuerySchema.safeParse({ search: "camiseta" }).success).toBe(false);
     expect(publicAddOnListQuerySchema.safeParse({ category: "recuperacion" }).success)
       .toBe(false);
     // Ordering is fixed server-side so the strip does not reshuffle between loads.

@@ -70,7 +70,6 @@ function product(id: string, variantId: string, name: string, sku: string): Prod
           lowStockThreshold: 5,
           allowBackorder: false,
         },
-        batch: null,
         image: null,
         isActive: true,
         version: 0,
@@ -105,13 +104,13 @@ describe("ProductReorderPage", () => {
         product(
           "11111111-1111-4111-8111-111111111111",
           "11111111-1111-4111-8111-111111111112",
-          "Creatina",
+          "Camiseta",
           "AK-CRE",
         ),
         product(
           "22222222-2222-4222-8222-222222222222",
           "22222222-2222-4222-8222-222222222223",
-          "Magnesio",
+          "Gorra",
           "AK-MAG",
         ),
       ],
@@ -121,8 +120,8 @@ describe("ProductReorderPage", () => {
 
     await renderReorderPage();
 
-    expect(screen.getByText("Creatina")).toBeInTheDocument();
-    expect(screen.getByText("Magnesio")).toBeInTheDocument();
+    expect(screen.getByText("Camiseta")).toBeInTheDocument();
+    expect(screen.getByText("Gorra")).toBeInTheDocument();
   });
 
   it("renders the shared error state, not an unhandled rejection, when the fetch fails", async () => {

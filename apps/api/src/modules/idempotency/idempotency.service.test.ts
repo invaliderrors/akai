@@ -95,9 +95,9 @@ function execution(
     key: overrides.key ?? "key-1",
     userId: overrides.userId ?? "admin-1",
     route: "POST /admin/products/import",
-    request: overrides.request ?? { products: [{ slug: "bpc-157" }] },
+    request: overrides.request ?? { products: [{ slug: "hoodie-kumo" }] },
     responseSchema: reportSchema,
-    handler: overrides.handler ?? (async () => ({ created: 1, slug: "bpc-157" })),
+    handler: overrides.handler ?? (async () => ({ created: 1, slug: "hoodie-kumo" })),
   };
 }
 
@@ -105,7 +105,7 @@ describe("IdempotencyService", () => {
   it("runs the handler once and replays the stored result on retry", async () => {
     const { prisma } = buildFakePrisma();
     const service = new IdempotencyService(prisma);
-    const handler = vi.fn(async () => ({ created: 1, slug: "bpc-157" }));
+    const handler = vi.fn(async () => ({ created: 1, slug: "hoodie-kumo" }));
 
     const first = await service.execute(execution({ handler }));
     const second = await service.execute(execution({ handler }));
@@ -133,7 +133,7 @@ describe("IdempotencyService", () => {
   it("treats key order in the body as irrelevant", async () => {
     const { prisma } = buildFakePrisma();
     const service = new IdempotencyService(prisma);
-    const handler = vi.fn(async () => ({ created: 1, slug: "bpc-157" }));
+    const handler = vi.fn(async () => ({ created: 1, slug: "hoodie-kumo" }));
 
     await service.execute(execution({ request: { a: 1, b: 2 }, handler }));
     const replay = await service.execute(execution({ request: { b: 2, a: 1 }, handler }));
@@ -148,7 +148,7 @@ describe("IdempotencyService", () => {
   it("scopes keys per actor, so two admins may reuse the same key value", async () => {
     const { prisma } = buildFakePrisma();
     const service = new IdempotencyService(prisma);
-    const handler = vi.fn(async () => ({ created: 1, slug: "bpc-157" }));
+    const handler = vi.fn(async () => ({ created: 1, slug: "hoodie-kumo" }));
 
     await service.execute(execution({ userId: "admin-1", handler }));
     const other = await service.execute(execution({ userId: "admin-2", handler }));
@@ -175,7 +175,7 @@ describe("IdempotencyService", () => {
     // deleting a row by hand.
     const retry = await service.execute(execution());
     expect(retry.replayed).toBe(false);
-    expect(retry.value).toEqual({ created: 1, slug: "bpc-157" });
+    expect(retry.value).toEqual({ created: 1, slug: "hoodie-kumo" });
   });
 
   it("409s a concurrent retry while the first request is still running", async () => {
@@ -191,7 +191,7 @@ describe("IdempotencyService", () => {
       execution({
         handler: async () => {
           await gate;
-          return { created: 1, slug: "bpc-157" };
+          return { created: 1, slug: "hoodie-kumo" };
         },
       }),
     );

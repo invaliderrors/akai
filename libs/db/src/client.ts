@@ -16,7 +16,6 @@ export type {
   // workaround that produces the right type today but silently diverges the
   // moment the model gains a field. Exported here so there is one name for it.
   AuthToken,
-  Batch,
   Cart,
   CartItem,
   Category,

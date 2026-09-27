@@ -49,7 +49,7 @@ export interface RefundFormProps {
  * The six members of `refundReasonSchema`, in the order an operator meets them.
  *
  * WITHDRAWAL_RIGHT IS SECOND, AND IT IS AN ADDITION TO THE ARTBOARD. It is the
- * EU 14-day right of withdrawal, which is the reason a European supplements
+ * EU 14-day right of withdrawal, which is the reason a European clothing
  * shop refunds most often, and the drawing omits it entirely.
  *
  * The drawn first option, "Cobro incorrecto del proveedor", HAS NO ENUM MEMBER

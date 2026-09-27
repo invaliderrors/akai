@@ -76,7 +76,7 @@ export type ValidateCartDto = z.infer<typeof validateCartSchema>;
  *
  * Before this existed, `prisma-cart.repository.ts` pinned Spanish for both the
  * product name and the variant name, so an English-speaking customer's basket
- * came back as "Creatina Monohidrato" and no client could ask for anything else.
+ * came back as "Camiseta Oversize" and no client could ask for anything else.
  * That is a violation of the platform's translation rule located in the API, and
  * a storefront cannot fix it by re-fetching the catalog on every cart render
  * without duplicating the whole read.

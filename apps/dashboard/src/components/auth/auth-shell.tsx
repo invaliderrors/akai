@@ -33,7 +33,7 @@ export async function AuthShell({ eyebrow, title, lede, children, footer }: Auth
           <div className="auth__brand-mark">{tc("brand")}</div>
           <p className="auth__brand-line">{t("brandTagline")}</p>
         </div>
-        <div className="auth__brand-foot">ISO 9001 · HPLC ≥ 99% · EU</div>
+        <div className="auth__brand-foot">Tokyo · Madrid · EU</div>
       </aside>
 
       <main className="auth__panel">

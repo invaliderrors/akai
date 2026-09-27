@@ -16,7 +16,6 @@ import { AdminModule } from "./modules/admin/admin.module";
 import { AffiliatesModule } from "./modules/affiliates/affiliates.module";
 import { AuditModule } from "./modules/audit/audit.module";
 import { AuthModule } from "./modules/auth/auth.module";
-import { BatchesModule } from "./modules/batches/batches.module";
 import { BlogModule } from "./modules/blog/blog.module";
 import { CartModule } from "./modules/cart/cart.module";
 import { CatalogModule } from "./modules/catalog/catalog.module";
@@ -90,7 +89,6 @@ import { UsersModule } from "./modules/users/users.module";
     CatalogModule,
     CategoriesModule,
     MediaModule,
-    BatchesModule,
     PricingModule,
     InventoryModule,
 

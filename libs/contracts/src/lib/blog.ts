@@ -19,7 +19,7 @@ import { idSchema, isoDateTimeSchema, localeSchema, paginatedSchema, slugSchema 
  */
 
 /** D8b. Mirrors the `BlogCategory` Prisma enum member-for-member. */
-export const blogCategorySchema = z.enum(["PEPTIDES", "RESEARCH_GUIDES", "NEWS"]);
+export const blogCategorySchema = z.enum(["DROPS", "LOOKBOOK", "STYLE_GUIDES", "NEWS"]);
 export type BlogCategory = z.infer<typeof blogCategorySchema>;
 
 /** Mirrors the `BlogPostStatus` Prisma enum. */

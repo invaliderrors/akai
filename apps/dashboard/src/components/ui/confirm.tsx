@@ -430,7 +430,7 @@ export function ConfirmAlert({
 /**
  * What the operator has to retype, and therefore how it is set.
  *
- * `identifier` is a slug, an order number or a lot code — mono, because that is
+ * `identifier` is a slug, an order number or a tracking number — mono, because that is
  * what mono is for in this product. `amount` is money, which the repo rule says
  * is NEVER mono: it takes the sans face with tabular figures so the digits line
  * up against the ledger row directly above them.

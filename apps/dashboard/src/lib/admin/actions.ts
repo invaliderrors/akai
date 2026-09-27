@@ -458,7 +458,7 @@ export async function setVariantInventoryPolicyAction(
  *
  * IT PREFILLS; IT NEVER SAVES. Nothing in this function writes a product row.
  * The operator reads what came back, edits it, and saves deliberately — a
- * machine translation of EU food-supplement copy going live unreviewed is a
+ * machine translation of customer-facing copy going live unreviewed is a
  * compliance problem, not a convenience, and the form marks the filled fields
  * as unreviewed until a human touches them.
  */
@@ -768,111 +768,6 @@ export async function removeProductMediaAction(
     const http = await adminHttp();
     await api.removeProductMedia(http, productId, mediaId);
     return { id: productId };
-  });
-
-  if (result.ok) {
-    revalidatePath(`/admin/products/${productId}`);
-  }
-  return result;
-}
-
-// ---------------------------------------------------------------------------
-// Batches / certificate of analysis
-// ---------------------------------------------------------------------------
-
-/** Records a new lot for a variant. Does not touch its COA — see the two below. */
-export async function createBatchAction(
-  productId: string,
-  variantId: string,
-  input: api.CreateBatchInput,
-): Promise<ActionResult<Awaited<ReturnType<typeof api.createBatch>>>> {
-  const result = await run(async () => {
-    const http = await adminHttp();
-    return api.createBatch(http, variantId, input);
-  });
-
-  if (result.ok) {
-    revalidatePath(`/admin/products/${productId}`);
-  }
-  return result;
-}
-
-/**
- * Issues the signed URL the browser PUTs the COA PDF to directly.
- *
- * Same reasoning as `createMediaUploadUrlAction`: presigning needs the admin
- * bearer, so it runs server-side; the signed URL it hands back carries its own
- * authority and a ten-minute expiry, so returning it to the browser is safe.
- */
-export async function createCoaUploadUrlAction(
-  batchId: string,
-  input: { sizeBytes: number },
-): Promise<ActionResult<Awaited<ReturnType<typeof api.createCoaUploadUrl>>>> {
-  return run(async () => {
-    const http = await adminHttp();
-    return api.createCoaUploadUrl(http, batchId, input);
-  });
-}
-
-/**
- * Records that a COA upload succeeded. Separate from the upload for the same
- * reason `addProductMediaAction` is: the bytes are already in storage by the
- * time this runs, so a failure here orphans an object rather than corrupting
- * the batch record.
- */
-export async function attachCoaAction(
-  productId: string,
-  batchId: string,
-  input: { objectKey: string },
-): Promise<ActionResult<Awaited<ReturnType<typeof api.attachCoa>>>> {
-  const result = await run(async () => {
-    const http = await adminHttp();
-    return api.attachCoa(http, batchId, input);
-  });
-
-  if (result.ok) {
-    revalidatePath(`/admin/products/${productId}`);
-  }
-  return result;
-}
-
-/**
- * The PRODUCT's certificate: presign, confirm, remove. Same split and the
- * same reasoning as the batch pair above. The storefront purge is the API's
- * job (each write enqueues it in the same transaction); this only refreshes
- * the dashboard's own product page so the "view" link is re-signed.
- */
-export async function createProductCoaUploadUrlAction(
-  productId: string,
-  input: { sizeBytes: number },
-): Promise<ActionResult<Awaited<ReturnType<typeof api.createProductCoaUploadUrl>>>> {
-  return run(async () => {
-    const http = await adminHttp();
-    return api.createProductCoaUploadUrl(http, productId, input);
-  });
-}
-
-export async function attachProductCoaAction(
-  productId: string,
-  input: { objectKey: string },
-): Promise<ActionResult<Awaited<ReturnType<typeof api.attachProductCoa>>>> {
-  const result = await run(async () => {
-    const http = await adminHttp();
-    return api.attachProductCoa(http, productId, input);
-  });
-
-  if (result.ok) {
-    revalidatePath(`/admin/products/${productId}`);
-  }
-  return result;
-}
-
-export async function removeProductCoaAction(
-  productId: string,
-): Promise<ActionResult<Awaited<ReturnType<typeof api.removeProductCoa>>>> {
-  const result = await run(async () => {
-    const http = await adminHttp();
-    return api.removeProductCoa(http, productId);
   });
 
   if (result.ok) {

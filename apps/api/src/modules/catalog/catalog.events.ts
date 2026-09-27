@@ -58,22 +58,6 @@ export const CATALOG_TOPICS = {
   categoryUpdated: "catalog.category.updated",
   categoryReordered: "catalog.category.reordered",
   categoryDeleted: "catalog.category.deleted",
-  /**
-   * Written by `BatchesService`, not `ProductsService`. Lot records and their
-   * certificates are ADMIN data now — the storefront's purity claim is fixed
-   * and the certificate it offers is the product's — so these purges are
-   * precautionary rather than load-bearing. Reasons only — never topics.
-   */
-  batchRecorded: "catalog.batch.recorded",
-  batchCoaAttached: "catalog.batch.coa_attached",
-  /**
-   * The PRODUCT's certificate of analysis was uploaded/replaced, or removed.
-   * Each flips the page's "Ver certificado de análisis" button (when the
-   * admin's `showCoa` switch is on). Toggling `showCoa` itself is an ordinary
-   * product update and purges as `productUpdated`.
-   */
-  productCoaAttached: "catalog.product.coa_attached",
-  productCoaRemoved: "catalog.product.coa_removed",
 } as const;
 
 export type CatalogTopic = (typeof CATALOG_TOPICS)[keyof typeof CATALOG_TOPICS];

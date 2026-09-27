@@ -47,8 +47,8 @@ function buildOrder(overrides: Record<string, unknown> = {}): Record<string, unk
     customer: { firstName: "Marta" },
     items: [
       {
-        productName: "BPC-157",
-        variantName: "5mg",
+        productName: "Hoodie Kumo",
+        variantName: "S",
         quantity: 2,
         unitPriceGross: 2224,
         lineTotalGross: 4449,
@@ -278,7 +278,7 @@ describe("EmailOutboxHandler — per-parcel dedupe scope", () => {
           orderUrl: "https://dash.akai.test/orders/AK-2026-000123",
           lines: [
             {
-              name: "BPC-157",
+              name: "Hoodie Kumo",
               quantity: 1,
               unitPrice: { amount: 2224, currency: "EUR" },
               lineTotal: { amount: 2224, currency: "EUR" },

@@ -119,7 +119,7 @@ function variantBody() {
   return {
     id: "11111111-1111-4111-8111-111111111111",
     productId: "22222222-2222-4222-8222-222222222222",
-    sku: "AK-BPC-10",
+    sku: "AK-HOOD-M",
     name: null,
     options: {},
     price: {
@@ -139,7 +139,6 @@ function variantBody() {
       lowStockThreshold: 5,
       allowBackorder: false,
     },
-    batch: null,
     image: null,
     isActive: true,
     version: 0,
@@ -150,11 +149,11 @@ function variantBody() {
 function productBody() {
   return {
     id: "22222222-2222-4222-8222-222222222222",
-    slug: "bpc-157",
+    slug: "hoodie-kumo",
     status: "ACTIVE",
     taxClass: "STANDARD",
     translations: [
-      { locale: "es", name: "BPC-157", shortDescription: "Péptido", description: "" },
+      { locale: "es", name: "Hoodie Kumo", shortDescription: "Sudadera", description: "" },
     ],
     variants: [variantBody()],
     media: [],
@@ -169,9 +168,9 @@ function productBody() {
 /** A minimal, genuinely valid create/update input — only the header handling is under test. */
 function productInput() {
   return createProductSchema.parse({
-    slug: "bpc-157",
-    translations: [{ locale: "es", name: "BPC-157", shortDescription: "Péptido", description: "" }],
-    variants: [{ sku: "AK-BPC-10", priceGross: 4999, currency: "EUR" }],
+    slug: "hoodie-kumo",
+    translations: [{ locale: "es", name: "Hoodie Kumo", shortDescription: "Sudadera", description: "" }],
+    variants: [{ sku: "AK-HOOD-M", priceGross: 4999, currency: "EUR" }],
   });
 }
 
@@ -194,8 +193,8 @@ describe("translateProductCopyAction", () => {
       status: 200,
       body: {
         translations: [
-          { key: "name", text: "BPC-157" },
-          { key: "shortDescription", text: "Peptide" },
+          { key: "name", text: "Hoodie Kumo" },
+          { key: "shortDescription", text: "Hoodie" },
         ],
       },
     });
@@ -203,14 +202,14 @@ describe("translateProductCopyAction", () => {
     const result = await translateProductCopyAction({
       from: "es",
       to: "en",
-      copy: { name: "BPC-157", shortDescription: "Péptido", description: "" },
+      copy: { name: "Hoodie Kumo", shortDescription: "Sudadera", description: "" },
     });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.data).toEqual({
-      name: "BPC-157",
-      shortDescription: "Peptide",
+      name: "Hoodie Kumo",
+      shortDescription: "Hoodie",
       // Not sent, so not translated, so blank — never the Spanish source text.
       description: "",
     });
@@ -222,8 +221,8 @@ describe("translateProductCopyAction", () => {
       source: "es",
       target: "en",
       texts: [
-        { key: "name", text: "BPC-157" },
-        { key: "shortDescription", text: "Péptido" },
+        { key: "name", text: "Hoodie Kumo" },
+        { key: "shortDescription", text: "Sudadera" },
       ],
     });
   });
@@ -245,7 +244,7 @@ describe("translateProductCopyAction", () => {
     const result = await translateProductCopyAction({
       from: "en",
       to: "en",
-      copy: { name: "BPC-157", shortDescription: "", description: "" },
+      copy: { name: "Hoodie Kumo", shortDescription: "", description: "" },
     });
 
     expect(result.ok).toBe(false);
@@ -258,7 +257,7 @@ describe("translateProductCopyAction", () => {
     const result = await translateProductCopyAction({
       from: "es",
       to: "en",
-      copy: { name: "BPC-157", shortDescription: "", description: "" },
+      copy: { name: "Hoodie Kumo", shortDescription: "", description: "" },
       saveImmediately: true,
     });
 
@@ -274,7 +273,7 @@ describe("translateProductCopyAction", () => {
     const result = await translateProductCopyAction({
       from: "es",
       to: "en",
-      copy: { name: "BPC-157", shortDescription: "", description: "" },
+      copy: { name: "Hoodie Kumo", shortDescription: "", description: "" },
     });
 
     expect(result.ok).toBe(false);
@@ -292,7 +291,7 @@ describe("translateProductCopyAction", () => {
     const result = await translateProductCopyAction({
       from: "es",
       to: "en",
-      copy: { name: "BPC-157", shortDescription: "", description: "" },
+      copy: { name: "Hoodie Kumo", shortDescription: "", description: "" },
     });
 
     expect(result.ok).toBe(false);
@@ -310,7 +309,7 @@ describe("translateProductCopyAction", () => {
     const result = await translateProductCopyAction({
       from: "es",
       to: "en",
-      copy: { name: "BPC-157", shortDescription: "", description: "" },
+      copy: { name: "Hoodie Kumo", shortDescription: "", description: "" },
     });
 
     expect(result.ok).toBe(false);
@@ -445,20 +444,20 @@ describe("createCategoryAction", () => {
       status: 201,
       body: {
         id: "11111111-1111-4111-8111-111111111111",
-        slug: "peptidos",
-        name: { es: "Péptidos", en: "Peptides" },
+        slug: "sudaderas",
+        name: { es: "Sudaderas", en: "Hoodies" },
         sortOrder: 4,
       },
     });
 
     const result = await createCategoryAction({
-      slug: "peptidos",
-      name: { es: "Péptidos", en: "Peptides" },
+      slug: "sudaderas",
+      name: { es: "Sudaderas", en: "Hoodies" },
     });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.data.slug).toBe("peptidos");
+    expect(result.data.slug).toBe("sudaderas");
     expect(calls[0]?.method).toBe("POST");
     expect(calls[0]?.path).toBe("/admin/categories");
   });
@@ -739,14 +738,14 @@ describe("addVariantAction", () => {
     respond = () => ({ status: 201, body: variantBody() });
 
     const result = await addVariantAction("22222222-2222-4222-8222-222222222222", {
-      sku: "AK-BPC-10",
+      sku: "AK-HOOD-M",
       priceGross: 4999,
       currency: "EUR",
     });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.data).toEqual({ id: variantBody().id, sku: "AK-BPC-10" });
+    expect(result.data).toEqual({ id: variantBody().id, sku: "AK-HOOD-M" });
     expect(calls[0]?.path).toBe(
       "/admin/products/22222222-2222-4222-8222-222222222222/variants",
     );

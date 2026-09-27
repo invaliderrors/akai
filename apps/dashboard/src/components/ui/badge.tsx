@@ -3,7 +3,7 @@ import type { BadgeTone } from "@/lib/status";
 import { Icon } from "./icon";
 
 /**
- * The three read-only capsules: a status `Badge`, a `Counter` and a `LotChip`.
+ * The read-only capsules: a status `Badge` and a `Counter`.
  *
  * COLOUR IS NEVER THE SIGNAL. Every badge carries its own text, so the state
  * survives greyscale, colour blindness and a photocopied packing slip
@@ -187,71 +187,6 @@ export function Counter({ count, label, tone = "neutral", density = "comfortable
           the caller, which is where a grouped thousands separator belongs. */}
       <span aria-hidden="true">{count}</span>
       <span className="sr-only">{label}</span>
-    </span>
-  );
-}
-
-/**
- * `match` is the lot code a search just answered; `reference` is a lot code
- * merely being cited. Solid accent for the first, accent tint for the second —
- * the same relationship as a highlighted search term to body text.
- */
-export type LotChipVariant = "reference" | "match";
-
-const LOT_VARIANT: Readonly<Record<LotChipVariant, string>> = {
-  reference: "bg-[var(--accent-tint)] text-[var(--accent-ink)]",
-  match: "bg-[var(--accent)] text-[var(--label-on-accent)]",
-};
-
-export interface LotChipProps {
-  /** The batch lot code itself, e.g. `B-4471`. */
-  readonly code: string;
-  readonly variant?: LotChipVariant;
-  /**
-   * Already-translated word rendered inside the chip before the code — "lote"
-   * in Spanish, "lot" in English. A separate text node rather than a
-   * caller-built `"lote " + code` so nothing here concatenates translated
-   * fragments; omit it where the surrounding row already says what the code is.
-   */
-  readonly prefix?: string;
-  readonly className?: string;
-}
-
-/**
- * A batch lot code.
- *
- * Mono at 12px, which is the rule for identifiers and only identifiers: a lot
- * code is compared character by character against a physical tub, and a
- * proportional face makes B/8 and 0/O a coin toss. Money is NOT mono — it gets
- * the sans face with tabular figures.
- *
- * `--r-check` (4px), not `--r-pill`: a pill is a state you read, and this is a
- * value you copy. It is also fixed across densities, where `--r-control` is
- * not, so an inline chip does not turn into a lozenge in the customer area.
- *
- * Not a link, though the artboard draws one: whether a lot code is clickable
- * depends on whether lot search exists on that surface, so the caller wraps it
- * in a `Link` from `@/i18n/navigation` when it is.
- *
- * `inline-block` and not `inline-flex`, which is what the other two capsules
- * use: a chip sits INSIDE a sentence ("×2 · lote B-4402"), so it has to sit on
- * the text baseline — and a flex container drops the whitespace text node
- * between the prefix and the code, which would leave "loteB-4402" as the string
- * a screen reader reads out.
- */
-export function LotChip({ code, variant = "reference", prefix, className }: LotChipProps) {
-  return (
-    <span
-      className={`inline-block whitespace-nowrap rounded-[var(--r-check)] px-[7px] py-[2px] font-mono text-[12px] leading-[16px] ${
-        LOT_VARIANT[variant]
-      }${className === undefined ? "" : ` ${className}`}`}
-    >
-      {prefix === undefined ? null : (
-        <>
-          {prefix}{" "}
-        </>
-      )}
-      {code}
     </span>
   );
 }

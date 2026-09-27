@@ -87,8 +87,8 @@ export function calculateTotals(input: TotalsInput): CalculatedTotals {
  * per-line discounts sum EXACTLY to the order discount. Without that, a €10.00
  * discount routinely removes €9.99 and the invoice does not foot.
  *
- * Lines can carry different tax rates (a supplement at the reduced rate beside
- * a standard-rated accessory), which is why tax cannot be computed once over
+ * Lines can carry different tax rates (a reduced-rate item beside a
+ * standard-rated hoodie), which is why tax cannot be computed once over
  * the subtotal.
  */
 function calculateTaxTotal(

@@ -58,7 +58,6 @@ const OLD_ORDER = {
       taxAmount: 210,
       lineTotalNet: 1000,
       lineTotalGross: 1210,
-      batchLotCode: null,
     },
   ],
   subtotal: 1210,

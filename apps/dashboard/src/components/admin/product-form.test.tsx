@@ -20,7 +20,6 @@ import {
   type ProductCopyDraft,
   type ProductFormMessages,
   type TranslateCopyRequest,
-  type SizeUnit,
 } from "./product-form";
 import type { AddOnCandidate } from "./add-on-picker";
 import type { PackComponentCandidate } from "./pack-components-picker";
@@ -57,7 +56,6 @@ const messages: ProductFormMessages = {
   notWholeGrams: form.fieldErrors.NOT_WHOLE_GRAMS,
   sizeRequired: "size required",
   sizeDuplicate: "size duplicate",
-  sizeNotANumber: "size not a number",
   tierQuantityInvalid: "tier quantity invalid",
   tierDuplicate: "tier duplicate",
   tierPriceTooHigh: "tier price too high",
@@ -66,14 +64,14 @@ const messages: ProductFormMessages = {
 function buildProduct(): Product {
   return {
     id: "22222222-2222-4222-8222-222222222222",
-    slug: "bpc-157",
+    slug: "hoodie-kumo",
     status: "ACTIVE",
     taxClass: "STANDARD",
     translations: [
       {
         locale: "es",
-        name: "BPC-157",
-        shortDescription: "Péptido",
+        name: "Hoodie Kumo",
+        shortDescription: "Sudadera",
         description: "Descripción",
       },
     ],
@@ -81,14 +79,14 @@ function buildProduct(): Product {
       {
         id: "11111111-1111-4111-8111-111111111111",
         productId: "22222222-2222-4222-8222-222222222222",
-        sku: "AK-BPC-10",
-        name: { es: "10 mg", en: "10 mg" },
+        sku: "AK-HOOD-M",
+        name: { es: "M / Black", en: "M / Black" },
         // CONSISTENT WITH `name`, deliberately: real stored data always sets
         // the two together (`buildPayload`'s own `options`/`name` pair, below)
         // — a fixture that left this `{}` while `name` implies a size would
         // make `classifyVariantChanges` see a changed size on every untouched
         // round-trip, which is a fixture bug, not a real one.
-        options: { size: "10 mg" },
+        options: { size: "M", color: "Black" },
         price: {
           currency: EUR,
           net: toMinor(4132),
@@ -107,7 +105,6 @@ function buildProduct(): Product {
           lowStockThreshold: 5,
           allowBackorder: false,
         },
-        batch: null,
         image: null,
         isActive: true,
         version: 3,
@@ -118,9 +115,6 @@ function buildProduct(): Product {
     addOns: [],
     kind: "SIMPLE",
     packComponents: [],
-    form: "LYOPHILIZED",
-    showCoa: false,
-    coaUrl: null,
     restrictedCountries: [],
     listed: true,
     offerOnNewProducts: false,
@@ -159,7 +153,7 @@ function withVariant(
 /** A minimal valid form state, so each test varies exactly one thing. */
 function validValues() {
   return {
-    slug: "bpc-157",
+    slug: "hoodie-kumo",
     status: "DRAFT" as const,
     taxClass: "STANDARD" as const,
     listed: true,
@@ -168,8 +162,6 @@ function validValues() {
     stackDiscountEnabled: false,
     currency: EUR,
     kind: "SIMPLE" as "SIMPLE" | "PACK",
-    form: "LYOPHILIZED" as "LYOPHILIZED" | "SOLUTION" | "CAPSULE" | "OTHER",
-    showCoa: false,
     // Annotated structurally, same reasoning as `addOns` immediately below.
     packComponents: [] as readonly { id: string; variantId: string; quantity: number }[],
     // Annotated structurally rather than via an import, exactly as
@@ -181,8 +173,8 @@ function validValues() {
     translations: [
       {
         locale: "es" as const,
-        name: "BPC-157",
-        shortDescription: "Péptido",
+        name: "Hoodie Kumo",
+        shortDescription: "Sudadera",
         description: "Descripción",
       },
       { locale: "en" as const, name: "", shortDescription: "", description: "" },
@@ -191,16 +183,14 @@ function validValues() {
       {
         key: "v1",
         version: 3,
-        sku: "AK-BPC-10",
-        nameEs: "10 mg",
-        nameEn: "10 mg",
+        sku: "AK-HOOD-M",
+        nameEs: "M / Black",
+        nameEn: "M / Black",
         // BLANK ON PURPOSE. A filled size overrides the carried name, so seeding
         // one here would quietly rewrite `nameEs`/`nameEn` for every test in the
         // file — including the one that clears them to assert a null name.
-        // Annotated for the same reason `stagedImage` is: a bare "" infers as
-        // `string`, which is not assignable to `SizeUnit | ""`.
-        sizeAmount: "",
-        sizeUnit: "" as SizeUnit | "",
+        size: "",
+        color: "",
         priceGross: "49.99",
         compareAtGross: "",
         weightGrams: "20",
@@ -395,8 +385,8 @@ describe("buildPayload", () => {
         translations: [
           {
             locale: "es",
-            name: "BPC-157",
-            shortDescription: "Péptido",
+            name: "Hoodie Kumo",
+            shortDescription: "Sudadera",
             description: '<p onclick="steal()">Perfil</p><script>alert(1)</script>',
           },
           { locale: "en", name: "", shortDescription: "", description: "" },
@@ -427,8 +417,8 @@ describe("buildPayload", () => {
         translations: [
           {
             locale: "es",
-            name: "BPC-157",
-            shortDescription: "10 < 20 mg",
+            name: "Hoodie Kumo",
+            shortDescription: "38 < 40 cm",
             description: "",
           },
           { locale: "en", name: "", shortDescription: "", description: "" },
@@ -439,7 +429,7 @@ describe("buildPayload", () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value.translations[0]?.shortDescription).toBe("10 < 20 mg");
+    expect(result.value.translations[0]?.shortDescription).toBe("38 < 40 cm");
   });
 });
 
@@ -454,11 +444,11 @@ describe("productCopySchema", () => {
    * own failure message.
    */
   it("rejects a partial payload rather than letting undefined reach an input", () => {
-    expect(productCopySchema.safeParse({ name: "BPC-157" }).success).toBe(false);
+    expect(productCopySchema.safeParse({ name: "Hoodie Kumo" }).success).toBe(false);
     expect(
       productCopySchema.safeParse({
-        name: "BPC-157",
-        shortDescription: "Peptide",
+        name: "Hoodie Kumo",
+        shortDescription: "Hoodie",
         description: 42,
       }).success,
     ).toBe(false);
@@ -466,8 +456,8 @@ describe("productCopySchema", () => {
 
   it("accepts the three fields and drops anything extra", () => {
     const parsed = productCopySchema.safeParse({
-      name: "BPC-157",
-      shortDescription: "Peptide",
+      name: "Hoodie Kumo",
+      shortDescription: "Hoodie",
       description: "Description",
       // A newer server saying more than we asked for is not a failure.
       detectedSourceLocale: "es",
@@ -477,8 +467,8 @@ describe("productCopySchema", () => {
     if (!parsed.success) return;
     const copy: ProductCopyDraft = parsed.data;
     expect(copy).toEqual({
-      name: "BPC-157",
-      shortDescription: "Peptide",
+      name: "Hoodie Kumo",
+      shortDescription: "Hoodie",
       description: "Description",
     });
   });
@@ -798,105 +788,6 @@ describe("<ProductForm /> — stack discount", () => {
   });
 });
 
-describe("spec fields — form and the certificate switch", () => {
-  it("buildPayload submits the form and the showCoa switch, and never a purity label", () => {
-    const result = buildPayload({ ...validValues(), form: "CAPSULE", showCoa: true }, messages);
-
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.value.form).toBe("CAPSULE");
-    expect(result.value.showCoa).toBe(true);
-    expect(result.value).not.toHaveProperty("purityLabel");
-  });
-
-  it("toFormValues seeds both from an existing product, and safe defaults for a new one", () => {
-    const seeded = toFormValues({ ...buildProduct(), form: "SOLUTION", showCoa: true }, EUR);
-    expect(seeded.form).toBe("SOLUTION");
-    expect(seeded.showCoa).toBe(true);
-
-    const fresh = toFormValues(undefined, EUR);
-    expect(fresh.form).toBe("LYOPHILIZED");
-    // Hidden until someone decides otherwise.
-    expect(fresh.showCoa).toBe(false);
-  });
-
-  it("no longer offers a purity field — purity is a fixed sitewide claim", () => {
-    renderForm(
-      <ProductForm
-        product={buildProduct()}
-        currency={EUR}
-        onSubmit={vi.fn(async () => {})}
-        submitLabel={form.submitSave}
-      />,
-    );
-
-    expect(screen.queryByRole("textbox", { name: /pureza/i })).not.toBeInTheDocument();
-  });
-
-  it("saves the chosen form and the 'show certificate' switch WITH the product", async () => {
-    const user = userEvent.setup();
-    const onSubmit = vi.fn<
-      (value: unknown, images: unknown, offer?: unknown, changes?: unknown) => Promise<void>
-    >(async () => {});
-
-    renderForm(
-      <ProductForm
-        product={buildProduct()}
-        currency={EUR}
-        onSubmit={onSubmit}
-        submitLabel={form.submitSave}
-      />,
-    );
-
-    await user.selectOptions(
-      screen.getByRole("combobox", { name: form.formLabel }),
-      form.formOptions.SOLUTION,
-    );
-    const toggle = screen.getByRole("checkbox", { name: esMessages.admin.productCoa.showLabel });
-    expect(toggle).not.toBeChecked();
-    await user.click(toggle);
-    // Nothing is sent on flip: the switch is a form field like any other.
-    expect(onSubmit).not.toHaveBeenCalled();
-    await user.click(screen.getByRole("button", { name: form.submitSave }));
-
-    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
-    const value = onSubmit.mock.calls[0]?.[0] as { form: string; showCoa: boolean };
-    expect(value.form).toBe("SOLUTION");
-    expect(value.showCoa).toBe(true);
-  });
-
-  it("offers the certificate upload only when the caller supplies one", () => {
-    const { unmount } = renderForm(
-      <ProductForm
-        product={buildProduct()}
-        currency={EUR}
-        onSubmit={vi.fn(async () => {})}
-        submitLabel={form.submitSave}
-      />,
-    );
-    // The section is always there (visibility is a product field); without
-    // `coaUploads` it explains why no file can be added yet.
-    expect(screen.getByText(esMessages.admin.productCoa.afterSave)).toBeInTheDocument();
-    unmount();
-
-    renderForm(
-      <ProductForm
-        product={buildProduct()}
-        currency={EUR}
-        onSubmit={vi.fn(async () => {})}
-        submitLabel={form.submitSave}
-        coaUploads={{
-          productId: buildProduct().id,
-          onRequestUpload: vi.fn(),
-          onAttach: vi.fn(),
-          onRemove: vi.fn(),
-        }}
-      />,
-    );
-    expect(screen.getByText(esMessages.admin.productCoa.dropTitle)).toBeInTheDocument();
-  });
-});
-
 describe("toFormValues", () => {
   it("round-trips an existing price without changing it by a cent", () => {
     // Load an existing product, build a payload from it untouched, and the price
@@ -988,12 +879,25 @@ describe("toFormValues", () => {
 
   it("carries a variant's per-locale name even though no input shows it", () => {
     // There is no "Nombre" cell for a variant, and saving must not erase what
-    // the form cannot display.
-    const values = toFormValues(buildProduct(), EUR);
+    // the form cannot display. A variant with no `size` option keeps its
+    // per-locale name exactly as stored.
+    const product = buildProduct();
+    const unsized: Product = {
+      ...product,
+      variants: product.variants.map((variant) => ({
+        ...variant,
+        options: {},
+        name: { es: "Edición limitada", en: "Limited edition" },
+      })),
+    };
+    const values = toFormValues(unsized, EUR);
     const rebuilt = buildPayload(values, messages);
     expect(rebuilt.ok).toBe(true);
     if (!rebuilt.ok) return;
-    expect(rebuilt.value.variants[0]?.name).toEqual({ es: "10 mg", en: "10 mg" });
+    expect(rebuilt.value.variants[0]?.name).toEqual({
+      es: "Edición limitada",
+      en: "Limited edition",
+    });
   });
 
   it("defaults stackDiscountEnabled to false for a new product", () => {
@@ -1009,11 +913,11 @@ describe("toFormValues", () => {
 
 describe("<ProductForm /> — pack components alongside add-ons", () => {
   const PACK_COMPONENT_CANDIDATES: readonly PackComponentCandidate[] = [
-    { id: "c1", slug: "creatina", name: "Creatina" },
-    { id: "c2", slug: "magnesio", name: "Magnesio" },
+    { id: "c1", slug: "camiseta", name: "Camiseta" },
+    { id: "c2", slug: "gorra", name: "Gorra" },
   ];
   const ADD_ON_CANDIDATES: readonly AddOnCandidate[] = [
-    { id: "a1", slug: "shaker", name: "Shaker" },
+    { id: "a1", slug: "sticker-pack", name: "Sticker pack" },
   ];
 
   it("shows BOTH panels for a PACK product — a pack can offer add-ons on its own page too", () => {
@@ -1165,7 +1069,7 @@ describe("classifyVariantChanges", () => {
     expect(result.updatedVariants).toEqual([
       {
         variantId: product.variants[0]?.id,
-        sku: "AK-BPC-10",
+        sku: "AK-HOOD-M",
         patch: { version: 3, priceGross: 5999 },
       },
     ]);
@@ -1179,7 +1083,7 @@ describe("classifyVariantChanges", () => {
     };
     const result = loadAndClassify(product, (values) => ({
       ...values,
-      variants: values.variants.map((variant) => ({ ...variant, sku: "AK-BPC-10-NEW" })),
+      variants: values.variants.map((variant) => ({ ...variant, sku: "AK-HOOD-M-NEW" })),
     }));
 
     expect(result.updatedVariants[0]?.patch.version).toBe(41);
@@ -1192,14 +1096,14 @@ describe("classifyVariantChanges", () => {
       ...values,
       variants: values.variants.map((variant) => ({
         ...variant,
-        sizeAmount: "20",
-        sizeUnit: "mg",
+        size: "L",
+        color: "Black",
       })),
     }));
 
     expect(result.updatedVariants[0]?.patch).toMatchObject({
-      name: { es: "20 mg", en: "20 mg" },
-      options: { size: "20 mg" },
+      name: { es: "L / Black", en: "L / Black" },
+      options: { size: "L", color: "Black" },
     });
   });
 
@@ -1277,7 +1181,7 @@ describe("classifyVariantChanges", () => {
     expect(result.inventoryPolicyChanges).toEqual([
       {
         variantId: product.variants[0]?.id,
-        sku: "AK-BPC-10",
+        sku: "AK-HOOD-M",
         policy: { lowStockThreshold: 10, allowBackorder: true },
       },
     ]);
@@ -1307,11 +1211,11 @@ describe("classifyVariantChanges", () => {
         {
           key: "new-1",
           version: 0,
-          sku: "AK-BPC-20",
+          sku: "AK-HOOD-L",
           nameEs: "",
           nameEn: "",
-          sizeAmount: "20",
-          sizeUnit: "mg" as SizeUnit,
+          size: "L",
+          color: "Black",
           priceGross: "89.99",
           compareAtGross: "",
           weightGrams: "30",
@@ -1330,7 +1234,7 @@ describe("classifyVariantChanges", () => {
     const result = classifyVariantChanges(withNewRow, product, built.value.variants);
 
     expect(result.newVariants).toHaveLength(1);
-    expect(result.newVariants[0]?.sku).toBe("AK-BPC-20");
+    expect(result.newVariants[0]?.sku).toBe("AK-HOOD-L");
     // The existing, untouched row is neither updated nor added again.
     expect(result.updatedVariants).toEqual([]);
   });
@@ -1338,12 +1242,12 @@ describe("classifyVariantChanges", () => {
 
 describe("stagedVariantImages", () => {
   it("tags each file with the SKU being submitted, trimmed exactly as the payload is", () => {
-    const values = withVariant({ sku: "  AK-BPC-20  ", stagedImage: stagedImage("vial.png") });
+    const values = withVariant({ sku: "  AK-HOOD-L  ", stagedImage: stagedImage("tee.png") });
 
     // Trimmed on both sides of the seam, so the lookup that places this file on
     // a created variant cannot miss by a stray space the operator never sees.
     expect(stagedVariantImages(values)).toEqual([
-      { sku: "AK-BPC-20", image: values.variants[0]?.stagedImage },
+      { sku: "AK-HOOD-L", image: values.variants[0]?.stagedImage },
     ]);
   });
 
@@ -1370,7 +1274,7 @@ describe("<ProductForm />", () => {
 
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
     expect(onSubmit.mock.calls[0]?.[0]).toMatchObject({
-      slug: "bpc-157",
+      slug: "hoodie-kumo",
       variants: [{ priceGross: 4999, compareAtGross: 5999 }],
     });
   });
@@ -1627,17 +1531,17 @@ describe("<ProductForm />", () => {
     ).not.toBeInTheDocument();
     await closePreview();
 
-    await user.type(screen.getByLabelText(form.descriptionLabel), "<p>Vial</p>");
+    await user.type(screen.getByLabelText(form.descriptionLabel), "<p>Tee</p>");
     await openPreview();
     await waitFor(() =>
       expect(screen.getByRole("region", { name: form.previewLabel })).toHaveTextContent(
-        "Vial",
+        "Tee",
       ),
     );
 
     // Rendered as MARKUP, not as the escaped text the field used to show.
     // SCOPED TO THE PREVIEW: the textarea legitimately still holds the literal
-    // "<p>Vial</p>" the operator typed, so a document-wide query for that string
+    // "<p>Tee</p>" the operator typed, so a document-wide query for that string
     // finds the input and proves nothing about what was drawn.
     expect(
       screen.getByRole("region", { name: form.previewLabel }).textContent,
@@ -1691,12 +1595,12 @@ describe("<ProductForm />", () => {
     );
     expect(screen.getByRole("button", { name: byIndex })).toBeInTheDocument();
 
-    await user.type(screen.getByLabelText(form.skuLabel), "AK-BPC-20");
+    await user.type(screen.getByLabelText(form.skuLabel), "AK-HOOD-L");
 
     // And once the operator has typed one, the control is named by the value
     // they typed rather than by a row number they never see again.
     expect(
-      screen.getByRole("button", { name: variantImage.add.replace("{variant}", "AK-BPC-20") }),
+      screen.getByRole("button", { name: variantImage.add.replace("{variant}", "AK-HOOD-L") }),
     ).toBeInTheDocument();
   });
 
@@ -1852,19 +1756,19 @@ describe("<ProductForm />", () => {
     // ONE name field, not two: this is the density win, and the assertion that
     // fails the day somebody re-adds the second copy card.
     expect(screen.getAllByLabelText(form.nameLabel)).toHaveLength(1);
-    expect(screen.getByLabelText(form.nameLabel)).toHaveValue("BPC-157");
+    expect(screen.getByLabelText(form.nameLabel)).toHaveValue("Hoodie Kumo");
 
     await user.click(screen.getByRole("radio", { name: ENGLISH }));
     const englishName = screen.getByLabelText(form.nameLabel);
     expect(englishName).toHaveValue("");
-    await user.type(englishName, "BPC-157 EN");
+    await user.type(englishName, "Hoodie Kumo EN");
 
     // Back to Spanish: what was typed in English must still exist, and the
     // Spanish copy must be exactly what it was.
     await user.click(screen.getByRole("radio", { name: SPANISH }));
-    expect(screen.getByLabelText(form.nameLabel)).toHaveValue("BPC-157");
+    expect(screen.getByLabelText(form.nameLabel)).toHaveValue("Hoodie Kumo");
     await user.click(screen.getByRole("radio", { name: ENGLISH }));
-    expect(screen.getByLabelText(form.nameLabel)).toHaveValue("BPC-157 EN");
+    expect(screen.getByLabelText(form.nameLabel)).toHaveValue("Hoodie Kumo EN");
   });
 
   it("counts the empty fields of the locale that is behind without switching to it", async () => {
@@ -1887,7 +1791,7 @@ describe("<ProductForm />", () => {
     expect(screen.getByText("3 campos vacíos")).toBeInTheDocument();
 
     await user.click(english);
-    await user.type(screen.getByLabelText(form.nameLabel), "BPC-157");
+    await user.type(screen.getByLabelText(form.nameLabel), "Hoodie Kumo");
     expect(screen.getByText("2 campos vacíos")).toBeInTheDocument();
   });
 
@@ -1958,8 +1862,8 @@ describe("<ProductForm />", () => {
     const user = userEvent.setup();
     const onTranslate = vi.fn<(request: TranslateCopyRequest) => Promise<ProductCopyDraft>>(
       async () => ({
-        name: "BPC-157",
-        shortDescription: "Peptide",
+        name: "Hoodie Kumo",
+        shortDescription: "Hoodie",
         description: "Description",
       }),
     );
@@ -1986,18 +1890,18 @@ describe("<ProductForm />", () => {
       from: "es",
       to: "en",
       copy: {
-        name: "BPC-157",
-        shortDescription: "Péptido",
+        name: "Hoodie Kumo",
+        shortDescription: "Sudadera",
         description: "Descripción",
       },
     });
 
-    await waitFor(() => expect(screen.getByLabelText(form.nameLabel)).toHaveValue("BPC-157"));
-    expect(screen.getByLabelText(form.summaryLabel)).toHaveValue("Peptide");
+    await waitFor(() => expect(screen.getByLabelText(form.nameLabel)).toHaveValue("Hoodie Kumo"));
+    expect(screen.getByLabelText(form.summaryLabel)).toHaveValue("Hoodie");
 
     // The source language is untouched.
     await user.click(screen.getByRole("radio", { name: SPANISH }));
-    expect(screen.getByLabelText(form.summaryLabel)).toHaveValue("Péptido");
+    expect(screen.getByLabelText(form.summaryLabel)).toHaveValue("Sudadera");
   });
 
   it("reports its own message when the translation fails", async () => {
@@ -2076,8 +1980,8 @@ describe("<ProductForm />", () => {
       translations: [
         {
           locale: "es",
-          name: "BPC-157",
-          shortDescription: "Péptido",
+          name: "Hoodie Kumo",
+          shortDescription: "Sudadera",
           description: "Descripción",
         },
         {
@@ -2171,8 +2075,8 @@ describe("<ProductForm />", () => {
         currency={EUR}
         onSubmit={async () => {}}
         onTranslate={async () => ({
-          name: "BPC-157",
-          shortDescription: "Peptide",
+          name: "Hoodie Kumo",
+          shortDescription: "Hoodie",
           description: "Description",
         })}
         submitLabel={form.submitSave}
@@ -2185,7 +2089,7 @@ describe("<ProductForm />", () => {
     );
 
     // An operator who cannot tell their own copy from a vendor's guess ships the
-    // guess — and this is EU food-supplement copy.
+    // guess — and this is the copy customers read.
     expect(await screen.findByText(form.machineTranslated)).toBeInTheDocument();
     // Said on the segment too, so it survives a switch to the other language.
     expect(
@@ -2207,8 +2111,8 @@ describe("<ProductForm />", () => {
         currency={EUR}
         onSubmit={async () => {}}
         onTranslate={async () => ({
-          name: "BPC-157",
-          shortDescription: "Peptide",
+          name: "Hoodie Kumo",
+          shortDescription: "Hoodie",
           description: "Description",
         })}
         submitLabel={form.submitSave}
@@ -2293,52 +2197,59 @@ function twoVariants(
     ...values,
     variants: [
       { ...variant, ...first },
-      { ...variant, key: "v2", sku: "AK-BPC-20", ...second },
+      { ...variant, key: "v2", sku: "AK-HOOD-L", ...second },
     ],
   };
 }
 
-describe("variant size", () => {
+describe("variant size and colour", () => {
   it("names a sized variant in BOTH locales, not just the one on screen", () => {
     // The name is what the storefront renders as the picker's label, and it
     // renders per shopper — so a save has to write both languages at once. An
     // operator editing Spanish copy cannot be asked to switch tabs to make the
     // English shop work.
-    const result = buildPayload(
-      withVariant({ sizeAmount: "5", sizeUnit: "mg" }),
-      messages,
-    );
+    const result = buildPayload(withVariant({ size: "M", color: "" }), messages);
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value.variants[0]?.name).toEqual({ es: "5 mg", en: "5 mg" });
+    expect(result.value.variants[0]?.name).toEqual({ es: "M", en: "M" });
+    expect(result.value.variants[0]?.options).toEqual({ size: "M" });
   });
 
-  it("writes the size into options, which is what keeps two variants distinct", () => {
+  it("adds the colour to both the label and the options when one is given", () => {
+    const result = buildPayload(withVariant({ size: " XL ", color: " Black " }), messages);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.variants[0]?.name).toEqual({ es: "XL / Black", en: "XL / Black" });
+    expect(result.value.variants[0]?.options).toEqual({ size: "XL", color: "Black" });
+  });
+
+  it("writes size and colour into options, which is what keeps two variants distinct", () => {
     // `product_variant_options_unique` is a UNIQUE index on (productId, options)
     // for live rows. This form used to send {} for every variant, so a second
-    // one collided and the insert failed as an opaque CONFLICT. The size is what
-    // makes the rows differ.
+    // one collided and the insert failed as an opaque CONFLICT. The size (and
+    // colour) is what makes the rows differ.
     const result = buildPayload(
-      twoVariants({ sizeAmount: "5", sizeUnit: "mg" }, { sizeAmount: "10", sizeUnit: "mg" }),
+      twoVariants({ size: "M", color: "Black" }, { size: "M", color: "White" }),
       messages,
     );
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value.variants[0]?.options).toEqual({ size: "5 mg" });
-    expect(result.value.variants[1]?.options).toEqual({ size: "10 mg" });
+    expect(result.value.variants[0]?.options).toEqual({ size: "M", color: "Black" });
+    expect(result.value.variants[1]?.options).toEqual({ size: "M", color: "White" });
   });
 
-  it("refuses two variants that share a size, in the operator's own words", () => {
+  it("refuses two variants that share a size and colour, whatever the case", () => {
     const result = buildPayload(
-      twoVariants({ sizeAmount: "5", sizeUnit: "mg" }, { sizeAmount: "5", sizeUnit: "mg" }),
+      twoVariants({ size: "M", color: "Black" }, { size: "m", color: "black" }),
       messages,
     );
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(result.errors["variants.1.sizeAmount"]).toBe(messages.sizeDuplicate);
+    expect(result.errors["variants.1.size"]).toBe(messages.sizeDuplicate);
   });
 
   it("asks for a size only once there is more than one variant", () => {
@@ -2346,7 +2257,7 @@ describe("variant size", () => {
 
     expect(many.ok).toBe(false);
     if (many.ok) return;
-    expect(many.errors["variants.0.sizeAmount"]).toBe(messages.sizeRequired);
+    expect(many.errors["variants.0.size"]).toBe(messages.sizeRequired);
 
     // A plain product has no picker to label, so demanding a size from it would
     // be the form inventing a requirement the shop does not have.
@@ -2354,25 +2265,22 @@ describe("variant size", () => {
     expect(one.ok).toBe(true);
   });
 
-  it("rejects an amount that is not a number", () => {
-    const result = buildPayload(
-      withVariant({ sizeAmount: "grande", sizeUnit: "g" }),
-      messages,
-    );
+  it("refuses a colour without a size", () => {
+    const result = buildPayload(withVariant({ size: "", color: "Black" }), messages);
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(result.errors["variants.0.sizeAmount"]).toBe(messages.sizeNotANumber);
+    expect(result.errors["variants.0.size"]).toBe(messages.sizeRequired);
   });
 
-  it("reads a stored size back into the fields", () => {
+  it("reads a stored size and colour back from the variant's options", () => {
     const values = toFormValues(buildProduct(), EUR);
 
-    expect(values.variants[0]?.sizeAmount).toBe("10");
-    expect(values.variants[0]?.sizeUnit).toBe("mg");
+    expect(values.variants[0]?.size).toBe("M");
+    expect(values.variants[0]?.color).toBe("Black");
   });
 
-  it("carries a name the size grammar cannot express, rather than erasing it", () => {
+  it("carries a name with no size option, rather than erasing it", () => {
     // The guarantee that matters on an edit: a legacy label survives a save by
     // an operator who never looked at the variant.
     const product = buildProduct();
@@ -2382,11 +2290,13 @@ describe("variant size", () => {
     }
     const legacy: Product = {
       ...product,
-      variants: [{ ...variant, name: { es: "Pack de inicio", en: "Starter pack" } }],
+      variants: [
+        { ...variant, options: {}, name: { es: "Pack de inicio", en: "Starter pack" } },
+      ],
     };
 
     const values = toFormValues(legacy, EUR);
-    expect(values.variants[0]?.sizeAmount).toBe("");
+    expect(values.variants[0]?.size).toBe("");
 
     const result = buildPayload(values, messages);
     expect(result.ok).toBe(true);
@@ -2410,14 +2320,14 @@ describe("<ProductForm /> simple-product mode", () => {
     );
 
     // A plain product is priced, not classified.
-    expect(screen.queryByLabelText(form.sizeAmountLabel)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(form.sizeLabel)).not.toBeInTheDocument();
     // …but its price and stock are reachable without expanding anything.
     expect(screen.getByLabelText(form.skuLabel)).toBeInTheDocument();
     expect(screen.getByLabelText(form.initialStockLabel)).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: form.addSizes }));
 
-    expect(screen.getByLabelText(form.sizeAmountLabel)).toBeInTheDocument();
+    expect(screen.getByLabelText(form.sizeLabel)).toBeInTheDocument();
   });
 
   it("does not count expanding the sizes as an unsaved change", async () => {
@@ -2447,6 +2357,6 @@ describe("<ProductForm /> simple-product mode", () => {
       />,
     );
 
-    expect(screen.getByLabelText(form.sizeAmountLabel)).toBeInTheDocument();
+    expect(screen.getByLabelText(form.sizeLabel)).toBeInTheDocument();
   });
 });

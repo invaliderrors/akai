@@ -35,7 +35,6 @@ const VARIANT = {
     available: 210,
     allowBackorder: false,
   },
-  batch: null,
   image: null,
   isActive: true,
   version: 0,
@@ -43,11 +42,11 @@ const VARIANT = {
 
 const PRODUCT = {
   id: "22222222-2222-4222-8222-222222222222",
-  slug: "creatine-monohydrate",
+  slug: "oversized-tee",
   status: "ACTIVE",
   taxClass: "STANDARD",
   translations: [
-    { locale: "es", name: "Creatina", shortDescription: "", description: "" },
+    { locale: "es", name: "Camiseta", shortDescription: "", description: "" },
   ],
   variants: [VARIANT],
   media: [],
@@ -285,8 +284,8 @@ describe("publicProductSchema variant image", () => {
   it("carries an explicit asset through unchanged", () => {
     const image = {
       id: "44444444-4444-4444-8444-444444444444",
-      url: "https://cdn.example.com/creatine-300.jpg",
-      alt: { es: "Bote de creatina de 300 g" },
+      url: "https://cdn.example.com/tee-black.jpg",
+      alt: { es: "Camiseta negra doblada" },
       width: 1200,
       height: 1200,
       sortOrder: 0,
@@ -327,14 +326,14 @@ describe("publicProductSchema.addOns", () => {
     const parsed = publicProductSchema.parse({
       ...PRODUCT,
       addOns: [
-        { id: "55555555-5555-4555-8555-555555555555", slug: "agua-bacteriostatica", sortOrder: 0 },
-        { id: "66666666-6666-4666-8666-666666666666", slug: "viales-vacios", sortOrder: 1 },
+        { id: "55555555-5555-4555-8555-555555555555", slug: "canvas-tote", sortOrder: 0 },
+        { id: "66666666-6666-4666-8666-666666666666", slug: "sticker-pack", sortOrder: 1 },
       ],
     });
 
     expect(parsed.addOns.map((ref) => ref.slug)).toEqual([
-      "agua-bacteriostatica",
-      "viales-vacios",
+      "canvas-tote",
+      "sticker-pack",
     ]);
   });
 
@@ -346,7 +345,7 @@ describe("publicProductSchema.addOns", () => {
     const parsed = publicProductSchema.parse({
       ...PRODUCT,
       addOns: [
-        { id: "55555555-5555-4555-8555-555555555555", slug: "agua-bacteriostatica", sortOrder: 0 },
+        { id: "55555555-5555-4555-8555-555555555555", slug: "canvas-tote", sortOrder: 0 },
       ],
     });
 
@@ -359,7 +358,7 @@ describe("publicProductSchema.addOns", () => {
       addOns: [
         {
           id: "55555555-5555-4555-8555-555555555555",
-          slug: "agua-bacteriostatica",
+          slug: "canvas-tote",
           sortOrder: 0,
           defaultVariantId: "77777777-7777-4777-8777-777777777777",
         },
@@ -520,111 +519,32 @@ describe("computeStackDiscountTiers", () => {
   });
 });
 
-describe("product spec fields (form) and the product-level certificate", () => {
-  const BATCH = {
-    id: "33333333-3333-4333-8333-333333333333",
-    lotCode: "LOT-1",
-    purityPercent: 99.4,
-    testedAt: "2026-07-01T00:00:00.000Z",
-    testMethod: "HPLC",
-    expiresAt: null,
+describe("fields from the previous catalogue are gone", () => {
+  const base = {
+    slug: "x",
+    translations: PRODUCT.translations,
+    variants: [{ sku: "X-1", priceGross: 100, currency: "EUR" }],
   };
 
-  const ADMIN_VARIANT = {
-    ...VARIANT,
-    inventory: { ...VARIANT.inventory, onHand: 210, reserved: 0, lowStockThreshold: 5 },
-  };
-
-  it("defaults form to LYOPHILIZED and hasCoa to false when an older API omits them", () => {
-    const parsed = publicProductSchema.parse(PRODUCT);
-    expect(parsed.form).toBe("LYOPHILIZED");
-    expect(parsed.hasCoa).toBe(false);
+  it("the public product rejects form, certificate and lot fields (strict)", () => {
+    expect(publicProductSchema.safeParse({ ...PRODUCT, form: "OTHER" }).success).toBe(false);
+    expect(publicProductSchema.safeParse({ ...PRODUCT, hasCoa: true }).success).toBe(false);
+    expect(
+      publicProductSchema.safeParse({ ...PRODUCT, variants: [{ ...VARIANT, batch: null }] })
+        .success,
+    ).toBe(false);
   });
 
-  it("carries a declared form and hasCoa through", () => {
-    const parsed = publicProductSchema.parse({ ...PRODUCT, form: "CAPSULE", hasCoa: true });
-    expect(parsed.form).toBe("CAPSULE");
-    expect(parsed.hasCoa).toBe(true);
-  });
-
-  it("rejects a form outside the closed set", () => {
-    expect(publicProductSchema.safeParse({ ...PRODUCT, form: "POWDER" }).success).toBe(false);
-  });
-
-  it("purityLabel no longer exists — purity is a fixed sitewide claim", () => {
-    expect(publicProductSchema.safeParse({ ...PRODUCT, purityLabel: "≥99% HPLC" }).success).toBe(
-      false,
-    );
-    const base = {
-      slug: "x",
-      translations: PRODUCT.translations,
-      variants: [{ sku: "X-1", priceGross: 100, currency: "EUR" }],
+  it("the admin product and the create DTO reject them too", () => {
+    const adminVariant = {
+      ...VARIANT,
+      inventory: { ...VARIANT.inventory, onHand: 210, reserved: 0, lowStockThreshold: 5 },
     };
-    expect(createProductSchema.safeParse({ ...base, purityLabel: "≥99% HPLC" }).success).toBe(
-      false,
-    );
-  });
-
-  it("the PUBLIC product never carries the certificate's signed URL or the admin toggle", () => {
+    expect(productSchema.safeParse({ ...PRODUCT, variants: [adminVariant] }).success).toBe(true);
     expect(
-      publicProductSchema.safeParse({ ...PRODUCT, coaUrl: "https://s3.example/x.pdf" }).success,
+      productSchema.safeParse({ ...PRODUCT, showCoa: true, variants: [adminVariant] }).success,
     ).toBe(false);
-    expect(publicProductSchema.safeParse({ ...PRODUCT, showCoa: true }).success).toBe(false);
-  });
-
-  it("the PUBLIC batch carries neither a signed URL nor a per-variant hasCoa", () => {
-    const parsed = publicProductSchema.parse({
-      ...PRODUCT,
-      variants: [{ ...VARIANT, batch: BATCH }],
-    });
-    expect(parsed.variants[0]?.batch?.lotCode).toBe("LOT-1");
-    expect(
-      publicProductSchema.safeParse({
-        ...PRODUCT,
-        variants: [{ ...VARIANT, batch: { ...BATCH, coaUrl: "https://s3.example/x.pdf" } }],
-      }).success,
-    ).toBe(false);
-    expect(
-      publicProductSchema.safeParse({
-        ...PRODUCT,
-        variants: [{ ...VARIANT, batch: { ...BATCH, hasCoa: true } }],
-      }).success,
-    ).toBe(false);
-  });
-
-  it("the ADMIN product carries showCoa and the signed coaUrl, defaulting both", () => {
-    const bare = productSchema.parse({ ...PRODUCT, variants: [ADMIN_VARIANT] });
-    expect(bare.showCoa).toBe(false);
-    expect(bare.coaUrl).toBeNull();
-
-    const parsed = productSchema.parse({
-      ...PRODUCT,
-      showCoa: true,
-      coaUrl: "https://s3.example/product-coa.pdf",
-      variants: [ADMIN_VARIANT],
-    });
-    expect(parsed.showCoa).toBe(true);
-    expect(parsed.coaUrl).toBe("https://s3.example/product-coa.pdf");
-  });
-
-  it("the ADMIN batch still carries its own signed coaUrl", () => {
-    const parsed = productSchema.parse({
-      ...PRODUCT,
-      variants: [{ ...ADMIN_VARIANT, batch: { ...BATCH, coaUrl: "https://s3.example/x.pdf" } }],
-    });
-    expect(parsed.variants[0]?.batch?.coaUrl).toBe("https://s3.example/x.pdf");
-  });
-
-  it("the create DTO accepts form and the showCoa toggle, both optional", () => {
-    const base = {
-      slug: "x",
-      translations: PRODUCT.translations,
-      variants: [{ sku: "X-1", priceGross: 100, currency: "EUR" }],
-    };
-    const parsed = createProductSchema.parse({ ...base, form: "SOLUTION", showCoa: true });
-    expect(parsed.form).toBe("SOLUTION");
-    expect(parsed.showCoa).toBe(true);
-    expect(createProductSchema.parse(base).showCoa).toBeUndefined();
-    expect(createProductSchema.safeParse({ ...base, showCoa: "yes" }).success).toBe(false);
+    expect(createProductSchema.safeParse({ ...base, form: "OTHER" }).success).toBe(false);
+    expect(createProductSchema.safeParse({ ...base, showCoa: true }).success).toBe(false);
   });
 });

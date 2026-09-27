@@ -52,7 +52,7 @@ function recordingFetch(
 
 describe("seedContentType", () => {
   it("maps an extension to the content type the admin route would use", () => {
-    expect(seedContentType("magnesium-bisglycinate-1.png")).toBe("image/png");
+    expect(seedContentType("box-logo-hoodie-1.png")).toBe("image/png");
     expect(seedContentType("hero.jpg")).toBe("image/jpeg");
     expect(seedContentType("hero.WEBP")).toBe("image/webp");
   });
@@ -67,17 +67,17 @@ describe("seedContentType", () => {
 
 describe("seedObjectKey", () => {
   it("is deterministic, so a second seed run overwrites instead of duplicating", () => {
-    const first = seedObjectKey("creatine-monohydrate", "creatine-monohydrate-1.png");
-    const second = seedObjectKey("creatine-monohydrate", "creatine-monohydrate-1.png");
+    const first = seedObjectKey("oversized-tee", "oversized-tee-1.png");
+    const second = seedObjectKey("oversized-tee", "oversized-tee-1.png");
 
     expect(first).toBe(second);
     expect(first).toBe(
-      `${SEED_MEDIA_PREFIX}creatine-monohydrate/creatine-monohydrate-1.png`,
+      `${SEED_MEDIA_PREFIX}oversized-tee/oversized-tee-1.png`,
     );
   });
 
   it("marks its own keys and nobody else's as prunable", () => {
-    expect(isSeedObjectKey(seedObjectKey("omega-3-triglyceride", "a.png"))).toBe(true);
+    expect(isSeedObjectKey(seedObjectKey("cargo-pants", "a.png"))).toBe(true);
     // Written by the PREVIOUS seed, which pointed media at the storefront's own
     // dev server. A re-run has to be able to delete those rows.
     expect(isSeedObjectKey("seed/carousel/carousel (1).png")).toBe(true);

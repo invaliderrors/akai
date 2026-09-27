@@ -34,7 +34,7 @@ import type {
  *
  * The store's default is Spanish (next-intl serves `es` at `/`). This used to be
  * the ONLY locale the cart could ever produce — pinned here with no request-level
- * override — so an English shopper's basket read "Creatina Monohidrato". The
+ * override — so an English shopper's basket read "Camiseta Oversize". The
  * cart routes now accept `?locale=`, and this constant is what an unlabelled
  * caller still gets, which is the documented default rather than a silent
  * assumption.
@@ -362,7 +362,7 @@ export class PrismaCartRepository implements CartRepository {
       const { product, inventory } = variant;
 
       // Requested locale first, then ANY translation. Falling back to the slug
-      // is the last resort only — a line reading "creatine-monohydrate" is
+      // is the last resort only — a line reading "oversized-tee" is
       // strictly worse than the same product named in the other language.
       const translation =
         product.translations.find((entry) => entry.locale === locale) ??

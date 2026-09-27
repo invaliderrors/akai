@@ -347,6 +347,6 @@ export class InMemoryLabelStorage implements LabelStorage {
   }
 
   signedUrl(objectKey: string): string {
-    return `https://s3.test/akai-coa/${objectKey}?X-Amz-Signature=abc`;
+    return `https://s3.test/akai-private/${objectKey}?X-Amz-Signature=abc`;
   }
 }

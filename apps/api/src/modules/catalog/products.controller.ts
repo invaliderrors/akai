@@ -1,16 +1,4 @@
-import {
-  Controller,
-  Get,
-  Header,
-  HttpStatus,
-  Inject,
-  Param,
-  Query,
-  Redirect,
-  Res,
-  StreamableFile,
-  UseGuards,
-} from "@nestjs/common";
+import { Controller, Get, Param, Query, UseGuards } from "@nestjs/common";
 import {
   slugSchema,
   type Paginated,
@@ -28,20 +16,7 @@ import {
   type PublicAddOnListQuery,
   type PublicProductListQuery,
 } from "./dto/catalog.dto";
-import { COA_FILE_READER, type CoaFileReader } from "./coa-file.reader";
 
-/** The slice of Express's response the file route writes: headers only. */
-interface HeaderWriter {
-  setHeader(name: string, value: string): void;
-}
-
-/**
- * How long a browser may keep the certificate bytes. PRIVATE — a shared cache
- * must not hold a document whose visibility the admin can switch off — and
- * short, so switching it off takes effect for a returning visitor within
- * minutes.
- */
-const COA_FILE_CACHE_CONTROL = "private, max-age=300";
 
 /**
  * The public catalog. Read-only, unauthenticated.
@@ -59,10 +34,7 @@ const COA_FILE_CACHE_CONTROL = "private, max-age=300";
  */
 @Controller("products")
 export class ProductsController {
-  constructor(
-    private readonly products: ProductsService,
-    @Inject(COA_FILE_READER) private readonly coaFiles: CoaFileReader,
-  ) {}
+  constructor(private readonly products: ProductsService) {}
 
   /**
    * The query is parsed by a `.strict()` schema with NO `status` and NO
@@ -143,75 +115,6 @@ export class ProductsController {
     @Param("slug", new ZodValidationPipe(slugSchema)) slug: string,
   ): Promise<Paginated<PublicPackComponent>> {
     return this.products.listPackComponentsFor(slug);
-  }
-
-  /**
-   * The PRODUCT's certificate of analysis, as a 302 to a signed URL minted at
-   * click time.
-   *
-   * THE STABLE LINK THE PRODUCT PAGE EMBEDS. The page is ISR-cached; a signed
-   * URL baked into it went dead when its signature expired. This URL never
-   * expires, and what it redirects to is always fresh. `no-store`, because
-   * the redirect TARGET does expire and no cache may replay it.
-   *
-   * NO QUERY PARAMETERS, AND NONE PARSED. The previous build linked per
-   * variant (`?variantId=`); a page cached from before the switch still
-   * carries that link, and it must land on the product's certificate rather
-   * than on a 400. Ignoring the query costs nothing: it selects nothing.
-   *
-   * ALSO DECLARED BEFORE `@Get(":slug")`, for the same routing reason
-   * `:slug/add-ons` states. 404 when the product or its certificate is
-   * missing, AND when the admin has not switched it on — the storefront only
-   * renders the link when `hasCoa` is true, so a 404 here means the page was
-   * stale, not that the link was wrong.
-   */
-  @Public()
-  @UseGuards(ThrottleGuard)
-  @Throttle(THROTTLE_RULES.catalogRead)
-  @Get(":slug/coa")
-  @Header("Cache-Control", "no-store")
-  @Redirect(undefined, HttpStatus.FOUND)
-  async coa(
-    @Param("slug", new ZodValidationPipe(slugSchema)) slug: string,
-  ): Promise<{ url: string; statusCode: number }> {
-    const url = await this.products.coaUrlFor(slug);
-    return { url, statusCode: HttpStatus.FOUND };
-  }
-
-  /**
-   * The PRODUCT's certificate of analysis, AS BYTES — what the storefront's
-   * in-page viewer (PDF.js) fetches. The 302 above stays for "open in a new
-   * tab / download"; this route exists because a browser `fetch` of the
-   * presigned bucket URL would be a cross-origin read from an origin whose
-   * CORS policy is not ours, whereas this API already answers the storefront.
-   *
-   * THE SAME VISIBILITY RULE AS THE REDIRECT, from the same method
-   * (`coaObjectKeyFor`): 404 for an unknown product, no file, a hidden file,
-   * and — here only — a row whose object is gone from the bucket.
-   *
-   * `inline` so a browser that navigates here directly shows rather than
-   * saves it; the filename is the slug, which `slugSchema` has already
-   * limited to `[a-z0-9-]`, so it cannot break out of the header's quotes.
-   * The Cache-Control is written on SUCCESS only (not via `@Header`), so a 404
-   * is never remembered for five minutes after the admin switches the
-   * certificate on.
-   */
-  @Public()
-  @UseGuards(ThrottleGuard)
-  @Throttle(THROTTLE_RULES.catalogRead)
-  @Get(":slug/coa/file")
-  async coaFile(
-    @Param("slug", new ZodValidationPipe(slugSchema)) slug: string,
-    @Res({ passthrough: true }) response: HeaderWriter,
-  ): Promise<StreamableFile> {
-    const objectKey = await this.products.coaObjectKeyFor(slug);
-    const pdf = await this.coaFiles.read(objectKey);
-    response.setHeader("Cache-Control", COA_FILE_CACHE_CONTROL);
-    return new StreamableFile(pdf, {
-      type: "application/pdf",
-      disposition: `inline; filename="certificado-${slug}.pdf"`,
-      length: pdf.byteLength,
-    });
   }
 
   /**

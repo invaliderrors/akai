@@ -46,7 +46,7 @@ export function createSendcloudClient(
  * controller (Phase 4–5 — BUILT, in `labels/LabelsModule`, which imports this
  * module for the client), tracking webhook + sweep (Phase 6, here),
  * zones/rates admin (Phase 5b). The data model for all of them is already in
- * place (migration 20260925120000_sendcloud_shipping).
+ * place (`20260927000000_init`).
  */
 @Module({
   providers: [

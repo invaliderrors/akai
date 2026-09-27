@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { Prisma } from "@akai/db";
 import { productSchema, productVariantSchema, publicProductSchema } from "@akai/contracts";
 import {
   derivePackAvailability,
@@ -48,7 +47,7 @@ function variantFixture(overrides: Partial<HydratedVariant> = {}): HydratedVaria
       productId: PRODUCT_ID,
       variantId: VARIANT_ID,
       objectKey: "variants/secret-variant-key.jpg",
-      url: "https://cdn.example.com/creatina-500g.jpg",
+      url: "https://cdn.example.com/camiseta-negra.jpg",
       alt: { es: "Bote de 500 g" },
       width: 900,
       height: 900,
@@ -64,19 +63,6 @@ function variantFixture(overrides: Partial<HydratedVariant> = {}): HydratedVaria
       version: 1,
       updatedAt: CREATED,
     },
-    batches: [
-      {
-        id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
-        variantId: VARIANT_ID,
-        lotCode: "LOT-2026-03",
-        purityPercent: new Prisma.Decimal("99.42"),
-        testedAt: CREATED,
-        testMethod: "HPLC",
-        coaObjectKey: "coa/secret-bucket-path.pdf",
-        expiresAt: null,
-        createdAt: CREATED,
-      },
-    ],
   };
 
   return { ...base, ...overrides };
@@ -85,7 +71,7 @@ function variantFixture(overrides: Partial<HydratedVariant> = {}): HydratedVaria
 function productFixture(overrides: Partial<HydratedProduct> = {}): HydratedProduct {
   const base: HydratedProduct = {
     id: PRODUCT_ID,
-    slug: "creatina-monohidrato",
+    slug: "camiseta-oversize",
     status: "ACTIVE",
     taxClass: "STANDARD",
     restrictedCountries: ["US"],
@@ -99,9 +85,6 @@ function productFixture(overrides: Partial<HydratedProduct> = {}): HydratedProdu
     stackDiscountEnabled: false,
     sortOrder: 0,
     kind: "SIMPLE",
-    form: "LYOPHILIZED",
-    coaObjectKey: null,
-    showCoa: false,
     addOns: [],
     packComponents: [],
     createdAt: CREATED,
@@ -112,8 +95,8 @@ function productFixture(overrides: Partial<HydratedProduct> = {}): HydratedProdu
         id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
         productId: PRODUCT_ID,
         locale: "es",
-        name: "Creatina Monohidrato",
-        shortDescription: "Pureza verificada",
+        name: "Camiseta Oversize",
+        shortDescription: "Algodón orgánico",
         description: "Descripcion larga",
       },
     ],
@@ -123,8 +106,8 @@ function productFixture(overrides: Partial<HydratedProduct> = {}): HydratedProdu
         productId: PRODUCT_ID,
         variantId: null,
         objectKey: "products/secret-key.jpg",
-        url: "https://cdn.example.com/creatina.jpg",
-        alt: { es: "Bote de creatina" },
+        url: "https://cdn.example.com/camiseta.jpg",
+        alt: { es: "Camiseta doblada" },
         width: 1200,
         height: 1200,
         sortOrder: 0,
@@ -180,7 +163,6 @@ describe("mapProduct", () => {
     expect(serialised).not.toContain("price_live_SECRET");
     expect(serialised).not.toContain("products/secret-key.jpg");
     expect(serialised).not.toContain("variants/secret-variant-key.jpg");
-    expect(serialised).not.toContain("coa/secret-bucket-path.pdf");
     expect(serialised).not.toContain("providerProductId");
     expect(serialised).not.toContain("objectKey");
   });
@@ -283,67 +265,6 @@ describe("mapVariant", () => {
       .toBeNull();
   });
 
-  it("exposes the newest batch without its S3 key, and leaves the url unset when NO signer is given", () => {
-    const batch = mapVariant(variantFixture()).batch;
-
-    expect(batch?.lotCode).toBe("LOT-2026-03");
-    expect(batch?.purityPercent).toBe(99.42);
-    // The caller (ProductsService, in production) owns signing; emitting the
-    // raw key here, or fabricating a url with no signer supplied, would
-    // either 403 or, worse, work.
-    expect(batch?.coaUrl).toBeNull();
-  });
-
-  it("maps a variant with no batches to a null batch", () => {
-    expect(mapVariant(variantFixture({ batches: [] })).batch).toBeNull();
-  });
-
-  it("signs the coaUrl through the CALLER's signer, with the object key and nothing else", () => {
-    // The whole point of threading a signer through: `product.mapper.ts` still
-    // never builds a URL itself, it only ever hands the raw key to whatever
-    // the caller (ProductsService, in production) supplies.
-    const seen: string[] = [];
-    const signer = (objectKey: string): string => {
-      seen.push(objectKey);
-      return `https://signed.test/${objectKey}?sig=abc`;
-    };
-
-    const batch = mapVariant(variantFixture(), signer).batch;
-
-    expect(seen).toEqual(["coa/secret-bucket-path.pdf"]);
-    expect(batch?.coaUrl).toBe("https://signed.test/coa/secret-bucket-path.pdf?sig=abc");
-  });
-
-  it("never calls the signer at all when the batch has no COA yet", () => {
-    let calls = 0;
-    const signer = (objectKey: string): string => {
-      calls += 1;
-      return `https://signed.test/${objectKey}`;
-    };
-
-    const batch = mapVariant(
-      variantFixture({
-        batches: [
-          {
-            id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
-            variantId: VARIANT_ID,
-            lotCode: "LOT-2026-03",
-            purityPercent: new Prisma.Decimal("99.42"),
-            testedAt: CREATED,
-            testMethod: "HPLC",
-            coaObjectKey: null,
-            expiresAt: null,
-            createdAt: CREATED,
-          },
-        ],
-      }),
-      signer,
-    ).batch;
-
-    expect(calls).toBe(0);
-    expect(batch?.coaUrl).toBeNull();
-  });
-
   // -- The variant's own image ----------------------------------------------
 
   it("maps the variant's own image through the same mapper as a gallery image", () => {
@@ -351,7 +272,7 @@ describe("mapVariant", () => {
 
     // Same wire shape as `product.media[n]`, so the storefront's fallback can be
     // a plain `variant.image ?? primaryMedia(product)` with no adapter between.
-    expect(image?.url).toBe("https://cdn.example.com/creatina-500g.jpg");
+    expect(image?.url).toBe("https://cdn.example.com/camiseta-negra.jpg");
     expect(image?.alt).toEqual({ es: "Bote de 500 g" });
     // objectKey is dropped here exactly as it is for a gallery image.
     expect(Object.keys(image ?? {})).not.toContain("objectKey");
@@ -370,9 +291,9 @@ describe("mapVariant", () => {
     // variant image showing up in the gallery would duplicate it on the hero
     // rail and in the admin gallery list.
     expect(mapped.media.map((asset) => asset.url)).toEqual([
-      "https://cdn.example.com/creatina.jpg",
+      "https://cdn.example.com/camiseta.jpg",
     ]);
-    expect(variant?.image?.url).toBe("https://cdn.example.com/creatina-500g.jpg");
+    expect(variant?.image?.url).toBe("https://cdn.example.com/camiseta-negra.jpg");
   });
 
   // -- Json column narrowing ------------------------------------------------
@@ -428,7 +349,7 @@ describe("mapProduct — add-ons", () => {
           defaultVariantId: null,
           addOn: {
             id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
-            slug: "agua-bacteriostatica",
+            slug: "canvas-tote",
           },
         },
       ],
@@ -439,7 +360,7 @@ describe("mapProduct — add-ons", () => {
     expect(mapped.addOns).toEqual([
       {
         id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
-        slug: "agua-bacteriostatica",
+        slug: "canvas-tote",
         sortOrder: 0,
         // Asserted in FULL, not with objectContaining: the storefront parses
         // this against a `.strict()` schema, so a field the mapper stops
@@ -560,95 +481,5 @@ describe("derivePackAvailability — a pack's stock is its components' stock", (
       allowBackorder: false,
     });
     expect(() => publicProductSchema.parse(published)).not.toThrow();
-  });
-});
-
-describe("mapProduct — spec field (form)", () => {
-  it("maps form onto both the admin and the public shape", () => {
-    const row = productFixture({ form: "SOLUTION" });
-
-    const admin = mapProduct(row, { activeVariantsOnly: false });
-    const pub = toPublicProduct(mapProduct(row, { activeVariantsOnly: true }));
-
-    expect(admin.form).toBe("SOLUTION");
-    expect(publicProductSchema.parse(pub).form).toBe("SOLUTION");
-    expect(pub).not.toHaveProperty("purityLabel");
-  });
-});
-
-describe("the product-level certificate of analysis", () => {
-  const signer = (key: string) => `https://s3.example.com/signed/${key}?X-Amz-Signature=abc`;
-  const KEY = `coa/products/${PRODUCT_ID}/2026-09-24-abc.pdf`;
-
-  it("gives the ADMIN shape the switch and a freshly signed URL for the current file", () => {
-    const admin = mapProduct(
-      productFixture({ coaObjectKey: KEY, showCoa: false }),
-      { activeVariantsOnly: false },
-      signer,
-    );
-
-    expect(admin.showCoa).toBe(false);
-    expect(admin.coaUrl).toBe(signer(KEY));
-  });
-
-  it("gives the ADMIN shape coaUrl: null when no file is uploaded", () => {
-    const admin = mapProduct(productFixture(), { activeVariantsOnly: false }, signer);
-
-    expect(admin.coaUrl).toBeNull();
-  });
-
-  it.each([
-    { showCoa: true, coaObjectKey: KEY, hasCoa: true },
-    { showCoa: false, coaObjectKey: KEY, hasCoa: false },
-    { showCoa: true, coaObjectKey: null, hasCoa: false },
-    { showCoa: false, coaObjectKey: null, hasCoa: false },
-  ])(
-    "public hasCoa is $hasCoa for showCoa=$showCoa, key=$coaObjectKey",
-    ({ showCoa, coaObjectKey, hasCoa }) => {
-      const pub = toPublicProduct(
-        mapProduct(productFixture({ showCoa, coaObjectKey }), { activeVariantsOnly: true }, signer),
-      );
-
-      expect(pub.hasCoa).toBe(hasCoa);
-    },
-  );
-
-  it("never puts the key, the signed URL or the switch in the PUBLIC shape", () => {
-    const pub = toPublicProduct(
-      mapProduct(
-        productFixture({ showCoa: true, coaObjectKey: KEY }),
-        { activeVariantsOnly: true },
-        signer,
-      ),
-    );
-
-    expect(pub).not.toHaveProperty("coaUrl");
-    expect(pub).not.toHaveProperty("showCoa");
-    const json = JSON.stringify(pub);
-    expect(json).not.toContain("X-Amz-Signature");
-    expect(json).not.toContain(KEY);
-    expect(publicProductSchema.safeParse(pub).success).toBe(true);
-  });
-});
-
-describe("toPublicProduct — a batch's certificate never reaches the public shape", () => {
-  const signer = (key: string) => `https://s3.example.com/signed/${key}?X-Amz-Signature=abc`;
-
-  it("strips the batch's signed coaUrl and carries no per-variant hasCoa", () => {
-    const pub = toPublicProduct(mapProduct(productFixture(), { activeVariantsOnly: true }, signer));
-    const batch = pub.variants[0]?.batch;
-
-    expect(batch?.lotCode).toBe("LOT-2026-03");
-    expect(batch === null || batch === undefined ? {} : batch).not.toHaveProperty("coaUrl");
-    expect(batch === null || batch === undefined ? {} : batch).not.toHaveProperty("hasCoa");
-    expect(JSON.stringify(pub)).not.toContain("X-Amz-Signature");
-    expect(publicProductSchema.safeParse(pub).success).toBe(true);
-  });
-
-  it("keeps a variant with no batch at null", () => {
-    const row = productFixture({ variants: [variantFixture({ batches: [] })] });
-    const pub = toPublicProduct(mapProduct(row, { activeVariantsOnly: true }, signer));
-
-    expect(pub.variants[0]?.batch).toBeNull();
   });
 });

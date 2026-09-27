@@ -57,13 +57,6 @@ import {
   type SetRestrictions,
   type UpdateVariant,
 } from "./dto/catalog.dto";
-import {
-  attachCoaSchema,
-  createCoaUploadUrlSchema,
-  type AttachCoa,
-  type CoaUploadUrlResponse,
-  type CreateCoaUploadUrl,
-} from "../batches/batches.dto";
 
 /**
  * The one thing this file needs from an HTTP response.
@@ -290,43 +283,6 @@ export class AdminProductsController {
     @Param("mediaId", new ZodValidationPipe(idSchema)) mediaId: string,
   ): Promise<Product> {
     return this.products.removeMedia(id, mediaId);
-  }
-
-  // -------------------------------------------------------------------------
-  // The product's certificate of analysis
-  // -------------------------------------------------------------------------
-  //
-  // The same presign → PUT → confirm lifecycle, and the SAME request schemas
-  // (`application/pdf` only, ≤ 10 MB, the server chooses the key), as a lot's
-  // certificate on `AdminBatchesController` — keyed per product instead. Class-
-  // level `@Roles` covers all three. Whether the shop shows the file is the
-  // separate `showCoa` field, saved with the product through `PATCH :id`.
-
-  /** 200, not 201: a capability is issued, nothing is created yet. */
-  @Post(":id/coa/upload-url")
-  @HttpCode(HttpStatus.OK)
-  async createCoaUploadUrl(
-    @Param("id", new ZodValidationPipe(idSchema)) id: string,
-    @Body(new ZodValidationPipe(createCoaUploadUrlSchema)) body: CreateCoaUploadUrl,
-  ): Promise<CoaUploadUrlResponse> {
-    return this.products.createCoaUploadUrl(id, body);
-  }
-
-  /** Record a succeeded upload — a first upload and a replacement alike. */
-  @Post(":id/coa")
-  @HttpCode(HttpStatus.OK)
-  async attachCoa(
-    @Param("id", new ZodValidationPipe(idSchema)) id: string,
-    @Body(new ZodValidationPipe(attachCoaSchema)) body: AttachCoa,
-  ): Promise<Product> {
-    return this.products.attachCoa(id, body);
-  }
-
-  @Delete(":id/coa")
-  async removeCoa(
-    @Param("id", new ZodValidationPipe(idSchema)) id: string,
-  ): Promise<Product> {
-    return this.products.removeCoa(id);
   }
 
   @Put(":id/categories")

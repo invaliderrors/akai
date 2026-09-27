@@ -293,13 +293,13 @@ describe("<TextArea />", () => {
       <TextArea
         label="Descripción (es)"
         name="description"
-        value="Monohidrato de creatina micronizado."
+        value="Camiseta oversize de algodón orgánico."
         onChange={vi.fn()}
         maxLength={400}
       />,
     );
 
-    expect(screen.getByText("36 / 400")).toBeInTheDocument();
+    expect(screen.getByText("38 / 400")).toBeInTheDocument();
   });
 
   it("shows no counter when there is no ceiling to count against", () => {

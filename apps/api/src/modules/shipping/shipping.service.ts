@@ -30,7 +30,7 @@ import { ShippingError } from "./shipping.errors";
  *  1. RESOLVES A RATE from `shipping_zone` / `shipping_rate` by destination,
  *     weight and subtotal — no more trusting a caller-supplied figure.
  *  2. ENFORCES THE COUNTRY RESTRICTION — a destination with no zone is refused,
- *     which is how a peptide catalogue that may not ship to a jurisdiction is
+ *     which is how a destination the shop may not ship to is
  *     blocked structurally rather than by an if nobody remembers to write.
  *  3. APPLIES free-over-threshold and the weight/price brackets, then splits the
  *     gross rate into the net + taxBps the order totals need.

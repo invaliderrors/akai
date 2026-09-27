@@ -101,7 +101,7 @@ describe("ShippingService", () => {
     });
 
     it("refuses to quote a destination with no zone", async () => {
-      // The peptide country-ship restriction: absence of a zone IS the block.
+      // The country-ship restriction: absence of a zone IS the block.
       await expect(
         h.service.resolveCharge({ ...chargeInput, countryCode: "US", shippingMethodId: "x" }),
       ).rejects.toBeInstanceOf(ShippingError);

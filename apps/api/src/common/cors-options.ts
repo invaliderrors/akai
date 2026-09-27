@@ -5,9 +5,8 @@ import { CONTENT_SANITIZED_HEADER } from "../modules/catalog/catalog.constants";
 
 /**
  * The API's CORS policy, as ONE function `main.ts` applies and the api-e2e
- * suites can apply too — so a cross-origin assertion there (e.g. the
- * storefront's in-page certificate viewer fetching `/v1/products/:slug/coa/file`)
- * exercises the policy production runs, not a restatement of it.
+ * suites can apply too — so a cross-origin assertion there exercises the
+ * policy production runs, not a restatement of it.
  */
 export function buildCorsOptions(allowedOrigins: readonly string[]): CorsOptions {
   return {

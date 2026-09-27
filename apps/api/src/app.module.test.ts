@@ -50,7 +50,7 @@ const TEST_ENV: NodeJS.ProcessEnv = {
   S3_BUCKET: "akai-media",
   S3_ACCESS_KEY_ID: "key",
   S3_SECRET_ACCESS_KEY: "secret",
-  S3_BUCKET_COA: "akai-coa",
+  S3_BUCKET_PRIVATE: "akai-private",
   CORS_ALLOWED_ORIGINS: "http://localhost:3000",
   STOREFRONT_URL: "http://localhost:3000",
   DASHBOARD_URL: "http://localhost:3001",

@@ -61,7 +61,7 @@ const TEST_ENV: NodeJS.ProcessEnv = {
   EMAIL_FROM: "no-reply@example.com",
   S3_ENDPOINT: "http://localhost:9000",
   S3_BUCKET: "akai-media",
-  S3_BUCKET_COA: "akai-coa",
+  S3_BUCKET_PRIVATE: "akai-private",
   S3_ACCESS_KEY_ID: "key",
   S3_SECRET_ACCESS_KEY: "secret",
   CORS_ALLOWED_ORIGINS: "http://localhost:3000",
@@ -131,16 +131,16 @@ describe.skipIf(!isDockerAvailable())("Pickup points — quote → search → ch
     await db.prisma.product.create({
       data: {
         id: PRODUCT_ID,
-        slug: "bpc-157",
+        slug: "hoodie-kumo",
         status: "ACTIVE",
-        translations: { create: [{ locale: "es", name: "BPC-157", shortDescription: "x", description: "x" }] },
+        translations: { create: [{ locale: "es", name: "Hoodie Kumo", shortDescription: "x", description: "x" }] },
       },
     });
     await db.prisma.productVariant.create({
       data: {
         id: VARIANT_ID,
         productId: PRODUCT_ID,
-        sku: "BPC-157-10",
+        sku: "HOODIE-KUMO-M",
         currency: "EUR",
         taxRateBps: 2100,
         priceNet: 4132,

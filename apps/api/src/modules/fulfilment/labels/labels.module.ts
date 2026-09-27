@@ -14,8 +14,7 @@ import { OrderFulfilmentOutboxHandler } from "./order-fulfilment.outbox-handler"
 import { SendcloudWriteThrottle } from "./sendcloud-write-throttle";
 
 /**
- * The same fixed region every other presigner call site uses (media, batches,
- * catalog): MinIO ignores it and the deployment's bucket lives there. Moving
+ * The same fixed region every other presigner call site uses (media): MinIO ignores it and the deployment's bucket lives there. Moving
  * it into validated config is the existing followUp those files record.
  */
 const S3_REGION = "us-east-1";
@@ -46,7 +45,7 @@ const S3_REGION = "us-east-1";
         new S3LabelStorage(
           {
             endpoint: config.S3_ENDPOINT,
-            bucket: config.S3_BUCKET_COA,
+            bucket: config.S3_BUCKET_PRIVATE,
             region: S3_REGION,
             accessKeyId: config.S3_ACCESS_KEY_ID,
             secretAccessKey: config.S3_SECRET_ACCESS_KEY,

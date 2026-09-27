@@ -22,7 +22,7 @@ CREATE EXTENSION IF NOT EXISTS citext;
 -- connects as this one. The split is what makes "the app cannot rewrite the
 -- audit log" a fact about privileges rather than a promise about code.
 --
--- The migration in libs/db/prisma/migrations/20260720000100_* detects this role
+-- The migration libs/db/prisma/migrations/20260927000100_invariants detects this role
 -- and applies the grants — including REVOKE UPDATE, DELETE on the append-only
 -- tables. It skips silently when the role is absent, which is why creating it
 -- here matters: without it, local runs quietly get a permission model that

@@ -15,8 +15,8 @@ const REQUEST: TranslateRequest = translateRequestSchema.parse({
   source: "es",
   target: "en",
   texts: [
-    { key: "name", text: "Creatina monohidratada" },
-    { key: "summary", text: "Pureza 99,9 %" },
+    { key: "name", text: "Camiseta oversize de algodón" },
+    { key: "summary", text: "Algodón 100 %" },
   ],
 });
 
@@ -65,8 +65,8 @@ describe("TranslationService", () => {
   it("returns every translation under its own key, in request order", async () => {
     await expect(service.translate(REQUEST)).resolves.toEqual({
       translations: [
-        { key: "name", text: "[en] Creatina monohidratada" },
-        { key: "summary", text: "[en] Pureza 99,9 %" },
+        { key: "name", text: "[en] Camiseta oversize de algodón" },
+        { key: "summary", text: "[en] Algodón 100 %" },
       ],
     });
   });
@@ -144,8 +144,8 @@ describe("TranslationService", () => {
 
     await expect(service.translate(REQUEST)).resolves.toEqual({
       translations: [
-        { key: "name", text: "[en] Creatina monohidratada" },
-        { key: "summary", text: "[en] Pureza 99,9 %" },
+        { key: "name", text: "[en] Camiseta oversize de algodón" },
+        { key: "summary", text: "[en] Algodón 100 %" },
       ],
     });
   });

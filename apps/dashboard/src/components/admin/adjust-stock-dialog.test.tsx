@@ -22,7 +22,7 @@ function renderDialog(onHand = 29) {
     <NextIntlClientProvider locale="es" messages={esMessages}>
       <AdjustStockDialog
         variantId="11111111-1111-4111-8111-111111111111"
-        sku="AK-BPC-10"
+        sku="AK-HOOD-M"
         onHand={onHand}
         reserved={4}
       />

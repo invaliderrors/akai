@@ -127,36 +127,36 @@ describe("what is stripped", () => {
 describe("what survives", () => {
   it("keeps the structural and inline formatting a description actually needs", () => {
     const input =
-      "<h2>Dosage</h2><p>Take <strong>5 g</strong> daily, ideally <em>post-workout</em>.</p>" +
-      "<ul><li>Micronised</li><li>Unflavoured</li></ul>" +
-      "<blockquote>Third-party tested.</blockquote><hr />";
+      "<h2>Fit</h2><p>Size <strong>down</strong> for a regular fit, <em>true to size</em> for oversized.</p>" +
+      "<ul><li>Heavyweight</li><li>Garment-dyed</li></ul>" +
+      "<blockquote>Made in Portugal.</blockquote><hr />";
 
     expect(sanitizeRichText(input)).toBe(
-      "<h2>Dosage</h2><p>Take <strong>5 g</strong> daily, ideally <em>post-workout</em>.</p>" +
-        "<ul><li>Micronised</li><li>Unflavoured</li></ul>" +
-        "<blockquote>Third-party tested.</blockquote><hr />",
+      "<h2>Fit</h2><p>Size <strong>down</strong> for a regular fit, <em>true to size</em> for oversized.</p>" +
+        "<ul><li>Heavyweight</li><li>Garment-dyed</li></ul>" +
+        "<blockquote>Made in Portugal.</blockquote><hr />",
     );
   });
 
   it("keeps a data table with its accessibility semantics", () => {
     const input =
-      "<table><caption>Per serving</caption><thead><tr>" +
-      '<th scope="col">Amino acid</th><th scope="col">mg</th>' +
-      '</tr></thead><tbody><tr><td colspan="1">Leucine</td><td>2500</td></tr></tbody></table>';
+      "<table><caption>Measurements (cm)</caption><thead><tr>" +
+      '<th scope="col">Size</th><th scope="col">Chest</th>' +
+      '</tr></thead><tbody><tr><td colspan="1">M</td><td>56</td></tr></tbody></table>';
 
     const output = sanitizeRichText(input);
 
-    expect(output).toContain('<th scope="col">Amino acid</th>');
-    expect(output).toContain('<td colspan="1">Leucine</td>');
-    expect(output).toContain("<caption>Per serving</caption>");
+    expect(output).toContain('<th scope="col">Size</th>');
+    expect(output).toContain('<td colspan="1">M</td>');
+    expect(output).toContain("<caption>Measurements (cm)</caption>");
   });
 
   it("keeps an https link and its title", () => {
     const output = sanitizeRichText(
-      '<a href="https://akai.shop/coa" title="Certificate">CoA</a>',
+      '<a href="https://akai.shop/size-guide" title="Size guide">Sizes</a>',
     );
 
-    expect(output).toBe('<a href="https://akai.shop/coa" title="Certificate">CoA</a>');
+    expect(output).toBe('<a href="https://akai.shop/size-guide" title="Size guide">Sizes</a>');
   });
 
   it("keeps a mailto link", () => {

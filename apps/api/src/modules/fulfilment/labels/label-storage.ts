@@ -3,7 +3,7 @@ import { presignGetUrl, presignPutUrl } from "../../media/s3-presigner";
 
 /**
  * Where bought label PDFs live (Sendcloud spec §3.5, §3.9, decision D9): the
- * `labels/` prefix of the PRIVATE bucket (`S3_BUCKET_COA` — no anonymous-read
+ * `labels/` prefix of the PRIVATE bucket (`S3_BUCKET_PRIVATE` — no anonymous-read
  * policy), one object per parcel.
  *
  * THE API WRITES AN OBJECT ITSELF FOR THE FIRST TIME here. Everything else in

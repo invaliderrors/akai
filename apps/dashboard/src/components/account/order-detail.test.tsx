@@ -37,40 +37,15 @@ describe("OrderDetailView", () => {
     it("renders each line with its snapshotted name, quantity and totals", () => {
       renderDetail();
 
-      expect(screen.getByText("Creatina Monohidrato")).toBeInTheDocument();
-      expect(screen.getByText("500 g")).toBeInTheDocument();
-      expect(screen.getByText("REF AK-CRE-500")).toBeInTheDocument();
+      expect(screen.getByText("Camiseta Oversize")).toBeInTheDocument();
+      expect(screen.getByText("M")).toBeInTheDocument();
+      expect(screen.getByText("REF AK-TEE-BLK-M")).toBeInTheDocument();
 
       // Both fixture lines have quantity 1, so unit price and line total are the
       // same figure and legitimately appear twice per row. Asserting "at least
       // one" would pass even if the line-total column stopped rendering.
       expect(screen.getAllByText(/89,99/)).toHaveLength(2);
       expect(screen.getAllByText(/24,99/)).toHaveLength(2);
-    });
-
-    it("shows the shipped batch lot, which the public FAQ promises", () => {
-      renderDetail();
-
-      expect(screen.getByText("Lote LOT-2026-041")).toBeInTheDocument();
-      expect(screen.getByText(/Guarda estos códigos de lote/)).toBeInTheDocument();
-    });
-
-    it("omits the batch line for items with no recorded lot", () => {
-      renderDetail();
-
-      // The second fixture line has batchLotCode: null.
-      expect(screen.queryByText(/Lote null/)).not.toBeInTheDocument();
-    });
-
-    it("drops the lot footnote when no line carries a lot at all", () => {
-      const order = buildOrder();
-      renderDetail({
-        order: buildOrder({
-          items: order.items.map((item) => ({ ...item, batchLotCode: null })),
-        }),
-      });
-
-      expect(screen.queryByText(/Guarda estos códigos de lote/)).not.toBeInTheDocument();
     });
   });
 

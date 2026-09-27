@@ -30,7 +30,6 @@ import {
   type UpdateSiteSettings,
   adminCustomerSchema,
   adminOrderSchema,
-  batchSchema,
   categoryListResponseSchema,
   categorySchema,
   emailEventSchema,
@@ -1130,125 +1129,6 @@ export async function removeProductMedia(
   const response = await http.request({
     method: "DELETE",
     path: `/admin/products/${productId}/media/${mediaId}`,
-  });
-
-  return parseOrThrow(productSchema, response);
-}
-
-/**
- * A batch (lot) and its certificate of analysis — the same presign-then-attach
- * shape as a product image, minus the parts that are image-specific (no alt
- * text, no dimensions, no sortOrder: a variant has at most one batch on
- * screen at a time today, whichever the operator just recorded).
- */
-export interface CreateBatchInput {
-  readonly lotCode: string;
-  readonly purityPercent: number;
-  readonly testedAt: string;
-  readonly testMethod: string;
-}
-
-export async function createBatch(
-  http: AdminHttp,
-  variantId: string,
-  input: CreateBatchInput,
-): Promise<z.infer<typeof batchSchema>> {
-  const response = await http.request({
-    method: "POST",
-    path: `/admin/variants/${variantId}/batches`,
-    body: input,
-  });
-
-  return parseOrThrow(batchSchema, response);
-}
-
-/**
- * Declared locally, not imported from the API: `coaUploadUrlResponseSchema`
- * is one of the API's own admin-only DTOs (`batches.dto.ts`), the same reason
- * `uploadUrlSchema` above is local rather than shared — it describes an admin
- * WRITE with no storefront consumer, so it has no home in `@akai/contracts`.
- * UNLIKE the media version, there is no `publicUrl`: `S3_BUCKET_COA` grants no
- * anonymous read, so the only way to read a COA back is the signed `coaUrl`
- * `batchSchema` itself carries.
- */
-const coaUploadUrlSchema = z
-  .object({
-    uploadUrl: z.string().url(),
-    objectKey: z.string().min(1),
-    expiresInSeconds: z.number().int().positive(),
-  })
-  .strict();
-
-export async function createCoaUploadUrl(
-  http: AdminHttp,
-  batchId: string,
-  input: { sizeBytes: number },
-): Promise<z.infer<typeof coaUploadUrlSchema>> {
-  const response = await http.request({
-    method: "POST",
-    path: `/admin/batches/${batchId}/coa/upload-url`,
-    body: input,
-  });
-
-  return parseOrThrow(coaUploadUrlSchema, response);
-}
-
-export async function attachCoa(
-  http: AdminHttp,
-  batchId: string,
-  input: { objectKey: string },
-): Promise<z.infer<typeof batchSchema>> {
-  const response = await http.request({
-    method: "POST",
-    path: `/admin/batches/${batchId}/coa`,
-    body: input,
-  });
-
-  return parseOrThrow(batchSchema, response);
-}
-
-/**
- * The PRODUCT's certificate of analysis — one PDF per product, same presign →
- * PUT → confirm lifecycle and the same private bucket as a lot's certificate
- * above, keyed per product. The upload URL response is the same shape, so it
- * is parsed with the same local schema. Attach and remove answer with the
- * whole product, whose `coaUrl` is freshly signed for the admin.
- */
-export async function createProductCoaUploadUrl(
-  http: AdminHttp,
-  productId: string,
-  input: { sizeBytes: number },
-): Promise<z.infer<typeof coaUploadUrlSchema>> {
-  const response = await http.request({
-    method: "POST",
-    path: `/admin/products/${productId}/coa/upload-url`,
-    body: input,
-  });
-
-  return parseOrThrow(coaUploadUrlSchema, response);
-}
-
-export async function attachProductCoa(
-  http: AdminHttp,
-  productId: string,
-  input: { objectKey: string },
-): Promise<z.infer<typeof productSchema>> {
-  const response = await http.request({
-    method: "POST",
-    path: `/admin/products/${productId}/coa`,
-    body: input,
-  });
-
-  return parseOrThrow(productSchema, response);
-}
-
-export async function removeProductCoa(
-  http: AdminHttp,
-  productId: string,
-): Promise<z.infer<typeof productSchema>> {
-  const response = await http.request({
-    method: "DELETE",
-    path: `/admin/products/${productId}/coa`,
   });
 
   return parseOrThrow(productSchema, response);
