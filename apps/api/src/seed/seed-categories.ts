@@ -4,7 +4,7 @@
  * Run with: `pnpm nx run api:seed-categories` (see package.json).
  *
  * WHY THIS EXISTS SEPARATELY FROM `seed.ts`:
- * `seed.ts` seeds a KNOWN admin password and three fixture products alongside
+ * `seed.ts` seeds a KNOWN admin password and a fixture catalogue alongside
  * its categories, runs its ENTIRE seed unconditionally as a side effect of
  * being imported (there is no `require.main` guard), and is meant for a
  * fresh dev/staging database, never one with real orders in it. Its own guard
@@ -14,9 +14,7 @@
  * `seed.ts` from running against the real database if it were ever imported
  * or invoked there. This script imports ONLY the plain-data taxonomy from
  * `./seed-taxonomy` (which has no top-level side effects of its own) and
- * never touches `seed.ts` at all, so the 7-category taxonomy requested in
- * `docs/superpowers/specs/2026-09-12-storefront-visual-and-catalog-changes.md`
- * can be applied to a live database with nothing else at risk.
+ * never touches `seed.ts` at all, so the taxonomy can be applied to a live database with nothing else at risk.
  *
  * SAFE TO RUN AGAINST A LIVE DATABASE: every write is find-then-write, keyed
  * on the LIVE row matching `slug` (mirroring `seedCategories()` in
@@ -25,11 +23,11 @@
  * `Product`, `Order`, `User`, or any other table.
  *
  * FIND-THEN-WRITE, NOT `upsert`. `category.slug` is unique among LIVE rows
- * only (`20260915100000_category_admin_crud` — the admin CRUD screen this
- * unlocked a real delete path for), so `upsert({ where: { slug } })` no
+ * only (a partial index in `20260927000100_invariants` — the admin CRUD
+ * screen has a real delete path), so `upsert({ where: { slug } })` no
  * longer type-checks: a slug is not Prisma's idea of a unique identifier once
  * the index is partial. A seed re-run building against a LIVE row is exactly
- * the behaviour wanted — an admin who deliberately deleted one of these seven
+ * the behaviour wanted — an admin who deliberately deleted one of these
  * categories should get a fresh one back, not a resurrected one carrying
  * whatever they changed before deleting it.
  */
