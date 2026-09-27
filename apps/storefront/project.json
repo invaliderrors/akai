@@ -1,0 +1,42 @@
+{
+  "name": "storefront",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "apps/storefront/src",
+  "tags": ["scope:web", "type:app"],
+  "targets": {
+    "dev": {
+      "executor": "nx:run-commands",
+      "options": { "command": "astro dev --port 3100", "cwd": "apps/storefront" }
+    },
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": { "command": "astro dev --port 3100", "cwd": "apps/storefront" }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "outputs": ["{projectRoot}/dist"],
+      "options": { "command": "astro build", "cwd": "apps/storefront" }
+    },
+    "start": {
+      "executor": "nx:run-commands",
+      "options": { "command": "node dist/server/entry.mjs", "cwd": "apps/storefront" }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/storefront",
+        "commands": ["astro check", "tsc -p tsconfig.spec.json --noEmit"],
+        "parallel": false
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": { "command": "vitest run --passWithNoTests", "cwd": "apps/storefront" }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": { "command": "eslint apps/storefront" }
+    }
+  }
+}

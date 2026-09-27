@@ -11,6 +11,7 @@
  * inherited by the API, which runs in a `node` environment.
  */
 export default [
+  "apps/storefront/vitest.config.ts",
   "apps/dashboard/vitest.config.ts",
   "apps/api/vitest.config.ts",
   "apps/worker/vitest.config.ts",

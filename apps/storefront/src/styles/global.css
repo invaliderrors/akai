@@ -1,0 +1,58 @@
+@import "tailwindcss";
+
+/*
+ * Akai (赤い, "red"): sumi ink, washi paper, one hanko red. Everything else is
+ * restraint — flat colour, hard edges, a condensed display face for headlines
+ * and a Japanese-capable gothic for body copy.
+ */
+@theme {
+  --color-ink: #0e0e0e;
+  --color-paper: #f3efe6;
+  --color-stone: #8a857b;
+  --color-line: #d6d0c3;
+  --color-akai: #d0231c;
+  --color-akai-deep: #a11a14;
+
+  --font-display: "Anton", "Zen Kaku Gothic New", system-ui, sans-serif;
+  --font-sans: "Zen Kaku Gothic New", system-ui, sans-serif;
+}
+
+@layer base {
+  html {
+    background: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-akai);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 bg-ink px-6 py-3 text-sm font-bold uppercase tracking-[0.2em] text-paper transition-colors hover:bg-akai disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-outline {
+    @apply inline-flex items-center justify-center gap-2 border border-ink px-6 py-3 text-sm font-bold uppercase tracking-[0.2em] transition-colors hover:bg-ink hover:text-paper;
+  }
+
+  .field {
+    @apply w-full border border-line bg-white/60 px-3 py-2.5 text-sm outline-none focus:border-ink;
+  }
+
+  .label {
+    @apply mb-1 block text-xs font-bold uppercase tracking-[0.15em] text-stone;
+  }
+
+  .rich-text p {
+    @apply mb-3;
+  }
+
+  .rich-text ul {
+    @apply mb-3 list-disc pl-5;
+  }
+}

@@ -1,0 +1,43 @@
+---
+import Footer from "@/components/Footer.astro";
+import Header from "@/components/Header.astro";
+import { messages } from "@/i18n/messages";
+import { alternatePath } from "@/i18n/routing";
+import "@/styles/global.css";
+
+interface Props {
+  title?: string;
+  description?: string | undefined;
+}
+
+const locale = Astro.locals.locale;
+const t = messages(locale);
+const { title, description = t.meta.description } = Astro.props;
+const other = locale === "es" ? "en" : "es";
+const fullTitle = title === undefined ? "AKAI — 赤い" : `${title} · AKAI`;
+---
+
+<!doctype html>
+<html lang={locale}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="alternate" hreflang={other} href={alternatePath(Astro.url.pathname, locale, other)} />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Anton&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap"
+    />
+  </head>
+  <body class="flex min-h-screen flex-col">
+    <Header />
+    <main class="flex-1">
+      <slot />
+    </main>
+    <Footer />
+  </body>
+</html>

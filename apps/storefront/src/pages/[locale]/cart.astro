@@ -1,0 +1,25 @@
+---
+import CartView from "@/components/islands/CartView";
+import { messages } from "@/i18n/messages";
+import { href } from "@/i18n/routing";
+import Base from "@/layouts/Base.astro";
+import { serverEnv } from "@/lib/env";
+
+const locale = Astro.locals.locale;
+const t = messages(locale);
+---
+
+<Base title={t.cart.title}>
+  <section class="mx-auto max-w-7xl px-4 pt-12 sm:px-6">
+    <h1 class="mb-10 font-display text-6xl uppercase">{t.cart.title}</h1>
+    <CartView
+      client:only="react"
+      apiUrl={serverEnv().PUBLIC_API_URL}
+      locale={locale}
+      shopHref={href(locale, "/products")}
+      checkoutHref={href(locale, "/checkout")}
+      productHrefBase={href(locale, "/products")}
+      t={t.cart}
+    />
+  </section>
+</Base>

@@ -1,0 +1,23 @@
+---
+import OrderProcessing from "@/components/islands/OrderProcessing";
+import { messages } from "@/i18n/messages";
+import { href } from "@/i18n/routing";
+import Base from "@/layouts/Base.astro";
+import { serverEnv } from "@/lib/env";
+
+const locale = Astro.locals.locale;
+const t = messages(locale);
+const orderNumber = Astro.url.searchParams.get("order");
+
+// The API builds this URL (`/checkout/processing?order=…`); anything else is not ours.
+if (orderNumber === null || !/^[A-Z]{2}-\d{4}-\d{6}$/.test(orderNumber)) {
+  return Astro.redirect(href(locale, "/"));
+}
+---
+
+<Base title={t.processing.title}>
+  <section class="mx-auto max-w-2xl px-4 pt-16 sm:px-6">
+    <h1 class="mb-8 font-display text-5xl uppercase">{t.processing.title}</h1>
+    <OrderProcessing client:only="react" apiUrl={serverEnv().PUBLIC_API_URL} locale={locale} orderNumber={orderNumber} t={t.processing} />
+  </section>
+</Base>

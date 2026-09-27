@@ -13,7 +13,7 @@
 # are runtime environment only and must never become build args.
 # =============================================================================
 
-FROM node:20.19-alpine AS deps
+FROM node:22.12-alpine AS deps
 WORKDIR /app
 RUN corepack enable
 
@@ -21,7 +21,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY apps/api/package.json apps/api/
 COPY apps/worker/package.json apps/worker/
 COPY apps/dashboard/package.json apps/dashboard/
-COPY apps/dashboard/package.json apps/dashboard/
+COPY apps/storefront/package.json apps/storefront/
 COPY libs/config/package.json libs/config/
 COPY libs/contracts/package.json libs/contracts/
 COPY libs/db/package.json libs/db/
@@ -35,7 +35,7 @@ COPY libs/ui/package.json libs/ui/
 RUN pnpm install --frozen-lockfile
 
 
-FROM node:20.19-alpine AS build
+FROM node:22.12-alpine AS build
 WORKDIR /app
 RUN corepack enable
 
@@ -84,7 +84,7 @@ COPY . .
 RUN pnpm nx run dashboard:build
 
 
-FROM node:20.19-alpine AS runtime
+FROM node:22.12-alpine AS runtime
 WORKDIR /app
 
 ENV NODE_ENV=production \

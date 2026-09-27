@@ -21,13 +21,22 @@ fresh, shop-agnostic base with a new Astro storefront.
 - [ ] Verify `prisma migrate reset` + seed against a clean Postgres
 
 ## 4. Astro storefront (`apps/storefront`)
-- [ ] Scaffold Astro (SSR, `@astrojs/node`), React islands, Tailwind v4, Nx project targets
-- [ ] i18n: `es` default at `/`, `en` at `/en`
-- [ ] Typed API client over `@akai/contracts`
-- [ ] BFF endpoints: `/api/auth/{login,logout,session,otp/verify}` and `/api/revalidate` using `@akai/session`
-- [ ] Pages: home, catalog/collection, product (size/colour variants), cart, checkout redirect (Whop), order status
-- [ ] Streetwear visual identity (Japanese-style)
-- [ ] Dockerfile + docker-compose service, e2e project
+- [x] Scaffold Astro 7 (SSR, `@astrojs/node`), React islands, Tailwind v4, Nx targets (dev/build/start/typecheck/test/lint)
+- [x] Workspace on Node 22.12+ (Astro 7 requirement; Node 20 is EOL)
+- [x] i18n: `es` default at `/`, `en` at `/en` (middleware rewrite; pages written once under `[locale]/`)
+- [x] Typed API client over `@akai/contracts` (server catalog reads, browser cart/checkout client)
+- [x] Session: reads the dashboard's shared sealed cookie; sign-in/account link to the dashboard
+- [x] `/api/revalidate` verifies the API's HMAC (acknowledge-only until a cache exists)
+- [x] Pages: home, products (+category filter, cursor paging), product (variant picker), cart, checkout (Whop redirect), checkout/processing (status poll), 404
+- [x] First pass of the visual identity (ink / washi / hanko red, Anton + Zen Kaku Gothic New)
+- [x] Dockerfile + docker-compose service
+- [ ] Pickup-point (SERVICE_POINT) delivery at checkout — blocked on the API's service-point search (Sendcloud Phase 3)
+- [ ] Discount code field in cart
+- [ ] Legal pages (terms, privacy, returns) + footer links; `TERMS_VERSION` in `src/lib/legal.ts`
+- [ ] SEO: sitemap, canonical URLs, product JSON-LD, OG images
+- [ ] Blog / lookbook pages (API `blog` module exists)
+- [ ] Brand design pass (real photography, lookbook layouts, motion)
+- [ ] `storefront-e2e` Playwright project (browse → add to cart → checkout redirect)
 
 ## 5. Docs & verification
 - [ ] Rewrite CLAUDE.md and README.md for Akai

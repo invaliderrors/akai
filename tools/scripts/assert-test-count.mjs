@@ -85,6 +85,7 @@ function extractTotalTests(output) {
 const MINIMUMS = [
   { project: "api", minimum: 900 },
   { project: "dashboard", minimum: 300 },
+  { project: "storefront", minimum: 4 },
 ];
 
 let failed = false;

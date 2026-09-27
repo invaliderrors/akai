@@ -13,7 +13,7 @@
 # is latency-sensitive and bursty, the worker is throughput-bound and steady.
 # =============================================================================
 
-FROM node:20.19-alpine AS deps
+FROM node:22.12-alpine AS deps
 WORKDIR /app
 RUN corepack enable
 
@@ -33,7 +33,7 @@ COPY libs/ui/package.json libs/ui/
 RUN pnpm install --frozen-lockfile
 
 
-FROM node:20.19-alpine AS build
+FROM node:22.12-alpine AS build
 WORKDIR /app
 RUN corepack enable
 
@@ -55,7 +55,7 @@ RUN pnpm exec prisma generate --schema libs/db/prisma/schema.prisma
 RUN pnpm nx run worker:build
 
 
-FROM node:20.19-alpine AS runtime
+FROM node:22.12-alpine AS runtime
 WORKDIR /app
 
 ENV NODE_ENV=production

@@ -1,0 +1,73 @@
+---
+import { idSchema, slugSchema } from "@akai/contracts";
+
+import ProductCard from "@/components/ProductCard.astro";
+import { messages } from "@/i18n/messages";
+import { href } from "@/i18n/routing";
+import Base from "@/layouts/Base.astro";
+import { listCategories, listProducts } from "@/lib/catalog";
+import { pickLocaleText } from "@/lib/view";
+
+const locale = Astro.locals.locale;
+const t = messages(locale);
+const category = slugSchema.safeParse(Astro.url.searchParams.get("category")).data;
+const cursor = idSchema.safeParse(Astro.url.searchParams.get("cursor")).data;
+
+const [page, categories] = await Promise.all([
+  listProducts({ locale, category, cursor, sort: "manual", limit: 24 }),
+  listCategories(locale),
+]);
+
+const base = href(locale, "/products");
+const withQuery = (query: Record<string, string | undefined>) => {
+  const params = new URLSearchParams(Object.entries(query).filter((entry): entry is [string, string] => entry[1] !== undefined));
+  const qs = params.toString();
+  return qs === "" ? base : `${base}?${qs}`;
+};
+---
+
+<Base title={t.shop.title}>
+  <section class="mx-auto max-w-7xl px-4 pt-12 sm:px-6">
+    <h1 class="font-display text-6xl uppercase sm:text-8xl">{t.shop.title}</h1>
+
+    <nav class="mt-8 flex flex-wrap gap-2 border-b border-ink pb-6 text-xs font-bold uppercase tracking-[0.15em]">
+      <a href={base} class:list={["border px-3 py-1.5", category === undefined ? "border-ink bg-ink text-paper" : "border-line hover:border-ink"]}>
+        {t.shop.all}
+      </a>
+      {
+        categories
+          .filter((entry) => entry.productCount > 0)
+          .map((entry) => (
+            <a
+              href={withQuery({ category: entry.slug })}
+              class:list={["border px-3 py-1.5", category === entry.slug ? "border-ink bg-ink text-paper" : "border-line hover:border-ink"]}
+            >
+              {pickLocaleText(entry.name, locale)}
+            </a>
+          ))
+      }
+    </nav>
+
+    {
+      page.items.length === 0 ? (
+        <p class="mt-10 text-stone">{t.shop.empty}</p>
+      ) : (
+        <div class="mt-10 grid grid-cols-2 gap-x-4 gap-y-10 md:grid-cols-3 lg:grid-cols-4">
+          {page.items.map((product) => (
+            <ProductCard product={product} />
+          ))}
+        </div>
+      )
+    }
+
+    {
+      page.hasMore && page.nextCursor !== null && (
+        <div class="mt-12 text-center">
+          <a href={withQuery({ category, cursor: page.nextCursor })} class="btn-outline">
+            {t.shop.loadMore}
+          </a>
+        </div>
+      )
+    }
+  </section>
+</Base>

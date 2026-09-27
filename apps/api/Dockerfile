@@ -14,7 +14,7 @@
 # --- Stage 1: dependencies ---------------------------------------------------
 # Split from the build stage so a source-only change reuses the cached install.
 # This is the slowest layer by an order of magnitude.
-FROM node:20.19-alpine AS deps
+FROM node:22.12-alpine AS deps
 WORKDIR /app
 
 RUN corepack enable
@@ -41,7 +41,7 @@ RUN pnpm install --frozen-lockfile
 
 
 # --- Stage 2: build ----------------------------------------------------------
-FROM node:20.19-alpine AS build
+FROM node:22.12-alpine AS build
 WORKDIR /app
 RUN corepack enable
 
@@ -68,7 +68,7 @@ RUN pnpm nx run api:build
 
 
 # --- Stage 3: runtime --------------------------------------------------------
-FROM node:20.19-alpine AS runtime
+FROM node:22.12-alpine AS runtime
 WORKDIR /app
 
 ENV NODE_ENV=production

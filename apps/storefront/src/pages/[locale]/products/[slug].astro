@@ -1,0 +1,67 @@
+---
+import { sanitizeRichText } from "@akai/rich-text";
+
+import AddToCart from "@/components/islands/AddToCart";
+import { messages } from "@/i18n/messages";
+import { href } from "@/i18n/routing";
+import Base from "@/layouts/Base.astro";
+import { getProduct } from "@/lib/catalog";
+import { serverEnv } from "@/lib/env";
+import { pickLocaleText, pickTranslation, productName } from "@/lib/view";
+
+const locale = Astro.locals.locale;
+const t = messages(locale);
+const product = await getProduct(Astro.params.slug ?? "");
+
+if (product === null) {
+  return Astro.rewrite("/404");
+}
+
+const name = productName(product, locale);
+const translation = pickTranslation(product, locale);
+const gallery = [...product.media].sort((a, b) => a.sortOrder - b.sortOrder);
+---
+
+<Base title={name} description={translation?.shortDescription || undefined}>
+  <article class="mx-auto grid max-w-7xl gap-10 px-4 pt-10 sm:px-6 lg:grid-cols-[3fr_2fr]">
+    <div class="grid gap-4 sm:grid-cols-2">
+      {
+        gallery.map((media, index) => (
+          <img
+            src={media.url}
+            alt={pickLocaleText(media.alt, locale) ?? name}
+            width={media.width}
+            height={media.height}
+            loading={index < 2 ? "eager" : "lazy"}
+            class:list={["w-full border border-ink bg-line object-cover", index === 0 && "sm:col-span-2"]}
+          />
+        ))
+      }
+    </div>
+
+    <div class="lg:sticky lg:top-28 lg:h-fit">
+      <h1 class="font-display text-5xl uppercase leading-none">{name}</h1>
+      {translation?.shortDescription && <p class="mt-4 text-stone">{translation.shortDescription}</p>}
+
+      <div class="mt-8">
+        <AddToCart
+          client:load
+          apiUrl={serverEnv().PUBLIC_API_URL}
+          locale={locale}
+          variants={product.variants}
+          cartHref={href(locale, "/cart")}
+          t={t.product}
+        />
+      </div>
+
+      {
+        translation?.description && (
+          <section class="mt-10 border-t border-ink pt-6">
+            <h2 class="label">{t.product.description}</h2>
+            <div class="rich-text text-sm leading-relaxed" set:html={sanitizeRichText(translation.description)} />
+          </section>
+        )
+      }
+    </div>
+  </article>
+</Base>

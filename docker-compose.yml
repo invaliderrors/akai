@@ -185,6 +185,29 @@ services:
       postgres:
         condition: service_healthy
 
+  storefront:
+    build:
+      context: .
+      dockerfile: apps/storefront/Dockerfile
+    container_name: akai-storefront
+    restart: unless-stopped
+    # SESSION_SECRET / SESSION_COOKIE_NAME (shared with the dashboard) and
+    # REVALIDATE_SIGNING_SECRET come from the env file.
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      # Server-rendered pages reach the API inside the compose network…
+      API_INTERNAL_URL: http://api:3333
+      # …while the browser uses the published host ports.
+      PUBLIC_API_URL: http://localhost:3333
+      PUBLIC_DASHBOARD_URL: http://localhost:3101
+    ports:
+      - "3100:3000"
+    depends_on:
+      api:
+        condition: service_started
+
   dashboard:
     build:
       context: .

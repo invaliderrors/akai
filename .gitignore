@@ -19,3 +19,6 @@ playwright-report/
 # Nx
 .nx/cache
 .nx/workspace-data
+
+# Claude Code agent worktrees
+.claude/worktrees/

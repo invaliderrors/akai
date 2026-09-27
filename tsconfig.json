@@ -4,6 +4,7 @@
   "files": [],
   "include": [],
   "references": [
+    { "path": "./apps/storefront" },
     { "path": "./apps/dashboard" },
     { "path": "./apps/api" },
     { "path": "./apps/worker" },

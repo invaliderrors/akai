@@ -1,0 +1,17 @@
+---
+import { messages } from "@/i18n/messages";
+import { href } from "@/i18n/routing";
+import Base from "@/layouts/Base.astro";
+
+const locale = Astro.locals.locale;
+const t = messages(locale);
+Astro.response.status = 404;
+---
+
+<Base title={t.notFound.title}>
+  <section class="mx-auto max-w-7xl px-4 py-24 text-center sm:px-6">
+    <p class="font-display text-[10rem] leading-none text-akai">404</p>
+    <h1 class="mt-4 font-display text-4xl uppercase">{t.notFound.title}</h1>
+    <a href={href(locale, "/products")} class="btn mt-8">{t.notFound.back}</a>
+  </section>
+</Base>

@@ -1,0 +1,28 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "jsxImportSource": "react",
+    "types": ["node"],
+
+    // `paths` shallow-overrides the base, so cross-project aliases are repeated
+    // alongside the app-local `@/*`. Astro resolves these natively.
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@akai/contracts": ["../../libs/contracts/src/index.ts"],
+      "@akai/money": ["../../libs/money/src/index.ts"],
+      "@akai/rich-text": ["../../libs/rich-text/src/index.ts"],
+      "@akai/i18n": ["../../libs/i18n/src/index.ts"],
+      "@akai/session": ["../../libs/session/src/index.ts"]
+    }
+  },
+  "include": [".astro/types.d.ts", "src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

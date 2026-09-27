@@ -20,7 +20,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  NODE_VERSION: "20.19.0"
+  NODE_VERSION: "22.12.0"
   # Prisma's schema is parsed by several targets (typecheck reads the generated
   # client). These are placeholders — no CI step connects with them except the
   # integration job, which overrides them with the service container's URL.

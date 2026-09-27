@@ -120,8 +120,8 @@ const eslintConfig = [
       // Reference material, not buildable source — kept in place but out of the
       // lint path so it cannot fail CI.
       "docs/**",
-      "Ascend BioLabs landing page/**",
-      "content.md",
+      ".claude/**",
+      "**/.astro/**",
     ],
   },
 
