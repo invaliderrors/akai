@@ -66,8 +66,8 @@ const ROWS: readonly InventoryRow[] = [
     variantId: "11111111-1111-4111-8111-111111111111",
     sku: "AK-WHE-1K",
     productId: "aaaaaaaa-1111-4111-8111-111111111111",
-    productSlug: "whey-isolate",
-    productName: "Whey isolate 1 kg",
+    productSlug: "coach-jacket",
+    productName: "Coach jacket L",
     tracked: true,
     onHand: 0,
     reserved: 0,
@@ -77,9 +77,9 @@ const ROWS: readonly InventoryRow[] = [
   }),
   inventoryRowSchema.parse({
     variantId: "22222222-2222-4222-8222-222222222222",
-    sku: "AK-SHK-01",
+    sku: "AK-STK-01",
     productId: "aaaaaaaa-2222-4222-8222-222222222222",
-    productSlug: "shaker-700-ml",
+    productSlug: "sticker-pack",
     // No translation in ANY locale — the defect the slug fallback exposes.
     productName: null,
     tracked: false,
@@ -91,10 +91,10 @@ const ROWS: readonly InventoryRow[] = [
   }),
   inventoryRowSchema.parse({
     variantId: "33333333-3333-4333-8333-333333333333",
-    sku: "AK-CRE-500",
+    sku: "AK-TEE-BLK-M",
     productId: "aaaaaaaa-3333-4333-8333-333333333333",
-    productSlug: "creatina-monohidrato",
-    productName: "Creatina monohidrato 500 g",
+    productSlug: "camiseta-oversize",
+    productName: "Camiseta oversize M",
     tracked: true,
     // Five figures on purpose: es-ES groups from 10.000 up (CLDR's
     // `minimumGroupingDigits` is 2 for Spanish), so a four-digit fixture would
@@ -159,7 +159,7 @@ describe("AdminInventoryPage", () => {
   it("renders an untracked variant as four em-dashes, never as four zeros", async () => {
     await renderList();
 
-    const untracked = within(rowFor("AK-SHK-01"));
+    const untracked = within(rowFor("AK-STK-01"));
     // On hand, reserved, available and threshold: all four, because a single
     // zero left among them reads as a stock level.
     expect(untracked.getAllByText("—")).toHaveLength(4);
@@ -170,7 +170,7 @@ describe("AdminInventoryPage", () => {
   it("shows the slug when a product has no name in any locale", async () => {
     await renderList();
 
-    expect(within(rowFor("AK-SHK-01")).getByText("shaker-700-ml")).toBeInTheDocument();
+    expect(within(rowFor("AK-STK-01")).getByText("sticker-pack")).toBeInTheDocument();
   });
 
   it("badges zero available as the state an operator has to act on", async () => {
@@ -184,8 +184,8 @@ describe("AdminInventoryPage", () => {
   it("groups counts in the reader's locale rather than printing bare integers", async () => {
     await renderList();
 
-    expect(within(rowFor("AK-CRE-500")).getByText("16.000")).toBeInTheDocument();
-    expect(within(rowFor("AK-CRE-500")).getByText("14.200")).toBeInTheDocument();
+    expect(within(rowFor("AK-TEE-BLK-M")).getByText("16.000")).toBeInTheDocument();
+    expect(within(rowFor("AK-TEE-BLK-M")).getByText("14.200")).toBeInTheDocument();
   });
 
   it("degrades an unrecognised filter to 'all' instead of sending it", async () => {
@@ -217,12 +217,12 @@ describe("AdminInventoryPage", () => {
     const user = userEvent.setup();
     await renderList();
 
-    const row = within(rowFor("AK-CRE-500"));
+    const row = within(rowFor("AK-TEE-BLK-M"));
     await user.click(row.getByRole("button", { name: stock.adjust }));
 
     const dialog = await screen.findByRole("dialog");
     expect(
-      within(dialog).getByText(stock.title.replace("{sku}", "AK-CRE-500")),
+      within(dialog).getByText(stock.title.replace("{sku}", "AK-TEE-BLK-M")),
     ).toBeInTheDocument();
     // The counts the dialog computes its delta from are this row's.
     expect(within(dialog).getByText("16000")).toBeInTheDocument();
@@ -236,7 +236,7 @@ describe("AdminInventoryPage", () => {
     const user = userEvent.setup();
     await renderList();
 
-    await user.click(within(rowFor("AK-SHK-01")).getByRole("button", { name: stock.adjust }));
+    await user.click(within(rowFor("AK-STK-01")).getByRole("button", { name: stock.adjust }));
     const dialog = await screen.findByRole("dialog");
     const target = within(dialog).getByLabelText(stock.targetLabel);
     await user.clear(target);

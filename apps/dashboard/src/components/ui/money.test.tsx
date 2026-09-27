@@ -60,7 +60,7 @@ describe("<Money />", () => {
     const element = renderFigure(<Money amount={toMinor(8980)} currency="EUR" locale="es" />);
 
     expect(element.className).toContain("tabular-nums");
-    // Mono is reserved for identifiers — SKUs, order numbers, lot codes. An
+    // Mono is reserved for identifiers — SKUs, order numbers, tracking numbers. An
     // amount rendered in it reads as a code rather than a quantity.
     expect(element.className).not.toMatch(/font-mono|--font-mono/);
   });

@@ -20,17 +20,11 @@ import type { PackComponentCandidate } from "./pack-components-picker";
 import {
   addProductMediaAction,
   addVariantAction,
-  attachCoaAction,
-  attachProductCoaAction,
-  createBatchAction,
-  createCoaUploadUrlAction,
   createMediaUploadUrlAction,
   createProductAction,
-  createProductCoaUploadUrlAction,
   deleteProductAction,
   offerProductEverywhereAction,
   publishProductAction,
-  removeProductCoaAction,
   removeProductMediaAction,
   setVariantInventoryPolicyAction,
   unpublishProductAction,
@@ -275,7 +269,7 @@ export function ProductEditor({
    *
    * IT RETURNS THE COPY; IT DOES NOT SAVE IT. Nothing here calls
    * `updateProductAction`. The operator reads the fill, edits it and saves
-   * deliberately — an unreviewed machine translation of a supplement label is a
+   * deliberately — an unreviewed machine translation of customer-facing copy is a
    * compliance failure, not a time saving.
    */
   async function handleTranslate(request: TranslateCopyRequest): Promise<ProductCopyDraft> {
@@ -505,7 +499,7 @@ export function ProductEditor({
     //
     // MATCHED BY SKU, NEVER BY POSITION. The API is under no obligation to
     // return the variants in the order they were sent, and an index match would
-    // silently put the 10 mg photo on the 20 mg variant — a failure with no
+    // silently put the black photo on the white variant — a failure with no
     // error, discovered by a customer. The SKU is unique and is what the
     // operator typed.
     const variantIdBySku = new Map(
@@ -659,29 +653,6 @@ export function ProductEditor({
                 },
               }
         }
-        // ABSENT ENTIRELY WHILE CREATING: a batch is keyed by a real
-        // variantId, which does not exist until the product is saved — there
-        // is no staged equivalent to fall back to, unlike the image column.
-        {...(product === undefined
-          ? {}
-          : {
-              batchUploads: {
-                onCreateBatch: (variantId, input) =>
-                  createBatchAction(product.id, variantId, input),
-                onRequestUpload: (input) =>
-                  createCoaUploadUrlAction(input.batchId, { sizeBytes: input.sizeBytes }),
-                onAttach: (batchId, input) => attachCoaAction(product.id, batchId, input),
-              },
-              // The PRODUCT's certificate: absent while creating for the same
-              // reason — its object key is derived from the product id.
-              coaUploads: {
-                productId: product.id,
-                onRequestUpload: (productId, input) =>
-                  createProductCoaUploadUrlAction(productId, input),
-                onAttach: (productId, input) => attachProductCoaAction(productId, input),
-                onRemove: (productId) => removeProductCoaAction(productId),
-              },
-            })}
       />
     </div>
   );

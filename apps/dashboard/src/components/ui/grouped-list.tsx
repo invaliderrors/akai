@@ -497,7 +497,7 @@ interface ContentRowBase {
    * derive from whatever the caller puts here.
    */
   readonly leading?: ReactNode;
-  /** The middle column: a `Badge`, a `LotChip`. Third column when `trailing` is present too. */
+  /** The middle column: a `Badge`, a `Counter`. Third column when `trailing` is present too. */
   readonly aside?: ReactNode;
   /** The right-hand column: money, a quantity, an action. */
   readonly trailing?: ReactNode;

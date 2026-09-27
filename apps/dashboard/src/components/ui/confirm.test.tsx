@@ -304,18 +304,18 @@ describe("<TypeToConfirmDialog />", () => {
 
   it("matches after trimming but never across a difference in case", async () => {
     const user = userEvent.setup();
-    render(<SheetHarness onConfirm={() => Promise.resolve()} phrase="BPC-157" phraseKind="identifier" />);
+    render(<SheetHarness onConfirm={() => Promise.resolve()} phrase="Hoodie Kumo" phraseKind="identifier" />);
     await openSheet();
 
     const submit = screen.getByRole("button", { name: SHEET_COPY.confirmLabel });
     const input = screen.getByLabelText(/Escribe/);
 
     // A pasted identifier routinely carries a trailing space.
-    await user.type(input, "  BPC-157 ");
+    await user.type(input, "  Hoodie Kumo ");
     expect(submit).toBeEnabled();
 
     await user.clear(input);
-    await user.type(input, "bpc-157");
+    await user.type(input, "hoodie-kumo");
     expect(submit).toBeDisabled();
   });
 
@@ -384,7 +384,7 @@ describe("<TypeToConfirmDialog />", () => {
 
   it("sets the phrase in mono for an identifier and in tabular figures for money", async () => {
     const { unmount } = render(
-      <SheetHarness onConfirm={() => Promise.resolve()} phrase="bpc-157" phraseKind="identifier" />,
+      <SheetHarness onConfirm={() => Promise.resolve()} phrase="hoodie-kumo" phraseKind="identifier" />,
     );
     await openSheet();
     expect(screen.getByLabelText(/Escribe/).className).toContain("font-mono");

@@ -9,22 +9,22 @@ import esMessages from "../../../messages/es.json";
 
 const form = esMessages.admin.productForm;
 
-/** Bacteriostatic water: 3 ml free, 10 ml paid, 30 ml discontinued. */
-const WATER_VARIANTS = [
-  { id: "a3", label: "3 ml", priceGross: 0, currency: "EUR", isActive: true },
-  { id: "a10", label: "10 ml", priceGross: 845, currency: "EUR", isActive: true },
-  { id: "a30", label: "30 ml", priceGross: 1900, currency: "EUR", isActive: false },
+/** Tote bag: mini free, standard paid, XL discontinued. */
+const TOTE_VARIANTS = [
+  { id: "a3", label: "Mini", priceGross: 0, currency: "EUR", isActive: true },
+  { id: "a10", label: "Standard", priceGross: 845, currency: "EUR", isActive: true },
+  { id: "a30", label: "XL", priceGross: 1900, currency: "EUR", isActive: false },
 ] as const;
 
 const CANDIDATES: readonly AddOnCandidate[] = [
   {
     id: "a",
-    slug: "agua-bacteriostatica",
-    name: "Agua bacteriostática",
-    variants: WATER_VARIANTS,
+    slug: "bolsa-tote",
+    name: "Bolsa tote",
+    variants: TOTE_VARIANTS,
   },
-  { id: "b", slug: "jeringas", name: "Jeringas" },
-  { id: "c", slug: "viales-vacios", name: "Viales vacíos" },
+  { id: "b", slug: "pegatinas", name: "Pegatinas" },
+  { id: "c", slug: "calcetines-blancos", name: "Calcetines" },
 ];
 
 /** The selection is a list of ENTRIES now, not ids — each may name a default. */
@@ -65,7 +65,7 @@ describe("<AddOnPicker />", () => {
     const user = userEvent.setup();
     const onChange = renderPicker([entry("c")]);
 
-    await user.click(screen.getByRole("checkbox", { name: "Jeringas" }));
+    await user.click(screen.getByRole("checkbox", { name: "Pegatinas" }));
 
     expect(onChange).toHaveBeenCalledWith([entry("c"), entry("b")]);
   });
@@ -74,7 +74,7 @@ describe("<AddOnPicker />", () => {
     const user = userEvent.setup();
     const onChange = renderPicker([entry("c"), entry("b"), entry("a")]);
 
-    await user.click(screen.getByRole("checkbox", { name: "Jeringas" }));
+    await user.click(screen.getByRole("checkbox", { name: "Pegatinas" }));
 
     expect(onChange).toHaveBeenCalledWith([entry("c"), entry("a")]);
   });
@@ -83,22 +83,22 @@ describe("<AddOnPicker />", () => {
     const user = userEvent.setup();
     renderPicker();
 
-    await user.type(screen.getByLabelText(form.addOnsSearch), "jering");
-    expect(screen.getByRole("checkbox", { name: "Jeringas" })).toBeInTheDocument();
+    await user.type(screen.getByLabelText(form.addOnsSearch), "pegat");
+    expect(screen.getByRole("checkbox", { name: "Pegatinas" })).toBeInTheDocument();
     expect(
-      screen.queryByRole("checkbox", { name: "Agua bacteriostática" }),
+      screen.queryByRole("checkbox", { name: "Bolsa tote" }),
     ).not.toBeInTheDocument();
 
     await user.clear(screen.getByLabelText(form.addOnsSearch));
-    await user.type(screen.getByLabelText(form.addOnsSearch), "viales-vacios");
-    expect(screen.getByRole("checkbox", { name: "Viales vacíos" })).toBeInTheDocument();
+    await user.type(screen.getByLabelText(form.addOnsSearch), "calcetines-bl");
+    expect(screen.getByRole("checkbox", { name: "Calcetines" })).toBeInTheDocument();
   });
 
   it("reflects what is already selected", () => {
     renderPicker([entry("a")]);
 
-    expect(screen.getByRole("checkbox", { name: "Agua bacteriostática" })).toBeChecked();
-    expect(screen.getByRole("checkbox", { name: "Jeringas" })).not.toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Bolsa tote" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Pegatinas" })).not.toBeChecked();
   });
 });
 
@@ -146,12 +146,12 @@ describe("<AddOnPicker /> — the pre-selected variant", () => {
   });
 
   it("reads a zero price as FREE, never as 0,00 €", () => {
-    // The whole point of the feature: "3 ml comes free with this". Rendering
+    // The whole point of the feature: "the mini tote comes free with this". Rendering
     // 0,00 € would make a gift look like a charge of nothing.
     renderPicker([entry("a")]);
 
     expect(
-      screen.getByRole("option", { name: `3 ml · ${form.defaultVariantFree}` }),
+      screen.getByRole("option", { name: `Mini · ${form.defaultVariantFree}` }),
     ).toBeInTheDocument();
     // A REGEX, NOT A LITERAL, and the reason is invisible: `Intl` separates the
     // amount from the currency symbol with a NON-BREAKING space (U+00A0), so a
@@ -159,7 +159,7 @@ describe("<AddOnPicker /> — the pre-selected variant", () => {
     // `getByText` hides this because its default normalizer collapses NBSP;
     // accessible-name computation keeps it, so the exact-string form fails
     // against markup that is entirely correct.
-    expect(screen.getByRole("option", { name: /10 ml · 8,45/ })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /Standard · 8,45/ })).toBeInTheDocument();
   });
 
   it("will not offer an INACTIVE variant as a default", () => {
@@ -167,7 +167,7 @@ describe("<AddOnPicker /> — the pre-selected variant", () => {
     // refuses to sell them.
     renderPicker([entry("a")]);
 
-    expect(screen.queryByRole("option", { name: /30 ml/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /XL/ })).not.toBeInTheDocument();
   });
 
   it("offers no control for an add-on whose variants are unknown", () => {
@@ -183,8 +183,8 @@ describe("<AddOnPicker /> — the pre-selected variant", () => {
 
 describe("<AddOnPicker /> — draft add-ons", () => {
   const DRAFT: readonly AddOnCandidate[] = [
-    { id: "a", slug: "agua-bacteriostatica", name: "Agua bacteriostática", status: "DRAFT" },
-    { id: "b", slug: "jeringas", name: "Jeringas", status: "ACTIVE" },
+    { id: "a", slug: "bolsa-tote", name: "Bolsa tote", status: "DRAFT" },
+    { id: "b", slug: "pegatinas", name: "Pegatinas", status: "ACTIVE" },
   ];
 
   it("warns that a DRAFT add-on will not appear in the shop", () => {
@@ -202,7 +202,7 @@ describe("<AddOnPicker /> — draft add-ons", () => {
     const onChange = renderPicker([], vi.fn(), DRAFT);
 
     expect(
-      screen.getByRole("checkbox", { name: "Agua bacteriostática" }),
+      screen.getByRole("checkbox", { name: "Bolsa tote" }),
     ).not.toBeDisabled();
     expect(onChange).not.toHaveBeenCalled();
   });

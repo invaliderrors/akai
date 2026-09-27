@@ -18,9 +18,9 @@ import esMessages from "../../../messages/es.json";
 const t = esMessages.admin.productReorder;
 
 const ROWS: readonly ProductReorderRow[] = [
-  { id: "11111111-1111-4111-8111-111111111111", name: "Creatina", sku: "AK-CRE", imageUrl: null },
-  { id: "22222222-2222-4222-8222-222222222222", name: "Magnesio", sku: "AK-MAG", imageUrl: null },
-  { id: "33333333-3333-4333-8333-333333333333", name: "Omega-3", sku: "AK-OMG", imageUrl: null },
+  { id: "11111111-1111-4111-8111-111111111111", name: "Camiseta", sku: "AK-CRE", imageUrl: null },
+  { id: "22222222-2222-4222-8222-222222222222", name: "Gorra", sku: "AK-MAG", imageUrl: null },
+  { id: "33333333-3333-4333-8333-333333333333", name: "Tote Bag", sku: "AK-OMG", imageUrl: null },
 ];
 
 function renderList(
@@ -44,50 +44,50 @@ describe("ProductReorderList", () => {
   it("renders every row in the given order", () => {
     renderList();
     const rendered = names();
-    expect(rendered[0]).toContain("Creatina");
-    expect(rendered[1]).toContain("Magnesio");
-    expect(rendered[2]).toContain("Omega-3");
+    expect(rendered[0]).toContain("Camiseta");
+    expect(rendered[1]).toContain("Gorra");
+    expect(rendered[2]).toContain("Tote Bag");
   });
 
   it("disables moving the first row up and the last row down", () => {
     renderList();
 
-    expect(screen.getByRole("button", { name: "Subir Creatina" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Bajar Omega-3" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Subir Camiseta" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Bajar Tote Bag" })).toBeDisabled();
     // Everything else stays enabled.
-    expect(screen.getByRole("button", { name: "Bajar Creatina" })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "Subir Omega-3" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Bajar Camiseta" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Subir Tote Bag" })).toBeEnabled();
   });
 
   it("moving a row down swaps it with its neighbour, nothing else", async () => {
     const user = userEvent.setup();
     renderList();
 
-    await user.click(screen.getByRole("button", { name: "Bajar Creatina" }));
+    await user.click(screen.getByRole("button", { name: "Bajar Camiseta" }));
 
     const rendered = names();
-    expect(rendered[0]).toContain("Magnesio");
-    expect(rendered[1]).toContain("Creatina");
-    expect(rendered[2]).toContain("Omega-3");
+    expect(rendered[0]).toContain("Gorra");
+    expect(rendered[1]).toContain("Camiseta");
+    expect(rendered[2]).toContain("Tote Bag");
   });
 
   it("moving a row up swaps it with its neighbour, nothing else", async () => {
     const user = userEvent.setup();
     renderList();
 
-    await user.click(screen.getByRole("button", { name: "Subir Omega-3" }));
+    await user.click(screen.getByRole("button", { name: "Subir Tote Bag" }));
 
     const rendered = names();
-    expect(rendered[0]).toContain("Creatina");
-    expect(rendered[1]).toContain("Omega-3");
-    expect(rendered[2]).toContain("Magnesio");
+    expect(rendered[0]).toContain("Camiseta");
+    expect(rendered[1]).toContain("Tote Bag");
+    expect(rendered[2]).toContain("Gorra");
   });
 
   it("sends the WHOLE current order on save, not a diff", async () => {
     const user = userEvent.setup();
     const { onSave } = renderList();
 
-    await user.click(screen.getByRole("button", { name: "Bajar Creatina" }));
+    await user.click(screen.getByRole("button", { name: "Bajar Camiseta" }));
     await user.click(screen.getByRole("button", { name: t.save }));
 
     expect(onSave).toHaveBeenCalledWith([

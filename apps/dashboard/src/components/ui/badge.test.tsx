@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import type { BadgeTone } from "@/lib/status";
 
-import { Badge, Counter, LotChip, type BadgeDensity } from "./badge";
+import { Badge, Counter, type BadgeDensity } from "./badge";
 import { Icon } from "./icon";
 
 /**
@@ -149,38 +149,5 @@ describe("<Counter />", () => {
     const { container } = render(<Counter count={12} label="12 pedidos abiertos" density={density} />);
 
     expect(container.firstElementChild?.className).toContain(density === "compact" ? "h-[18px]" : "h-[24px]");
-  });
-});
-
-describe("<LotChip />", () => {
-  it("renders the code on its own", () => {
-    render(<LotChip code="B-4471" />);
-
-    expect(screen.getByText("B-4471")).toBeInTheDocument();
-  });
-
-  it("reads as one string when it carries a translated prefix", () => {
-    render(<LotChip code="B-4471" prefix="lote" />);
-
-    // A missing separator would announce "loteB-4471", which is the failure a
-    // flex container would have introduced invisibly.
-    expect(screen.getByText("lote B-4471")).toBeInTheDocument();
-  });
-
-  it("fills solid accent when it is the lot a search answered", () => {
-    const { container: reference } = render(<LotChip code="B-4402" />);
-    const { container: match } = render(<LotChip code="B-4471" variant="match" />);
-
-    expect(reference.firstElementChild?.className).toContain("var(--accent-tint)");
-    expect(match.firstElementChild?.className).toContain("var(--accent)");
-    expect(match.firstElementChild?.className).toContain("var(--label-on-accent)");
-  });
-
-  it("sets a lot code in the mono face, because it is an identifier", () => {
-    // Compared character by character against a physical tub; a proportional
-    // face makes B/8 and 0/O a coin toss. Money never gets this treatment.
-    const { container } = render(<LotChip code="B-4471" />);
-
-    expect(container.firstElementChild?.className).toContain("font-mono");
   });
 });

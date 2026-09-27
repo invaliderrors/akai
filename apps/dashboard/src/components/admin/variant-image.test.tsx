@@ -36,7 +36,7 @@ vi.mock("@/i18n/navigation", () => ({
   useRouter: () => ({ refresh, push: vi.fn() }),
 }));
 
-const SKU = "AK-BPC-10";
+const SKU = "AK-HOOD-M";
 const VARIANT_ID = "11111111-1111-4111-8111-111111111111";
 const PRODUCT_ID = "22222222-2222-4222-8222-222222222222";
 
@@ -45,8 +45,8 @@ const ui = esMessages.ui;
 
 const ASSET: MediaAsset = {
   id: "9f1c6c5e-0000-4000-8000-000000000001",
-  url: "https://cdn.example.test/products/creatina-10mg.jpg",
-  alt: { es: "Vial de 10 mg", en: "10 mg vial" },
+  url: "https://cdn.example.test/products/camiseta-m.jpg",
+  alt: { es: "Camiseta negra, talla M", en: "Black tee, size M" },
   width: 1200,
   height: 1200,
   sortOrder: 0,
@@ -57,7 +57,7 @@ const CATALOGUES = [
   { locale: "en" as const, messages: enMessages },
 ];
 
-const png = (name = "vial.png") =>
+const png = (name = "tee.png") =>
   new File([new Uint8Array(64)], name, { type: "image/png" });
 
 function named(template: string, value = SKU): string {
@@ -134,8 +134,8 @@ function uploads(): VariantImageUploads & { readonly onAttach: ReturnType<typeof
       ok: true,
       data: {
         uploadUrl: "https://storage.test/signed",
-        objectKey: "products/p1/vial.png",
-        publicUrl: "https://cdn.test/vial.png",
+        objectKey: "products/p1/tee.png",
+        publicUrl: "https://cdn.test/tee.png",
         expiresInSeconds: 600,
       },
     }),
@@ -260,8 +260,8 @@ describe("<VariantImageField /> — live", () => {
 
     await userEvent.click(screen.getByRole("button", { name: named(variant.add) }));
     await userEvent.upload(screen.getByLabelText(/Arrastra una imagen/), png());
-    await userEvent.type(screen.getByLabelText(ui.altEs), "Vial de 10 mg");
-    await userEvent.type(screen.getByLabelText(ui.altEn), "10 mg vial");
+    await userEvent.type(screen.getByLabelText(ui.altEs), "Camiseta negra, talla M");
+    await userEvent.type(screen.getByLabelText(ui.altEn), "Black tee, size M");
     await userEvent.click(screen.getByRole("button", { name: ui.upload }));
 
     await waitFor(() => expect(deps.onAttach).toHaveBeenCalledTimes(1));
@@ -269,8 +269,8 @@ describe("<VariantImageField /> — live", () => {
     // render on every card of a product it only describes one variant of.
     expect(deps.onAttach.mock.calls[0]?.[1]).toMatchObject({
       variantId: VARIANT_ID,
-      url: "https://cdn.test/vial.png",
-      alt: { es: "Vial de 10 mg", en: "10 mg vial" },
+      url: "https://cdn.test/tee.png",
+      alt: { es: "Camiseta negra, talla M", en: "Black tee, size M" },
     });
   });
 });

@@ -43,7 +43,7 @@ beforeEach(() => {
 describe("loadAddOnCandidates", () => {
   it("offers only the products marked as add-ons", async () => {
     listProducts.mockResolvedValue({
-      items: [row("a", "agua", false), row("b", "creatina", true)],
+      items: [row("a", "agua", false), row("b", "camiseta", true)],
     });
 
     const result = await loadAddOnCandidates(http, "es");
@@ -55,7 +55,7 @@ describe("loadAddOnCandidates", () => {
     // A page cannot offer itself, and listing it only invites the 400 the
     // service answers with.
     listProducts.mockResolvedValue({
-      items: [row("a", "agua", false), row("self", "creatina", false)],
+      items: [row("a", "agua", false), row("self", "camiseta", false)],
     });
 
     const result = await loadAddOnCandidates(http, "es", "self");
@@ -74,7 +74,7 @@ describe("loadAddOnCandidates", () => {
     listProducts.mockResolvedValue({
       items: [
         row("a", "agua", false, [{ locale: "es", name: "Agua" }]),
-        row("b", "jeringas", false, []),
+        row("b", "pegatinas", false, []),
       ],
     });
 
@@ -83,7 +83,7 @@ describe("loadAddOnCandidates", () => {
     // No English translation — the Spanish one still names it better than an id.
     expect(result[0]?.name).toBe("Agua");
     // No translation at all — the slug is always present and always unique.
-    expect(result[1]?.name).toBe("jeringas");
+    expect(result[1]?.name).toBe("pegatinas");
   });
 
   it("returns nothing rather than throwing when the catalogue read fails", async () => {

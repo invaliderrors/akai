@@ -23,24 +23,24 @@ describe("toTranslationTexts", () => {
     // draft with a name and no description is the ordinary case this feature
     // exists for.
     const texts = toTranslationTexts({
-      name: "BPC-157",
+      name: "Hoodie Kumo",
       shortDescription: "  ",
       description: "",
     });
 
-    expect(texts).toEqual([{ key: "name", text: "BPC-157" }]);
+    expect(texts).toEqual([{ key: "name", text: "Hoodie Kumo" }]);
   });
 
   it("trims what it does send, matching the schema that will parse it", () => {
     const texts = toTranslationTexts({
-      name: "  BPC-157  ",
-      shortDescription: "Péptido",
+      name: "  Hoodie Kumo  ",
+      shortDescription: "Sudadera",
       description: "Descripción",
     });
 
     expect(texts).toEqual([
-      { key: "name", text: "BPC-157" },
-      { key: "shortDescription", text: "Péptido" },
+      { key: "name", text: "Hoodie Kumo" },
+      { key: "shortDescription", text: "Sudadera" },
       { key: "description", text: "Descripción" },
     ]);
   });
@@ -57,8 +57,8 @@ describe("mergeTranslations", () => {
   it("returns a field that was never sent as blank, not as the source text", () => {
     // Echoing the source would put Spanish prose in the English box and mark it
     // translated — the one outcome worse than an empty field.
-    expect(mergeTranslations([{ key: "name", text: "BPC-157" }])).toEqual({
-      name: "BPC-157",
+    expect(mergeTranslations([{ key: "name", text: "Hoodie Kumo" }])).toEqual({
+      name: "Hoodie Kumo",
       shortDescription: "",
       description: "",
     });
@@ -67,20 +67,20 @@ describe("mergeTranslations", () => {
   it("pairs by key rather than by position", () => {
     const merged = mergeTranslations([
       { key: "description", text: "Description" },
-      { key: "name", text: "BPC-157" },
+      { key: "name", text: "Hoodie Kumo" },
     ]);
 
-    expect(merged.name).toBe("BPC-157");
+    expect(merged.name).toBe("Hoodie Kumo");
     expect(merged.description).toBe("Description");
   });
 
   it("ignores a key it does not know instead of discarding the batch", () => {
     const merged = mergeTranslations([
-      { key: "name", text: "BPC-157" },
+      { key: "name", text: "Hoodie Kumo" },
       { key: "subtitle", text: "Newer API, more fields" },
     ]);
 
-    expect(merged).toEqual({ name: "BPC-157", shortDescription: "", description: "" });
+    expect(merged).toEqual({ name: "Hoodie Kumo", shortDescription: "", description: "" });
   });
 });
 
@@ -91,7 +91,7 @@ describe("translateCopyInputSchema", () => {
     const parsed = translateCopyInputSchema.safeParse({
       from: "es",
       to: "en",
-      copy: { name: "BPC-157", shortDescription: "", description: "", price: 1 },
+      copy: { name: "Hoodie Kumo", shortDescription: "", description: "", price: 1 },
     });
 
     expect(parsed.success).toBe(false);
@@ -101,7 +101,7 @@ describe("translateCopyInputSchema", () => {
     const parsed = translateCopyInputSchema.safeParse({
       from: "en",
       to: "en",
-      copy: { name: "BPC-157", shortDescription: "", description: "" },
+      copy: { name: "Hoodie Kumo", shortDescription: "", description: "" },
     });
 
     expect(parsed.success).toBe(false);

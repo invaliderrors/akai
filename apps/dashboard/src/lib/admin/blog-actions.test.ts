@@ -50,9 +50,9 @@ const ISO = "2026-09-24T10:00:00.000Z";
 function adminPost(overrides: Record<string, unknown> = {}) {
   return {
     id: POST_ID,
-    slug: "que-es-bpc-157",
+    slug: "como-combinar-un-oversize",
     status: "DRAFT",
-    category: "PEPTIDES",
+    category: "STYLE_GUIDES",
     publishedAt: null,
     coverObjectKey: null,
     coverUrl: null,
@@ -75,8 +75,8 @@ function adminPost(overrides: Record<string, unknown> = {}) {
 }
 
 const CREATE = {
-  slug: "que-es-bpc-157",
-  category: "PEPTIDES" as const,
+  slug: "como-combinar-un-oversize",
+  category: "STYLE_GUIDES" as const,
   translations: [
     {
       locale: "es" as const,
@@ -192,7 +192,7 @@ describe("blog actions", () => {
 
 describe("translateBlogCopyAction", () => {
   const copy = {
-    title: "Qué es BPC-157",
+    title: "Qué es Hoodie Kumo",
     excerpt: "Resumen",
     bodyHtml: "<p>Hola</p>",
     metaTitle: "",
@@ -205,7 +205,7 @@ describe("translateBlogCopyAction", () => {
       status: 200,
       body: {
         translations: [
-          { key: "title", text: "What is BPC-157" },
+          { key: "title", text: "What is Hoodie Kumo" },
           { key: "excerpt", text: "Summary" },
           { key: "bodyHtml", text: "<p>Hello</p>" },
         ],
@@ -220,7 +220,7 @@ describe("translateBlogCopyAction", () => {
         source: "es",
         target: "en",
         texts: [
-          { key: "title", text: "Qué es BPC-157" },
+          { key: "title", text: "Qué es Hoodie Kumo" },
           { key: "excerpt", text: "Resumen" },
           { key: "bodyHtml", text: "<p>Hola</p>" },
         ],
@@ -228,7 +228,7 @@ describe("translateBlogCopyAction", () => {
     });
     expect(result).toEqual({
       ok: true,
-      data: { ...copy, title: "What is BPC-157", excerpt: "Summary", bodyHtml: "<p>Hello</p>" },
+      data: { ...copy, title: "What is Hoodie Kumo", excerpt: "Summary", bodyHtml: "<p>Hello</p>" },
     });
   });
 

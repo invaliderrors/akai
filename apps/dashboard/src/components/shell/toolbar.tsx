@@ -34,7 +34,7 @@ import { SidebarToggle } from "./sidebar-toggle";
  *
  * THE SEARCH SLOT IS AN ORDER-NUMBER LOOKUP, not a command palette. `/admin/orders`
  * with an `orderNumber` filter is the one search the API actually answers;
- * there is no endpoint behind a global search over SKUs, addresses or lot
+ * there is no endpoint behind a global search over SKUs, addresses or tracking
  * codes, so building the box would be asserting a capability the platform does
  * not have.
  */

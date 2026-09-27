@@ -102,8 +102,8 @@ describe("<RichTextPreview />", () => {
     // Every description written before this field accepted HTML is plain text,
     // and it is now parsed as markup. "10 < 20" must not vanish into a tag that
     // was never opened.
-    render(<RichTextPreview html="10 < 20 mg" label={LABEL} emptyLabel={EMPTY} />);
+    render(<RichTextPreview html="38 < 40 cm" label={LABEL} emptyLabel={EMPTY} />);
 
-    expect(screen.getByRole("region", { name: LABEL })).toHaveTextContent("10 < 20 mg");
+    expect(screen.getByRole("region", { name: LABEL })).toHaveTextContent("38 < 40 cm");
   });
 });

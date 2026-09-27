@@ -5,7 +5,7 @@ import { formatAggregateMinor, formatMoney } from "@akai/money";
  * The ONE money renderer, in two entry points with deliberately different types.
  *
  * MONEY IS NOT MONOSPACE. The rule that survives from the old shell is "mono
- * for identifiers only" — SKUs, order numbers, lot codes, invoice numbers,
+ * for identifiers only" — SKUs, order numbers, tracking numbers, invoice numbers,
  * request ids — and an amount is not one of those. An identifier is compared
  * character by character, which is what a fixed pitch is for; an amount is
  * compared by MAGNITUDE, and `font-variant-numeric: tabular-nums` on the

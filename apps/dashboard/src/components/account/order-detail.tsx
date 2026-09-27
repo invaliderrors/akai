@@ -9,7 +9,6 @@ import type {
   OrderShipment,
 } from "@akai/contracts";
 
-import { LotChip } from "@/components/ui/badge";
 import { Card, SectionHeader } from "@/components/ui/card";
 import { ContentRow, GroupedList } from "@/components/ui/grouped-list";
 import { Icon } from "@/components/ui/icon";
@@ -356,15 +355,10 @@ function ShipmentsSection({ shipments }: { readonly shipments: readonly OrderShi
 function OrderItemsSection({ order }: { readonly order: Order }) {
   const t = useTranslations("account.orderDetail");
   const locale = asLocale(useLocale());
-  const hasLots = order.items.some((item) => item.batchLotCode !== null);
 
   return (
     <Group id="order-items-heading" title={t("itemsTitle")}>
-      <GroupedList
-        id="order-items"
-        labelledBy="order-items-heading"
-        {...(hasLots ? { hint: t("batchHint") } : {})}
-      >
+      <GroupedList id="order-items" labelledBy="order-items-heading">
         {order.items.map((item) => (
           <OrderItemRow key={item.id} item={item} currency={order.currency} locale={locale} />
         ))}
@@ -397,16 +391,6 @@ function OrderItemRow({ item, currency, locale }: OrderItemRowProps) {
         </>
       }
       meta={<span className="font-mono">{t("sku", { sku: item.sku })}</span>}
-      {...(item.batchLotCode === null
-        ? {}
-        : {
-            /* Lot traceability is contractually promised in the public FAQ, so
-               it is surfaced here rather than kept as internal metadata. The
-               catalogue carries "Lote {lot}" as ONE message and has no bare
-               word for the prefix, so the composed message is the chip's text —
-               a call site must never glue two translated fragments together. */
-            aside: <LotChip code={t("batch", { lot: item.batchLotCode })} />,
-          })}
       trailing={
         <span className="grid justify-items-end gap-0.5">
           <Money amount={item.lineTotalGross} currency={currency} locale={locale} emphasis />

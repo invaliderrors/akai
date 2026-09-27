@@ -30,7 +30,7 @@
       "manageProfile": "Editar perfil",
       "manageAddresses": "Direcciones",
       "manageSecurity": "Seguridad",
-      "subtitle": "Tus pedidos, envíos y lotes, en un solo sitio.",
+      "subtitle": "Tus pedidos y envíos, en un solo sitio.",
       "emailUnverifiedBody": "Enviamos las confirmaciones de pedido a {email}.",
       "resendVerification": "Reenviar el enlace",
       "resendingVerification": "Enviando…",
@@ -74,7 +74,6 @@
       "colQuantity": "Cant.",
       "colUnitPrice": "Precio unitario",
       "colLineTotal": "Total línea",
-      "batch": "Lote {lot}",
       "sku": "REF {sku}",
       "totalsTitle": "Resumen",
       "subtotal": "Subtotal",
@@ -112,8 +111,7 @@
       "timelineShipped": "Enviado",
       "timelineDelivered": "Entregado",
       "timelinePending": "Pendiente",
-      "quantity": "×{quantity}",
-      "batchHint": "Guarda estos códigos de lote: identifican exactamente lo que recibiste."
+      "quantity": "×{quantity}"
     },
     "profile": {
       "title": "Perfil",
@@ -133,7 +131,7 @@
       "requiredLastName": "Introduce tus apellidos.",
       "sectionDetails": "Datos",
       "sectionComms": "Comunicaciones",
-      "marketing": "Novedades y resultados de análisis",
+      "marketing": "Novedades y nuevos drops",
       "marketingHint": "Como mucho un correo al mes. Se aplica al instante.",
       "marketingSaved": "Preferencia guardada.",
       "marketingFailed": "No hemos podido guardar la preferencia.",
@@ -580,7 +578,6 @@
       "itemColumns": {
         "item": "Artículo",
         "sku": "SKU",
-        "batch": "Lote",
         "quantity": "Cant.",
         "unitPrice": "Unidad (IVA incl.)",
         "tax": "IVA",
@@ -780,7 +777,7 @@
       "translateFailed": "No hemos podido traducir el contenido. Revísalo y vuelve a intentarlo.",
       "translateOverwrite": "Ya hay contenido en {language}. ¿Lo reemplazamos por la traducción automática?",
       "translateOverwriteConfirm": "Reemplazar",
-      "machineTranslated": "Traducción automática sin revisar. Léela antes de publicar: de este texto responde la normativa de complementos alimenticios.",
+      "machineTranslated": "Traducción automática sin revisar. Léela antes de publicar: es el texto que verán los clientes.",
       "machineTranslatedShort": "sin revisar",
       "markReviewed": "Marcar como revisada",
       "translateErrors": {
@@ -803,7 +800,7 @@
       "previewLabel": "Vista previa",
       "previewEmpty": "Escribe la descripción y aquí verás cómo se mostrará en la tienda.",
       "variantsTitle": "Variantes",
-      "variantsHint": "Al menos una. Un producto con dos tamaños no tiene un único precio, así que cada variante se precia por separado.",
+      "variantsHint": "Al menos una. Un producto con varias tallas o colores no tiene un único precio, así que cada variante se precia por separado.",
       "columns": {
         "image": "Imagen",
         "variant": "Variante",
@@ -815,11 +812,10 @@
         "weight": "Peso (g)",
         "backorder": "Bajo pedido"
       },
-      "sizeAmountLabel": "Tamaño",
-      "sizeUnitLabel": "Unidad",
-      "sizeUnitNone": "Sin unidad",
-      "addSizes": "Este producto tiene varios tamaños",
-      "hideSizes": "Es de un único tamaño",
+      "sizeLabel": "Talla",
+      "colorLabel": "Color (opcional)",
+      "addSizes": "Este producto tiene varias tallas o colores",
+      "hideSizes": "Es de talla única",
       "previewProduct": "Ver como en la tienda",
       "preview": {
         "title": "Vista previa de la ficha",
@@ -828,7 +824,7 @@
         "addToCart": "Añadir al carrito",
         "disabledHint": "Los botones no funcionan en la vista previa.",
         "soldOut": "Agotado",
-        "usageNote": "Solo para uso en investigación de laboratorio. No apto para uso humano ni veterinario.",
+        "usageNote": "Consulta la guía de tallas antes de pedir. Lavar del revés en frío.",
         "descriptionHeading": "Descripción",
         "refLabel": "REF",
         "backorder": "Bajo pedido",
@@ -845,7 +841,6 @@
         "tierUnits": "{count, plural, one {# unidad} other {# unidades}}",
         "addOnsOptional": "Opcional",
         "quantity": "Cantidad",
-        "batchTested": "Analizado por lote",
         "addOnsNone": "No, gracias",
         "addOnsFree": "Gratis"
       },
@@ -875,7 +870,7 @@
       "slugHint": "Minúsculas y guiones. Aparece en la URL de la tienda.",
       "statusLabel": "Estado",
       "taxClassLabel": "Tipo de IVA",
-      "taxClassHint": "Los complementos alimenticios tributan a tipo reducido en unos estados miembros y a tipo general en otros.",
+      "taxClassHint": "La ropa tributa a tipo general; usa otro tipo solo si el producto lo requiere.",
       "taxClasses": {
         "STANDARD": "General",
         "REDUCED": "Reducido",
@@ -893,16 +888,6 @@
         "SIMPLE": "Producto normal",
         "PACK": "Pack de productos"
       },
-      "formLabel": "Forma",
-      "formHint": "Cómo se presenta el producto. Se muestra en la tabla de especificaciones de la tienda.",
-      "formOptions": {
-        "LYOPHILIZED": "Liofilizado",
-        "SOLUTION": "Solución",
-        "CAPSULE": "Cápsulas",
-        "OTHER": "Otro"
-      },
-      "coaTitle": "Certificado de análisis",
-      "coaHint": "Comparte el informe de laboratorio con los clientes en la página del producto.",
       "packComponentsTitle": "Productos del pack",
       "packComponentsHint": "Elige de 2 a 6 productos y fija la variante exacta de cada uno. El precio de este pack se escribe arriba, en el precio de la variante.",
       "packComponentsEmpty": "Todavía no hay ningún producto disponible para formar parte de un pack.",
@@ -921,9 +906,8 @@
         "COMPARE_AT_TOO_LOW": "El precio anterior debe ser igual o superior al de venta.",
         "NOT_A_WHOLE_NUMBER": "Introduce un número entero.",
         "NOT_WHOLE_GRAMS": "Introduce un número entero de gramos.",
-        "SIZE_REQUIRED": "Indica el tamaño de esta variante.",
-        "SIZE_DUPLICATE": "Ya hay otra variante con este tamaño.",
-        "SIZE_NOT_A_NUMBER": "Introduce una cantidad, por ejemplo 5 o 2,5.",
+        "SIZE_REQUIRED": "Indica la talla de esta variante.",
+        "SIZE_DUPLICATE": "Ya hay otra variante con esta talla y color.",
         "TIER_QUANTITY_INVALID": "La cantidad de un tramo debe ser un número entero de 2 o más.",
         "TIER_DUPLICATE": "Ya hay un tramo que empieza en esa cantidad.",
         "TIER_PRICE_TOO_HIGH": "El precio del tramo debe ser menor que el precio unitario."
@@ -993,7 +977,7 @@
       "defaultVariantLabel": "Preseleccionado",
       "defaultVariantNone": "Ninguno",
       "defaultVariantFree": "Gratis",
-      "weightHint": "Lo que pesa el paquete, no lo que contiene: un vial de 5 mg se envía con unos 20 g de vidrio y embalaje. Decide el tramo de envío.",
+      "weightHint": "Lo que pesa el paquete, no la prenda sola: una sudadera se envía con unos 700 g entre prenda y embalaje. Decide el tramo de envío.",
       "tierPercentLabel": "Descuento (%)",
       "tierPercentHint": "Se guarda como precio unitario, no como porcentaje: el carrito cobra exactamente la cifra que se ve.",
       "offerNewProducts": "Ofrecer también en los productos nuevos",
@@ -1329,8 +1313,9 @@
         "DRAFT": "Borrador"
       },
       "categories": {
-        "PEPTIDES": "Péptidos",
-        "RESEARCH_GUIDES": "Guías de investigación",
+        "DROPS": "Drops",
+        "LOOKBOOK": "Lookbook",
+        "STYLE_GUIDES": "Guías de estilo",
         "NEWS": "Noticias"
       },
       "publishSwitch": "Publicar «{title}»",
@@ -1387,7 +1372,7 @@
       "fieldErrors": {
         "REQUIRED": "Este campo es obligatorio.",
         "TOO_LONG": "Este valor es demasiado largo.",
-        "INVALID_SLUG": "Usa solo minúsculas, números y guiones, por ejemplo que-es-bpc-157.",
+        "INVALID_SLUG": "Usa solo minúsculas, números y guiones, por ejemplo como-combinar-un-oversize.",
         "INVALID": "Revisa este campo."
       },
       "errors": {
@@ -1562,69 +1547,6 @@
       "empty": "Esta variante todavía no tiene imagen.",
       "stagedHint": "Se subirá en cuanto se guarde.",
       "badge": "Variante"
-    },
-    "batchCoa": {
-      "title": "Certificado de análisis — {variant}",
-      "hint": "Registro interno del lote, en PDF. La tienda no lo muestra: el certificado público es el del producto.",
-      "add": "Añadir certificado a la variante {variant}",
-      "view": "Ver el certificado de la variante {variant}",
-      "lotCodeLabel": "Código de lote",
-      "purityLabel": "Pureza (%)",
-      "testMethodLabel": "Método de análisis",
-      "testedAtLabel": "Fecha del análisis",
-      "recordBatch": "Registrar lote",
-      "recording": "Registrando…",
-      "invalidBatch": "Completa todos los campos; la pureza debe estar entre 0 y 100.",
-      "duplicateLot": "Esta variante ya tiene un lote registrado con ese código.",
-      "createFailed": "No hemos podido registrar el lote.",
-      "uploadLabel": "Subir certificado (PDF)",
-      "replaceLabel": "Sustituir el certificado (PDF)",
-      "viewCurrent": "Ver el certificado actual",
-      "sizeHint": "PDF, hasta {maxMb} MB.",
-      "uploading": "Subiendo el certificado…",
-      "uploadSuccess": "Certificado subido correctamente.",
-      "uploadError": {
-        "tooLarge": "El archivo supera el tamaño máximo permitido.",
-        "notAPdf": "Solo se admiten archivos PDF.",
-        "signFailed": "No hemos podido preparar la subida. Inténtalo de nuevo.",
-        "uploadFailed": "No hemos podido subir el archivo. Inténtalo de nuevo.",
-        "attachFailed": "El archivo se subió, pero no hemos podido registrarlo. Inténtalo de nuevo."
-      }
-    },
-    "productCoa": {
-      "uploading": "Subiendo el certificado…",
-      "uploadSuccess": "Certificado subido correctamente.",
-      "removing": "Eliminando…",
-      "removed": "Certificado eliminado.",
-      "removeFailed": "No hemos podido eliminar el certificado. Inténtalo de nuevo.",
-      "uploadError": {
-        "tooLarge": "El archivo supera el tamaño máximo permitido.",
-        "notAPdf": "Solo se admiten archivos PDF.",
-        "signFailed": "No hemos podido preparar la subida. Inténtalo de nuevo.",
-        "uploadFailed": "No hemos podido subir el archivo. Inténtalo de nuevo.",
-        "attachFailed": "El archivo se subió, pero no hemos podido registrarlo. Inténtalo de nuevo."
-      },
-      "statusVisible": "Visible en la tienda",
-      "statusHidden": "Subido · oculto en la tienda",
-      "statusNoFile": "Sin certificado",
-      "fileStep": "1. Archivo del certificado",
-      "afterSave": "Guarda primero el producto; después podrás subir aquí su certificado.",
-      "dropTitle": "Subir el certificado (PDF)",
-      "dropHint": "Arrastra el archivo aquí o haz clic para elegirlo · PDF de hasta {maxMb} MB",
-      "fileName": "Certificado de análisis.pdf",
-      "fileMeta": "PDF guardado",
-      "view": "Ver",
-      "replace": "Sustituir",
-      "removeAria": "Eliminar el certificado",
-      "removeTitle": "¿Eliminar el certificado?",
-      "removeBody": "Se borra el archivo y la tienda deja de mostrar el certificado. Puedes subir otro cuando quieras.",
-      "removeConfirm": "Eliminar",
-      "cancel": "Cancelar",
-      "visibilityStep": "2. Mostrarlo a los clientes",
-      "showLabel": "Mostrar «Ver certificado de análisis» en la página del producto",
-      "showHint": "Los clientes podrán abrir el PDF desde la página del producto.",
-      "showHintNoFile": "No se muestra nada hasta que subas un certificado.",
-      "unsaved": "Guarda el producto para aplicar este cambio."
     },
     "shipping": {
       "title": "Envíos",
@@ -1877,7 +1799,7 @@
     }
   },
   "auth": {
-    "brandTagline": "Péptidos de precisión. Trazabilidad completa.",
+    "brandTagline": "Streetwear de inspiración japonesa.",
     "emailLabel": "Correo electrónico",
     "passwordLabel": "Contraseña",
     "signIn": {

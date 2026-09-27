@@ -80,7 +80,7 @@ describe("<GroupedList />", () => {
       <>
         <h2 id="items-heading">Artículos a devolver</h2>
         <GroupedList id="items" labelledBy="items-heading">
-          <ValueRow label="Creatina" value="×1" />
+          <ValueRow label="Camiseta" value="×1" />
         </GroupedList>
       </>,
     );
@@ -338,7 +338,7 @@ describe("<ContentRow />", () => {
       <GroupedList id="orders">
         <ContentRow
           title="AK-2026-000412"
-          meta="28 ago · Creatina monohidrato 500 g y 1 más"
+          meta="28 ago · Camiseta oversize M y 1 más"
           aside={<span>En tránsito</span>}
           trailing="59,80 €"
           href="/cuenta/pedidos/AK-2026-000412"
@@ -348,7 +348,7 @@ describe("<ContentRow />", () => {
 
     const link = screen.getByRole("link");
     expect(within(link).getByText("AK-2026-000412")).toBeInTheDocument();
-    expect(within(link).getByText("28 ago · Creatina monohidrato 500 g y 1 más")).toBeInTheDocument();
+    expect(within(link).getByText("28 ago · Camiseta oversize M y 1 más")).toBeInTheDocument();
     expect(within(link).getByText("En tránsito")).toBeInTheDocument();
     expect(within(link).getByText("59,80 €")).toBeInTheDocument();
   });
@@ -356,7 +356,7 @@ describe("<ContentRow />", () => {
   it("steps its separator in behind whatever the caller leads with", () => {
     renderList(
       <GroupedList id="items">
-        <ContentRow title="Creatina monohidrato 500 g" leading={<input type="checkbox" aria-label="Devolver" />} />
+        <ContentRow title="Camiseta oversize M" leading={<input type="checkbox" aria-label="Devolver" />} />
         <ContentRow title="BCAA 2:1:1 300 g" />
       </GroupedList>,
     );
@@ -373,7 +373,7 @@ describe("<ContentRow />", () => {
   it("is a row and a bit tall, derived from --row-h rather than a second number", () => {
     renderList(
       <GroupedList id="orders">
-        <ContentRow title="AK-2026-000398" meta="11 ago · Whey isolate 1 kg" />
+        <ContentRow title="AK-2026-000398" meta="11 ago · Coach jacket L" />
       </GroupedList>,
     );
 
@@ -383,7 +383,7 @@ describe("<ContentRow />", () => {
   it("is neither a link nor a button when it only displays a record", () => {
     renderList(
       <GroupedList id="items">
-        <ContentRow title="Creatina monohidrato 500 g" meta="AK-CRE-500" trailing="29,90 €" />
+        <ContentRow title="Camiseta oversize M" meta="AK-TEE-BLK-M" trailing="29,90 €" />
       </GroupedList>,
     );
 

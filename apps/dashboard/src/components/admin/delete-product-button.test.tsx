@@ -22,7 +22,7 @@ import esMessages from "../../../messages/es.json";
  * reaches an operator, and two of these on one page do not share DOM ids.
  */
 
-const SLUG = "bpc-157";
+const SLUG = "hoodie-kumo";
 const del = esMessages.admin.productForm.delete;
 
 function renderButton(onConfirm: () => Promise<void>) {
@@ -139,7 +139,7 @@ describe("<DeleteProductButton />", () => {
     render(
       <NextIntlClientProvider locale="es" messages={esMessages}>
         <DeleteProductButton productSlug={SLUG} onConfirm={async () => {}} />
-        <DeleteProductButton productSlug="creatina" onConfirm={async () => {}} />
+        <DeleteProductButton productSlug="camiseta" onConfirm={async () => {}} />
       </NextIntlClientProvider>,
     );
 

@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 const SHIPMENT = "0b9f6a52-6a8e-4d38-9c1e-5b1d7d9e2a10";
-const SIGNED = "https://s3.example/akai-coa/labels/o/1.pdf?X-Amz-Signature=abc";
+const SIGNED = "https://s3.example/akai-private/labels/o/1.pdf?X-Amz-Signature=abc";
 
 vi.mock("@/lib/session/server", () => ({
   getSession: () => Promise.resolve({ accessToken: "access-token" }),

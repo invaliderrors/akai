@@ -131,16 +131,6 @@ export default async function AdminOrderDetailPage({
       cell: (item) => item.sku,
     },
     {
-      // The shipped lot. The live Spanish FAQ contractually promises batch
-      // traceability on every order, so this column is a commitment rather than
-      // a nicety — and a lot code is read character by character off a label,
-      // which is what the mono face is for.
-      key: "batch",
-      header: t("itemColumns.batch"),
-      kind: "identifier",
-      cell: (item) => item.batchLotCode ?? "—",
-    },
-    {
       key: "quantity",
       header: t("itemColumns.quantity"),
       kind: "numeric",

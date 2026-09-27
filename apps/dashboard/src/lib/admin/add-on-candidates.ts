@@ -43,7 +43,7 @@ export interface AddOnCandidateRow {
   readonly currency: string | null;
   /**
    * EVERY variant, so the operator can choose which one a product page
-   * pre-selects — "3 ml, free" rather than "bacteriostatic water, somehow".
+   * pre-selects — "mini, free" rather than "tote bag, somehow".
    *
    * All of them, including inactive ones, and each carries `isActive` so the
    * picker can show a variant it will not let you choose. Filtering them out

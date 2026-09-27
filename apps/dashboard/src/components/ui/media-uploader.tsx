@@ -240,7 +240,7 @@ function moved<T>(list: readonly T[], from: number, to: number): readonly T[] {
 /**
  * The file name for a stored image, which the API does not return.
  *
- * It is display-only — the operator recognises "creatina-front.jpg" and does not
+ * It is display-only — the operator recognises "camiseta-front.jpg" and does not
  * recognise a UUID — so a URL that cannot be parsed falls back to the id rather
  * than throwing on a page whose only job is showing pictures.
  */

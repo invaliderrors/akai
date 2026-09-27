@@ -400,7 +400,7 @@ function totalAvailable(product: Product): number {
  * ranking `resolveStockState` uses: a variant that takes backorders is still
  * sellable at zero, so it is `backorder` rather than the attention case. It
  * takes EVERY variant to be backorder-able for that, not one: a product whose
- * 500 g size is unbuyable is a product with a problem, however its 1 kg size is
+ * size M is unbuyable is a product with a problem, however its size L is
  * configured.
  */
 function availability(product: Product): "out" | "backorder" | null {

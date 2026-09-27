@@ -175,7 +175,7 @@ export interface FilterTextField extends FilterFieldBase {
    */
   readonly type?: "text" | "search";
   readonly placeholder?: string;
-  /** Identifiers only — order numbers, SKUs, lot codes. Never money. */
+  /** Identifiers only — order numbers, SKUs, tracking numbers. Never money. */
   readonly mono?: boolean;
   readonly width?: FilterFieldWidth;
 }

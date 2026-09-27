@@ -50,9 +50,9 @@ import { CONTENT_SANITIZED_HEADER } from "./catalog-headers";
 /** A minimal, genuinely valid create/update body — only the header handling is under test. */
 function buildProductBody() {
   return createProductSchema.parse({
-    slug: "bpc-157",
-    translations: [{ locale: "es", name: "BPC-157", shortDescription: "Péptido", description: "" }],
-    variants: [{ sku: "AK-BPC-10", priceGross: 4999, currency: "EUR" }],
+    slug: "hoodie-kumo",
+    translations: [{ locale: "es", name: "Hoodie Kumo", shortDescription: "Sudadera", description: "" }],
+    variants: [{ sku: "AK-HOOD-M", priceGross: 4999, currency: "EUR" }],
   });
 }
 
@@ -88,8 +88,8 @@ function buildVariant() {
   return {
     id: "11111111-1111-4111-8111-111111111111",
     productId: "22222222-2222-4222-8222-222222222222",
-    sku: "AK-BPC-10",
-    name: { es: "10 mg", en: "10 mg" },
+    sku: "AK-HOOD-M",
+    name: { es: "M", en: "M" },
     options: { size: "10mg" },
     price: {
       currency: "EUR",
@@ -108,7 +108,6 @@ function buildVariant() {
       lowStockThreshold: 5,
       allowBackorder: false,
     },
-    batch: null,
     image: null,
     isActive: true,
     version: 3,
@@ -118,11 +117,11 @@ function buildVariant() {
 function buildProduct() {
   return {
     id: "22222222-2222-4222-8222-222222222222",
-    slug: "bpc-157",
+    slug: "hoodie-kumo",
     status: "ACTIVE",
     taxClass: "STANDARD",
     translations: [
-      { locale: "es", name: "BPC-157", shortDescription: "Péptido", description: "..." },
+      { locale: "es", name: "Hoodie Kumo", shortDescription: "Sudadera", description: "..." },
     ],
     variants: [buildVariant()],
     media: [],
@@ -162,9 +161,9 @@ describe("listProducts", () => {
       ok({ items: [], nextCursor: null, hasMore: false }),
     );
 
-    await listProducts(http, { status: "DRAFT", search: "bpc" });
+    await listProducts(http, { status: "DRAFT", search: "hoodie" });
 
-    expect(calls[0]?.query).toMatchObject({ status: "DRAFT", search: "bpc" });
+    expect(calls[0]?.query).toMatchObject({ status: "DRAFT", search: "hoodie" });
     expect(calls[0]?.query?.cursor).toBeUndefined();
   });
 
@@ -292,13 +291,13 @@ describe("addVariant", () => {
     const variant = await addVariant(
       http,
       "22222222-2222-4222-8222-222222222222",
-      addVariantRequestSchema.parse({ sku: "AK-BPC-10", priceGross: 4999, currency: "EUR" }),
+      addVariantRequestSchema.parse({ sku: "AK-HOOD-M", priceGross: 4999, currency: "EUR" }),
     );
 
     expect(calls[0]?.path).toBe(
       "/admin/products/22222222-2222-4222-8222-222222222222/variants",
     );
-    expect(variant.sku).toBe("AK-BPC-10");
+    expect(variant.sku).toBe("AK-HOOD-M");
     expect(variant.price.gross).toBe(4999);
   });
 });
@@ -383,22 +382,22 @@ describe("createCategory", () => {
     const { http, calls } = fakeHttp(
       ok({
         id: "11111111-1111-4111-8111-111111111111",
-        slug: "peptidos",
-        name: { es: "Péptidos", en: "Peptides" },
+        slug: "sudaderas",
+        name: { es: "Sudaderas", en: "Hoodies" },
         sortOrder: 4,
       }),
     );
 
     const result = await createCategory(http, {
-      slug: "peptidos",
-      name: { es: "Péptidos", en: "Peptides" },
+      slug: "sudaderas",
+      name: { es: "Sudaderas", en: "Hoodies" },
     });
 
     expect(calls[0]?.method).toBe("POST");
     expect(calls[0]?.path).toBe("/admin/categories");
     expect(calls[0]?.body).toEqual({
-      slug: "peptidos",
-      name: { es: "Péptidos", en: "Peptides" },
+      slug: "sudaderas",
+      name: { es: "Sudaderas", en: "Hoodies" },
     });
     expect(result.sortOrder).toBe(4);
   });
@@ -656,9 +655,9 @@ describe("getOrder", () => {
           {
             id: "66666666-6666-4666-8666-666666666666",
             variantId: "11111111-1111-4111-8111-111111111111",
-            productName: "BPC-157",
-            variantName: "10 mg",
-            sku: "AK-BPC-10",
+            productName: "Hoodie Kumo",
+            variantName: "M",
+            sku: "AK-HOOD-M",
             imageUrl: null,
             quantity: 2,
             unitPriceNet: 4132,
@@ -668,7 +667,6 @@ describe("getOrder", () => {
             taxAmount: 1734,
             lineTotalNet: 8264,
             lineTotalGross: 9998,
-            batchLotCode: "LOT-A",
             packProductId: null,
             packInstanceId: null,
           },

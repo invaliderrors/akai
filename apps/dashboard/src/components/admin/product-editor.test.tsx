@@ -78,22 +78,22 @@ const VENDOR_ENGLISH = "DeepL responded 456: quota exceeded for this billing per
 function buildProduct(): Product {
   return {
     id: "22222222-2222-4222-8222-222222222222",
-    slug: "bpc-157",
+    slug: "hoodie-kumo",
     status: "ACTIVE",
     taxClass: "STANDARD",
     translations: [
-      { locale: "es", name: "BPC-157", shortDescription: "Péptido", description: "Descripción" },
+      { locale: "es", name: "Hoodie Kumo", shortDescription: "Sudadera", description: "Descripción" },
     ],
     variants: [
       {
         id: "11111111-1111-4111-8111-111111111111",
         productId: "22222222-2222-4222-8222-222222222222",
-        sku: "AK-BPC-10",
-        name: { es: "10 mg", en: "10 mg" },
+        sku: "AK-HOOD-M",
+        name: { es: "M / Black", en: "M / Black" },
         // Kept consistent with `name` — real data always derives both from the
         // same size fields, and a mismatch here makes an untouched round trip
         // through `toFormValues`/`buildPayload` look like a variant edit.
-        options: { size: "10 mg" },
+        options: { size: "M", color: "Black" },
         price: {
           currency: EUR,
           net: toMinor(4132),
@@ -112,7 +112,6 @@ function buildProduct(): Product {
           lowStockThreshold: 5,
           allowBackorder: false,
         },
-        batch: null,
         image: null,
         isActive: true,
         version: 3,
@@ -123,9 +122,6 @@ function buildProduct(): Product {
     addOns: [],
     kind: "SIMPLE",
     packComponents: [],
-    form: "LYOPHILIZED",
-    showCoa: false,
-    coaUrl: null,
     restrictedCountries: [],
     listed: true,
     // Required in the inferred type because `productSchema` DEFAULTS them for
@@ -210,7 +206,7 @@ describe("ProductEditor variant images", () => {
         // and nothing would fail, which is what makes it worth a test.
         variants: [
           { id: "55555555-5555-4555-8555-555555555555", sku: "AK-OTHER" },
-          { id: WANTED, sku: "AK-BPC-20" },
+          { id: WANTED, sku: "AK-HOOD-L" },
         ],
         sanitizedLocales: [],
       },
@@ -225,11 +221,11 @@ describe("ProductEditor variant images", () => {
       </NextIntlClientProvider>,
     );
 
-    await user.type(screen.getByLabelText(form.slugLabel), "bpc-157");
-    await user.type(screen.getByLabelText(form.nameLabel), "BPC-157");
-    await user.type(screen.getByLabelText(form.summaryLabel), "Péptido");
+    await user.type(screen.getByLabelText(form.slugLabel), "hoodie-kumo");
+    await user.type(screen.getByLabelText(form.nameLabel), "Hoodie Kumo");
+    await user.type(screen.getByLabelText(form.summaryLabel), "Sudadera");
     await user.type(screen.getByLabelText(form.descriptionLabel), "Descripción");
-    await user.type(screen.getByLabelText(form.skuLabel), "AK-BPC-20");
+    await user.type(screen.getByLabelText(form.skuLabel), "AK-HOOD-L");
     await user.type(
       screen.getByLabelText(form.priceLabel.replace("{currency}", EUR)),
       "49.99",
@@ -237,7 +233,7 @@ describe("ProductEditor variant images", () => {
 
     await user.click(
       screen.getByRole("button", {
-        name: esMessages.admin.variantImage.add.replace("{variant}", "AK-BPC-20"),
+        name: esMessages.admin.variantImage.add.replace("{variant}", "AK-HOOD-L"),
       }),
     );
     // SCOPED TO THE DIALOG. The create page carries two dropzones — the product
@@ -246,7 +242,7 @@ describe("ProductEditor variant images", () => {
     // by construction rather than by accident.
     await user.upload(
       within(screen.getByRole("dialog")).getByLabelText(/Arrastra una imagen/),
-      new File([new Uint8Array(64)], "vial.png", { type: "image/png" }),
+      new File([new Uint8Array(64)], "tee.png", { type: "image/png" }),
     );
     await user.click(screen.getByRole("button", { name: esMessages.ui.close }));
 
@@ -281,7 +277,7 @@ describe("ProductEditor — sanitised-description warning", () => {
       ok: true,
       data: {
         id: "44444444-4444-4444-8444-444444444444",
-        variants: [{ id: "55555555-5555-4555-8555-555555555555", sku: "AK-BPC-20" }],
+        variants: [{ id: "55555555-5555-4555-8555-555555555555", sku: "AK-HOOD-L" }],
         sanitizedLocales: [],
       },
     });
@@ -294,11 +290,11 @@ describe("ProductEditor — sanitised-description warning", () => {
       </NextIntlClientProvider>,
     );
 
-    await user.type(screen.getByLabelText(form.slugLabel), "bpc-157");
-    await user.type(screen.getByLabelText(form.nameLabel), "BPC-157");
-    await user.type(screen.getByLabelText(form.summaryLabel), "Péptido");
+    await user.type(screen.getByLabelText(form.slugLabel), "hoodie-kumo");
+    await user.type(screen.getByLabelText(form.nameLabel), "Hoodie Kumo");
+    await user.type(screen.getByLabelText(form.summaryLabel), "Sudadera");
     await user.type(screen.getByLabelText(form.descriptionLabel), "Descripción");
-    await user.type(screen.getByLabelText(form.skuLabel), "AK-BPC-20");
+    await user.type(screen.getByLabelText(form.skuLabel), "AK-HOOD-L");
     await user.type(
       screen.getByLabelText(form.priceLabel.replace("{currency}", EUR)),
       "49.99",
@@ -316,7 +312,7 @@ describe("ProductEditor — sanitised-description warning", () => {
       ok: true,
       data: {
         id: "44444444-4444-4444-8444-444444444444",
-        variants: [{ id: "55555555-5555-4555-8555-555555555555", sku: "AK-BPC-20" }],
+        variants: [{ id: "55555555-5555-4555-8555-555555555555", sku: "AK-HOOD-L" }],
         sanitizedLocales: ["es"],
       },
     });
@@ -329,11 +325,11 @@ describe("ProductEditor — sanitised-description warning", () => {
       </NextIntlClientProvider>,
     );
 
-    await user.type(screen.getByLabelText(form.slugLabel), "bpc-157");
-    await user.type(screen.getByLabelText(form.nameLabel), "BPC-157");
-    await user.type(screen.getByLabelText(form.summaryLabel), "Péptido");
+    await user.type(screen.getByLabelText(form.slugLabel), "hoodie-kumo");
+    await user.type(screen.getByLabelText(form.nameLabel), "Hoodie Kumo");
+    await user.type(screen.getByLabelText(form.summaryLabel), "Sudadera");
     await user.type(screen.getByLabelText(form.descriptionLabel), "<div style='color:blue'>x</div>");
-    await user.type(screen.getByLabelText(form.skuLabel), "AK-BPC-20");
+    await user.type(screen.getByLabelText(form.skuLabel), "AK-HOOD-L");
     await user.type(
       screen.getByLabelText(form.priceLabel.replace("{currency}", EUR)),
       "49.99",
@@ -388,14 +384,14 @@ describe("ProductEditor translation", () => {
     const user = userEvent.setup();
     translateProductCopyAction.mockResolvedValue({
       ok: true,
-      data: { name: "BPC-157", shortDescription: "Peptide", description: "Description" },
+      data: { name: "Hoodie Kumo", shortDescription: "Hoodie", description: "Description" },
     });
 
     renderEditor();
     await pressTranslate(user);
 
     await waitFor(() =>
-      expect(screen.getByLabelText(form.nameLabel)).toHaveValue("BPC-157"),
+      expect(screen.getByLabelText(form.nameLabel)).toHaveValue("Hoodie Kumo"),
     );
     // The request states its direction rather than leaving the action to infer
     // it: English is on screen, so Spanish is the source.
@@ -403,8 +399,8 @@ describe("ProductEditor translation", () => {
       from: "es",
       to: "en",
       copy: {
-        name: "BPC-157",
-        shortDescription: "Péptido",
+        name: "Hoodie Kumo",
+        shortDescription: "Sudadera",
         description: "Descripción",
       },
     });
@@ -557,7 +553,7 @@ describe("ProductEditor — existing-variant edits and new-variant creation", ()
     const NEW_VARIANT_ID = "66666666-6666-4666-8666-666666666666";
     addVariantAction.mockResolvedValue({
       ok: true,
-      data: { id: NEW_VARIANT_ID, sku: "AK-BPC-20" },
+      data: { id: NEW_VARIANT_ID, sku: "AK-HOOD-L" },
     });
     uploadProductImage.mockResolvedValue({ ok: true });
 
@@ -575,24 +571,24 @@ describe("ProductEditor — existing-variant edits and new-variant creation", ()
     expect(rows).toHaveLength(2);
     const newRow = within(rows[1] as HTMLElement);
 
-    await user.type(newRow.getByLabelText(form.skuLabel), "AK-BPC-20");
+    await user.type(newRow.getByLabelText(form.skuLabel), "AK-HOOD-L");
     await user.type(
       newRow.getByLabelText(form.priceLabel.replace("{currency}", EUR)),
       "39.99",
     );
     // A size is required once there is more than one variant, and it must not
-    // collide with the existing row's "10 mg".
-    await user.type(newRow.getByLabelText(form.sizeAmountLabel), "20");
-    await user.selectOptions(newRow.getByLabelText(form.sizeUnitLabel), "mg");
+    // collide with the existing row's "M / Black".
+    await user.type(newRow.getByLabelText(form.sizeLabel), "L");
+    await user.type(newRow.getByLabelText(form.colorLabel), "Black");
 
     await user.click(
       newRow.getByRole("button", {
-        name: esMessages.admin.variantImage.add.replace("{variant}", "AK-BPC-20"),
+        name: esMessages.admin.variantImage.add.replace("{variant}", "AK-HOOD-L"),
       }),
     );
     await user.upload(
       within(screen.getByRole("dialog")).getByLabelText(/Arrastra una imagen/),
-      new File([new Uint8Array(64)], "vial.png", { type: "image/png" }),
+      new File([new Uint8Array(64)], "tee.png", { type: "image/png" }),
     );
     await user.click(screen.getByRole("button", { name: esMessages.ui.close }));
 
@@ -601,7 +597,7 @@ describe("ProductEditor — existing-variant edits and new-variant creation", ()
     await waitFor(() => expect(addVariantAction).toHaveBeenCalledTimes(1));
     expect(addVariantAction).toHaveBeenCalledWith(
       "22222222-2222-4222-8222-222222222222",
-      expect.objectContaining({ sku: "AK-BPC-20", priceGross: 3999 }),
+      expect.objectContaining({ sku: "AK-HOOD-L", priceGross: 3999 }),
     );
     await waitFor(() => expect(uploadProductImage).toHaveBeenCalledTimes(1));
     expect(uploadProductImage.mock.calls[0]?.[1]).toMatchObject({

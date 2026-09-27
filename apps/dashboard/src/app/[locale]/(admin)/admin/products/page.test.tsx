@@ -90,23 +90,23 @@ function product(
 ): Product {
   return productSchema.parse({
     id: PRODUCT_ID,
-    slug: "creatina-monohidrato",
+    slug: "camiseta-oversize",
     status: "ACTIVE",
     taxClass: "STANDARD",
     translations: [
       {
         locale: "es",
-        name: "Creatina monohidrato",
+        name: "Camiseta oversize",
         shortDescription: "Micronizada",
-        description: "Analizada por HPLC.",
+        description: "Algodón orgánico de 240 g/m².",
       },
     ],
     variants: [
       {
         id: VARIANT_ID,
         productId: PRODUCT_ID,
-        sku: "AK-CRE-500",
-        name: { es: "500 g" },
+        sku: "AK-TEE-BLK-M",
+        name: { es: "M" },
         options: {},
         price: {
           currency: "EUR",
@@ -125,7 +125,6 @@ function product(
           lowStockThreshold: 40,
           allowBackorder: variant.allowBackorder ?? false,
         },
-        batch: null,
         image: null,
         isActive: true,
         version: 1,
@@ -207,7 +206,7 @@ describe("AdminProductsPage", () => {
 
     await renderPage();
 
-    const row = within(rowFor("Creatina monohidrato"));
+    const row = within(rowFor("Camiseta oversize"));
     expect(row.getByText("142")).toBeInTheDocument();
     // 150 is on hand, and eight of them are already inside someone else's
     // checkout. Promising them is how a shop oversells.
@@ -221,7 +220,7 @@ describe("AdminProductsPage", () => {
 
     await renderPage();
 
-    const row = rowFor("Creatina monohidrato");
+    const row = rowFor("Camiseta oversize");
     // The fill is on the row; the 3px rail is an inset shadow on its LEADING
     // CELL, because under `border-collapse: collapse` a row box does not paint
     // a box-shadow at all in Chrome or Safari.
@@ -241,7 +240,7 @@ describe("AdminProductsPage", () => {
 
     await renderPage();
 
-    const row = rowFor("Creatina monohidrato");
+    const row = rowFor("Camiseta oversize");
     // The badge is unconditional — zero is zero — while the rail is spent only
     // where a customer can reach the listing and cannot buy it.
     expect(within(row).getByText("Agotada")).toBeInTheDocument();
@@ -258,7 +257,7 @@ describe("AdminProductsPage", () => {
 
     await renderPage();
 
-    const row = rowFor("Creatina monohidrato");
+    const row = rowFor("Camiseta oversize");
     expect(within(row).getByText("Bajo pedido")).toBeInTheDocument();
     expect(row.className).not.toContain("--danger-fill");
   });
@@ -336,14 +335,14 @@ describe("AdminProductsPage", () => {
 
     await renderPage();
 
-    const link = screen.getByRole("link", { name: "Editar Creatina monohidrato" });
+    const link = screen.getByRole("link", { name: "Editar Camiseta oversize" });
     expect(link).toHaveAttribute("href", `/admin/products/${PRODUCT_ID}`);
   });
 
   it("tells an operator with filters applied to clear them, not to create a product", async () => {
     listProducts.mockResolvedValue(pageOf([]));
 
-    await renderPage({ search: "creatina" });
+    await renderPage({ search: "camiseta" });
 
     expect(screen.getByText(esMessages.admin.products.emptyFilteredBody)).toBeInTheDocument();
     expect(screen.queryByText(esMessages.admin.products.emptyFirstBody)).toBeNull();

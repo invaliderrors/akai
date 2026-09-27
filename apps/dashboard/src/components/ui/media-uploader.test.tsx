@@ -81,7 +81,7 @@ function stubImageDecoding(succeeds = true): void {
   );
 }
 
-const png = (bytes = 1024, name = "tub.png") =>
+const png = (bytes = 1024, name = "tee.png") =>
   new File([new Uint8Array(bytes)], name, { type: "image/png" });
 
 function wrap(children: React.ReactNode) {
@@ -190,8 +190,8 @@ function dropzone(): HTMLElement {
 /** Pick, name in both locales, commit. The whole live path in one call. */
 async function uploadOne(file = png()): Promise<void> {
   await userEvent.upload(dropzone(), file);
-  await userEvent.type(screen.getByLabelText(media.altEs), "Bote de frente");
-  await userEvent.type(screen.getByLabelText(media.altEn), "Tub, front");
+  await userEvent.type(screen.getByLabelText(media.altEs), "Camiseta de frente");
+  await userEvent.type(screen.getByLabelText(media.altEn), "Tee, front");
   await userEvent.click(screen.getByRole("button", { name: labels.upload }));
 }
 
@@ -242,13 +242,13 @@ describe("<MediaUploader mode='staged' />", () => {
   it("flags a missing English alt as a field error, not a silent gap", async () => {
     renderStaged([stagedImage("a.png", "blob:a")]);
 
-    await userEvent.type(screen.getByLabelText(media.altEs), "Bote de frente");
+    await userEvent.type(screen.getByLabelText(media.altEs), "Camiseta de frente");
 
     const english = screen.getByLabelText(media.altEn);
     expect(english).toHaveAttribute("aria-invalid", "true");
     expect(screen.getByRole("alert")).toHaveTextContent(labels.altRequired);
 
-    await userEvent.type(english, "Tub, front");
+    await userEvent.type(english, "Tee, front");
     // Clears the moment the rule passes — no second blur required.
     expect(english).not.toHaveAttribute("aria-invalid");
     expect(screen.queryByRole("alert")).toBeNull();
@@ -303,8 +303,8 @@ describe("<MediaUploader mode='live' />", () => {
   });
 
   it("names a stored image by its file, not its uuid", () => {
-    renderLive({ items: [item("m1", 0, "https://cdn.test/creatina-front.jpg")] });
-    expect(screen.getByRole("button", { name: labels.select("creatina-front.jpg") })).toBeInTheDocument();
+    renderLive({ items: [item("m1", 0, "https://cdn.test/camiseta-front.jpg")] });
+    expect(screen.getByRole("button", { name: labels.select("camiseta-front.jpg") })).toBeInTheDocument();
   });
 
   it("PUTs the file straight to storage, not through this app", async () => {
@@ -345,7 +345,7 @@ describe("<MediaUploader mode='live' />", () => {
 
     await waitFor(() => expect(onAttach).toHaveBeenCalled());
     expect(onAttach.mock.calls[0]?.[1]).toMatchObject({
-      alt: { es: "Bote de frente", en: "Tub, front" },
+      alt: { es: "Camiseta de frente", en: "Tee, front" },
     });
   });
 
@@ -356,11 +356,11 @@ describe("<MediaUploader mode='live' />", () => {
     const commit = screen.getByRole("button", { name: labels.upload });
     expect(commit).toBeDisabled();
 
-    await userEvent.type(screen.getByLabelText(media.altEs), "Bote de frente");
+    await userEvent.type(screen.getByLabelText(media.altEs), "Camiseta de frente");
     // Still short one locale — there is no route that adds alt text later.
     expect(commit).toBeDisabled();
 
-    await userEvent.type(screen.getByLabelText(media.altEn), "Tub, front");
+    await userEvent.type(screen.getByLabelText(media.altEn), "Tee, front");
     expect(commit).toBeEnabled();
   });
 

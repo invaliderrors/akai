@@ -434,10 +434,6 @@ export function ProductPreviewDialog({
               <p className="mt-2 text-xs text-muted2">{t("preview.disabledHint")}</p>
             </div>
 
-            <ul className="mt-8 flex flex-wrap gap-x-6 gap-y-2 border-t border-line pt-6 text-xs text-muted">
-              <li>{t("preview.batchTested")}</li>
-            </ul>
-
             <p className="mt-6 text-xs text-muted2">{t("preview.usageNote")}</p>
           </div>
         </div>

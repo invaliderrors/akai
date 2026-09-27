@@ -33,7 +33,7 @@ function renderManager(rows: readonly CategoryRow[] = ROWS, overrides: Partial<{
     overrides.onCreate ??
     vi.fn().mockResolvedValue({
       ok: true,
-      data: { id: "new-cat", slug: "peptidos", name: { es: "Péptidos", en: "Peptides" } },
+      data: { id: "new-cat", slug: "sudaderas", name: { es: "Sudaderas", en: "Hoodies" } },
     });
   const onRename =
     overrides.onRename ??
@@ -78,16 +78,16 @@ describe("CategoryManager", () => {
       const user = userEvent.setup();
       const { onCreate } = renderManager();
 
-      await user.type(screen.getByLabelText((content) => content.startsWith(t.slugLabel)), "peptidos");
-      await user.type(screen.getByLabelText((content) => content.startsWith(t.nameEsLabel)), "Péptidos");
-      await user.type(screen.getByLabelText((content) => content.startsWith(t.nameEnLabel)), "Peptides");
+      await user.type(screen.getByLabelText((content) => content.startsWith(t.slugLabel)), "sudaderas");
+      await user.type(screen.getByLabelText((content) => content.startsWith(t.nameEsLabel)), "Sudaderas");
+      await user.type(screen.getByLabelText((content) => content.startsWith(t.nameEnLabel)), "Hoodies");
       await user.click(screen.getByRole("button", { name: t.create }));
 
       expect(onCreate).toHaveBeenCalledWith({
-        slug: "peptidos",
-        name: { es: "Péptidos", en: "Peptides" },
+        slug: "sudaderas",
+        name: { es: "Sudaderas", en: "Hoodies" },
       });
-      expect(await screen.findByText("Péptidos")).toBeInTheDocument();
+      expect(await screen.findByText("Sudaderas")).toBeInTheDocument();
     });
 
     it("shows a specific message for a duplicate slug, not the generic failure", async () => {
