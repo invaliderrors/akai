@@ -11,14 +11,15 @@ fresh, shop-agnostic base with a new Astro storefront.
 - [x] Initial commit + push to github.com/invaliderrors/akai
 
 ## 2. Strip the supplement domain
-- [ ] Remove batches/lots + certificate-of-analysis (COA bucket, `coaObjectKey`, `showCoa`, `/coa` endpoints, admin UI)
-- [ ] Remove supplement-only product fields (`ProductForm`, peptide/country legality notes, supplement tax wording)
-- [ ] Replace supplement seed catalog + images with a streetwear placeholder catalog
-- [ ] Neutralise supplement copy in dashboard messages and email templates
+- [x] Remove batches/lots + certificate of analysis (model, endpoints, admin UI); private bucket renamed `S3_BUCKET_COA` → `S3_BUCKET_PRIVATE` (Sendcloud label PDFs)
+- [x] Remove `ProductForm` / `Product.form` and supplement/peptide copy; blog categories → DROPS, LOOKBOOK, STYLE_GUIDES, NEWS
+- [x] Dashboard variant editor takes free-text size + optional colour (`{size}` / `{size, color}`)
+- [x] Streetwear placeholder seed catalogue (6 products, 23 variants, 4 categories)
+- [x] Seed an unmapped HOME rate per shipping zone
 
 ## 3. Database
-- [ ] Squash all Prisma migrations into one fresh `init` migration (plus invariants SQL)
-- [ ] Verify `prisma migrate reset` + seed against a clean Postgres
+- [x] Squash migrations into `20260927000000_init` + `20260927000100_invariants`
+- [x] Verified: `migrate deploy` on an empty DB, seed, API + storefront end to end (browse → cart → checkout → processing, order `AK-2026-000001`)
 
 ## 4. Astro storefront (`apps/storefront`)
 - [x] Scaffold Astro 7 (SSR, `@astrojs/node`), React islands, Tailwind v4, Nx targets (dev/build/start/typecheck/test/lint)
@@ -39,7 +40,16 @@ fresh, shop-agnostic base with a new Astro storefront.
 - [ ] `storefront-e2e` Playwright project (browse → add to cart → checkout redirect)
 
 ## 5. Docs & verification
-- [ ] Rewrite CLAUDE.md and README.md for Akai
-- [ ] `.env.example` storefront section for Astro
-- [ ] typecheck, lint, test, build green; CI green
-- [ ] Confirm production domain (placeholder `akai.shop`)
+- [x] Rewrite CLAUDE.md and README.md for Akai
+- [x] `.env.example` storefront section for Astro
+- [x] typecheck, lint, test, build green locally (15 projects)
+- [ ] CI green on GitHub (api-e2e under testcontainers has only run against a local Postgres so far)
+
+## 6. Before launch
+- [ ] Confirm the production domain (placeholder `akai.shop`) and `SESSION_COOKIE_DOMAIN`
+- [ ] Akai's own Sendcloud account: sender address, re-run the option spike, map the HOME rates
+- [ ] Whop live + sandbox accounts, webhook secret, product id
+- [ ] Real catalogue, photography and copy; replace seed placeholders
+- [ ] Legal texts (terms, privacy, returns, imprint) for es/en
+- [ ] Turnstile keys, SMTP provider, S3/CDN for media
+- [ ] API placeholders still empty: audit, disputes, gdpr, invoices, metrics, notifications, pricing
