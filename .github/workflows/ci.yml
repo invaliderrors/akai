@@ -1,0 +1,137 @@
+# =============================================================================
+# CI — install, gate, typecheck, lint, test, build.
+#
+# Runs the FULL target set rather than `nx affected` on the default branch, and
+# affected-only on pull requests. Affected-only on main is how a broken project
+# stays broken silently: nothing touched it, so nothing rebuilt it.
+# =============================================================================
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  # One run per ref. A force-push mid-review otherwise leaves two runs racing to
+  # report a status on the same commit.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "20.19.0"
+  # Prisma's schema is parsed by several targets (typecheck reads the generated
+  # client). These are placeholders — no CI step connects with them except the
+  # integration job, which overrides them with the service container's URL.
+  DATABASE_URL: postgresql://akai:akai@localhost:5432/akai
+  DIRECT_DATABASE_URL: postgresql://akai:akai@localhost:5432/akai
+
+jobs:
+  verify:
+    name: Verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Nx needs history to compute the affected graph against the base ref.
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install
+        # --frozen-lockfile: a lockfile that does not satisfy the manifests is a
+        # CI failure, not something to resolve on the fly. Otherwise CI can pass
+        # against a dependency graph that exists nowhere else.
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        # Generated code is not committed, and typecheck fails without it.
+        run: pnpm exec prisma generate --schema libs/db/prisma/schema.prisma
+
+      - name: Type-safety gate (no any / ts-ignore / non-null assertions)
+        # Runs BEFORE the expensive targets: it is fast, and a violation here
+        # means the branch is not mergeable regardless of whether tests pass.
+        run: pnpm check:no-any
+
+      - name: Set Nx SHAs for affected
+        if: github.event_name == 'pull_request'
+        uses: nrwl/nx-set-shas@v4
+
+      - name: Typecheck, lint, test, build (affected)
+        if: github.event_name == 'pull_request'
+        run: pnpm exec nx affected -t typecheck,lint,test,build --parallel=3
+
+      - name: Typecheck, lint, test, build (all)
+        if: github.event_name != 'pull_request'
+        run: pnpm exec nx run-many -t typecheck,lint,test,build --parallel=3
+
+      - name: Assert minimum test count
+        # A Vitest `include` that matches ZERO files exits 0 and is
+        # indistinguishable from a passing suite. This has actually happened
+        # during the monorepo move, so the count is asserted rather than trusted.
+        # Raise the floor when the suite grows; never lower it to make CI pass.
+        run: node tools/scripts/assert-test-count.mjs
+
+  integration:
+    name: Integration (real Postgres)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: akai
+          POSTGRES_PASSWORD: akai
+          POSTGRES_DB: akai_test
+        ports:
+          - 5432:5432
+        # Without a health check the job races the server's startup and the
+        # first migration fails on connection refused.
+        options: >-
+          --health-cmd "pg_isready -U akai"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      DATABASE_URL: postgresql://akai:akai@localhost:5432/akai_test
+      DIRECT_DATABASE_URL: postgresql://akai:akai@localhost:5432/akai_test
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm exec prisma generate --schema libs/db/prisma/schema.prisma
+
+      - name: Apply migrations
+        # `migrate deploy`, never `migrate dev`: forward-only, no shadow database,
+        # no interactive prompt, and it fails on a drifted migration rather than
+        # rewriting it. This is the same command production runs, which is the
+        # point — CI proves the migration chain applies from scratch.
+        run: pnpm exec prisma migrate deploy --schema libs/db/prisma/schema.prisma
+
+      - name: Integration tests
+        # `e2e`, not `test`: api-e2e defines only an `e2e` target (its suites need a real
+        # Postgres via testcontainers and must stay out of the unit `test` run-many). This
+        # is the job that actually runs whop-webhook-dedupe.spec.ts — the sole proof of
+        # the provider_event transaction boundary. `api-e2e:test` does not exist and exits 1
+        # with "Cannot find configuration for task api-e2e:test", so this deliverable was
+        # never executed in CI before.
+        run: pnpm exec nx run api-e2e:e2e

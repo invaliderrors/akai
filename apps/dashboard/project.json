@@ -1,0 +1,67 @@
+{
+  "name": "dashboard",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "apps/dashboard/src",
+  "tags": [
+    "scope:web",
+    "type:app"
+  ],
+  "targets": {
+    "dev": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "next dev --port 3101",
+        "cwd": "apps/dashboard"
+      }
+    },
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "next dev --port 3101",
+        "cwd": "apps/dashboard"
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "outputs": [
+        "{projectRoot}/.next"
+      ],
+      "options": {
+        "command": "next build",
+        "cwd": "apps/dashboard"
+      }
+    },
+    "start": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "next start --port 3001",
+        "cwd": "apps/dashboard"
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/dashboard",
+        "commands": [
+          "tsc -p tsconfig.json --noEmit",
+          "tsc -p tsconfig.spec.json --noEmit"
+        ],
+        "parallel": false
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "vitest run --passWithNoTests",
+        "cwd": "apps/dashboard"
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "eslint apps/dashboard"
+      }
+    }
+  }
+}

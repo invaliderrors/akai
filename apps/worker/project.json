@@ -1,0 +1,67 @@
+{
+  "name": "worker",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "apps/worker/src",
+  "tags": [
+    "scope:server",
+    "type:app"
+  ],
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "outputs": [
+        "{workspaceRoot}/dist/apps/worker"
+      ],
+      "options": {
+        "cwd": "apps/worker",
+        "commands": [
+          "tsc -p tsconfig.app.json",
+          "tsc-alias -p tsconfig.app.json"
+        ],
+        "parallel": false
+      }
+    },
+    "dev": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsc -p tsconfig.app.json --watch --preserveWatchOutput",
+        "cwd": "apps/worker"
+      }
+    },
+    "serve": {
+      "executor": "nx:run-commands",
+      "dependsOn": [
+        "build"
+      ],
+      "options": {
+        "cwd": ".",
+        "command": "node --watch dist/apps/worker/apps/worker/src/main.js"
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/worker",
+        "commands": [
+          "tsc -p tsconfig.app.json --noEmit",
+          "tsc -p tsconfig.spec.json --noEmit"
+        ],
+        "parallel": false
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "vitest run --passWithNoTests",
+        "cwd": "apps/worker"
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "eslint apps/worker"
+      }
+    }
+  }
+}

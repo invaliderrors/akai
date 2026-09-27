@@ -1,0 +1,2005 @@
+// =============================================================================
+// Akai — Postgres schema. Source of truth for products, customers, carts,
+// orders, payments and email.
+//
+// STANDING RULES ENCODED HERE (do not "simplify" any of them away):
+//
+//  * MONEY IS `Int`, ALWAYS, IN MINOR UNITS. Never Decimal, never Float. Any
+//    SQL aggregate over a money column must cast `::bigint` — Prisma `Int` is
+//    32-bit and a SUM over orders WILL overflow.
+//  * The VARIANT is the sellable unit. Single-variant products still get one
+//    variant row.
+//  * Order lines and order addresses are SNAPSHOTS, not foreign keys. A renamed
+//    product or an edited address must never rewrite a filed invoice.
+//  * audit_log and inventory_ledger are APPEND-ONLY. The runtime DB role holds
+//    INSERT + SELECT on them and nothing else; migrations run as a separate
+//    role. See the initial migration.
+//  * Soft delete (`deletedAt`) everywhere a record can be referenced by an
+//    order. Hard deletes destroy financial history.
+// =============================================================================
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  directUrl  = env("DIRECT_DATABASE_URL")
+  extensions = [citext, pgcrypto]
+}
+
+// =============================================================================
+// Enums — mirror libs/contracts/src/lib/enums.ts member-for-member.
+// =============================================================================
+
+enum Role {
+  CUSTOMER
+  STAFF
+  ADMIN
+  /// A referral partner signed into their OWN restricted view — see
+  /// `Affiliate.customerId`. Deliberately excluded from `ROLES_REQUIRING_TWO_FACTOR`
+  /// and `ELEVATED_ROLES` in the API's auth module: this is a read-one-number
+  /// account, not a privileged one.
+  PARTNER
+}
+
+enum AddressType {
+  SHIPPING
+  BILLING
+}
+
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+/// SIMPLE is every product that exists today. PACK is a product whose own
+/// variant is never sold directly — see `Product.kind`'s own comment.
+enum ProductKind {
+  SIMPLE
+  PACK
+}
+
+/// The form a product ships in. See `Product.form`.
+enum ProductForm {
+  LYOPHILIZED
+  SOLUTION
+  CAPSULE
+  OTHER
+}
+
+enum TaxClass {
+  STANDARD
+  REDUCED
+  ZERO_RATED
+}
+
+enum OrderStatus {
+  PENDING
+  AWAITING_PAYMENT
+  PAID
+  /// The provider says a payment settled, but for an amount or currency that
+  /// does NOT match our own recomputed grand total. Non-terminal and
+  /// OPERATOR-RESOLVED: a webhook may enter this state, only a human may leave
+  /// it. Absence of an amount on the event is never agreement — an event that
+  /// does not say what was charged cannot prove the right amount was charged.
+  PAYMENT_MISMATCH
+  FULFILLING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUNDED
+  PARTIALLY_REFUNDED
+  FAILED
+}
+
+enum PaymentProvider {
+  /// ONE MEMBER, ON PURPOSE. A value no code can produce is a value that only
+  /// ever appears in a query someone forgot to update.
+  ///
+  /// The migration RENAMES the `TAGADA` value rather than dropping and
+  /// recreating the type. `ALTER TYPE … RENAME VALUE` preserves every existing
+  /// row, so the change carries no data-migration question and needs no
+  /// per-environment branch — it is correct whether or not any payment has ever
+  /// been taken.
+  WHOP
+}
+
+enum PaymentStatus {
+  REQUIRES_PAYMENT_METHOD
+  REQUIRES_ACTION
+  PROCESSING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum RefundStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum RefundReason {
+  REQUESTED_BY_CUSTOMER
+  DUPLICATE
+  FRAUDULENT
+  WITHDRAWAL_RIGHT
+  DAMAGED
+  OTHER
+}
+
+/// PENDING/IN_TRANSIT/DELIVERED/RETURNED/LOST are the manual-fulfilment
+/// states. The rest arrived with Sendcloud (spec 2026-09-24-sendcloud-shipping
+/// §3.7 / §11a G4): LABEL_CREATED = label bought, parcel not yet scanned;
+/// AWAITING_PICKUP = at the pickup point waiting for the customer; CANCELLED =
+/// label cancelled (credited); FAILED = announcement refused, no label exists;
+/// EXCEPTION = the carrier reports a problem that needs a human.
+enum ShipmentStatus {
+  PENDING
+  IN_TRANSIT
+  DELIVERED
+  RETURNED
+  LOST
+  LABEL_CREATED
+  AWAITING_PICKUP
+  CANCELLED
+  FAILED
+  EXCEPTION
+}
+
+/// How a shipping rate hands the parcel over. SERVICE_POINT rates require the
+/// customer to pick a pickup point at checkout (spec §3.3).
+enum ShippingDeliveryType {
+  HOME
+  SERVICE_POINT
+}
+
+/// Who made a shipment: staff by hand (carrier + tracking typed in), or a
+/// label bought through Sendcloud.
+enum ShipmentProvider {
+  MANUAL
+  SENDCLOUD
+}
+
+enum InventoryMovement {
+  SALE
+  RESTOCK
+  RETURN
+  ADJUSTMENT
+  RESERVATION
+  RESERVATION_RELEASE
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED_AMOUNT
+  FREE_SHIPPING
+}
+
+enum EmailStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  BOUNCED
+  COMPLAINED
+  FAILED
+}
+
+enum ReturnStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+  IN_TRANSIT
+  RECEIVED
+  REFUNDED
+}
+
+enum Locale {
+  es
+  en
+}
+
+/// A blog post is either a draft only operators see, or published.
+enum BlogPostStatus {
+  DRAFT
+  PUBLISHED
+}
+
+/// Decision D8b (spec 2026-09-24 §8): a FIXED list, editable only by code, so
+/// the storefront's category chip is a translated label rather than whatever
+/// an operator typed. Mirrors `blogCategorySchema` in libs/contracts.
+enum BlogCategory {
+  PEPTIDES
+  RESEARCH_GUIDES
+  NEWS
+}
+
+// =============================================================================
+// Identity
+// =============================================================================
+
+model Customer {
+  id    String @id @default(uuid()) @db.Uuid
+  /// citext: identity must not depend on the case a customer typed.
+  email String @unique @db.Citext
+
+  /// Null for a guest-checkout shell record that has never set a password.
+  passwordHash    String?
+  emailVerifiedAt DateTime?
+
+  firstName String? @db.VarChar(80)
+  lastName  String? @db.VarChar(80)
+  phone     String? @db.VarChar(32)
+
+  role            Role   @default(CUSTOMER)
+  preferredLocale Locale @default(es)
+
+  /// TOTP secret, encrypted at rest by the application. Mandatory for ADMIN.
+  totpSecret      String?
+  totpEnabledAt   DateTime?
+  /// The highest TOTP counter (time step) this account has already spent.
+  ///
+  /// REPLAY DEFENCE. A TOTP code is valid for its whole step plus the accepted
+  /// drift window — roughly 90 seconds. Without a record of what was already
+  /// used, the same six digits are accepted repeatedly inside that window, so
+  /// a code shoulder-surfed, phished or read from a proxy log can be replayed
+  /// by a second party while the legitimate user is still logging in.
+  /// TotpService.verify already returns the counter it matched; the login path
+  /// rejects any counter less than or equal to this value and then advances it.
+  lastTotpCounter BigInt?
+  /// Hashed single-use recovery codes.
+  recoveryCodes   RecoveryCode[]
+
+  marketingConsentAt      DateTime?
+  /// The VERSION of the text consented to. "They ticked a box once" is not a
+  /// defensible record under GDPR.
+  marketingConsentVersion String?   @db.VarChar(32)
+
+  /// Erasure is anonymise-in-place: financial records must survive (EU invoice
+  /// retention is 7-10 years) while the person is tombstoned.
+  anonymisedAt DateTime?
+
+  failedLoginCount Int       @default(0)
+  lockedUntil      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  addresses     Address[]
+  sessions      Session[]
+  refreshTokens RefreshToken[]
+  carts         Cart[]
+  orders        Order[]
+  authTokens    AuthToken[]
+  emailOtp      EmailOtp?
+  returns       ReturnRequest[]
+  /// Set only for role PARTNER — see `Affiliate.customerId`.
+  affiliate     Affiliate?
+  /// Blog posts this operator created. See `BlogPost.authorId`.
+  blogPosts     BlogPost[]
+
+  @@index([createdAt])
+  @@index([anonymisedAt])
+  @@map("customer")
+}
+
+model RecoveryCode {
+  id         String    @id @default(uuid()) @db.Uuid
+  customerId String    @db.Uuid
+  /// SHA-256 of the code. Never the code itself.
+  codeHash   String    @unique
+  usedAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@map("recovery_code")
+}
+
+/// A login session. The ROLE is re-read from this row on every request, never
+/// trusted from the JWT — a role revocation must take effect immediately.
+model Session {
+  id         String @id @default(uuid()) @db.Uuid
+  customerId String @db.Uuid
+
+  ipAddress String? @db.VarChar(45)
+  userAgent String? @db.VarChar(512)
+
+  /// Admin routes require a FRESH 2FA assertion recorded here.
+  twoFactorAssertedAt DateTime?
+
+  createdAt  DateTime  @default(now())
+  lastSeenAt DateTime  @default(now())
+  expiresAt  DateTime
+  revokedAt  DateTime?
+
+  customer      Customer       @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  refreshTokens RefreshToken[]
+
+  @@index([customerId])
+  @@index([expiresAt])
+  @@map("session")
+}
+
+/// Opaque refresh token, stored SHA-256-hashed with a family id. Replay of a
+/// consumed token revokes the whole family — that is the reuse-detection
+/// mechanism, and it only works because rotation writes a new row every time.
+model RefreshToken {
+  id         String @id @default(uuid()) @db.Uuid
+  customerId String @db.Uuid
+  sessionId  String @db.Uuid
+  familyId   String @db.Uuid
+
+  tokenHash String @unique
+
+  consumedAt DateTime?
+  revokedAt  DateTime?
+  expiresAt  DateTime
+  createdAt  DateTime  @default(now())
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  session  Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([familyId])
+  @@index([customerId])
+  @@index([expiresAt])
+  @@map("refresh_token")
+}
+
+/// Email-verification and password-reset tokens. Hashed at rest, single use,
+/// TTL-bounded. One table because the two flows have identical mechanics.
+model AuthToken {
+  id         String @id @default(uuid()) @db.Uuid
+  customerId String @db.Uuid
+  /// "EMAIL_VERIFICATION" | "PASSWORD_RESET"
+  purpose    String @db.VarChar(32)
+  tokenHash  String @unique
+
+  usedAt    DateTime?
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId, purpose])
+  @@index([expiresAt])
+  @@map("auth_token")
+}
+
+/// An emailed one-time sign-in code.
+///
+/// DELIBERATELY NOT AN `AuthToken`. That table's `tokenHash` is GLOBALLY
+/// unique, which is safe for a 256-bit token and a collision waiting to happen
+/// across a 10^6 code space; and it is looked up BY HASH ALONE, which for a
+/// short code is an authentication bypass rather than a bug. Here the digest is
+/// SHA-256 over `customerId:code`, so a code is bound to its account, and the
+/// lookup is by customer.
+///
+/// ONE LIVE CODE PER CUSTOMER, enforced by the primary key rather than by an
+/// application "invalidate the old one first", which races with a concurrent
+/// request. Issuing is an upsert.
+model EmailOtp {
+  /// The customer IS the key: a second live code cannot exist.
+  customerId String    @id @db.Uuid
+  /// SHA-256 hex of `${customerId}:${code}`.
+  codeHash   String    @db.Char(64)
+  /// Bounds brute force against ONE issued code; the verifier burns the code
+  /// when it is exhausted, so guesses are per-issuance, not per source address.
+  attempts   Int       @default(0)
+  consumedAt DateTime?
+  expiresAt  DateTime
+  createdAt  DateTime  @default(now())
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@map("email_otp")
+}
+
+model Address {
+  id         String      @id @default(uuid()) @db.Uuid
+  customerId String      @db.Uuid
+  type       AddressType
+
+  firstName   String  @db.VarChar(80)
+  lastName    String  @db.VarChar(80)
+  company     String? @db.VarChar(120)
+  line1       String  @db.VarChar(200)
+  line2       String? @db.VarChar(200)
+  city        String  @db.VarChar(120)
+  region      String? @db.VarChar(120)
+  postalCode  String  @db.VarChar(20)
+  countryCode String  @db.Char(2)
+  phone       String? @db.VarChar(32)
+
+  isDefault Boolean   @default(false)
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId, type])
+  /// NOTE: "exactly one default per (customer, type)" is additionally enforced
+  /// by a PARTIAL unique index that Prisma's schema language cannot express
+  /// (it has no `WHERE` clause on `@@unique`). It is created in the migration
+  /// `20260720000200_integration_invariants` as:
+  ///
+  ///   CREATE UNIQUE INDEX "address_one_default_per_type"
+  ///     ON "address" ("customerId", "type")
+  ///     WHERE "isDefault" AND "deletedAt" IS NULL;
+  ///
+  /// AddressesService already enforces this inside a transaction, but two
+  /// concurrent creates can both pass an application-level check before either
+  /// commits. Only the database can decide that race.
+  @@map("address")
+}
+
+// =============================================================================
+// Catalog
+// =============================================================================
+
+model Product {
+  id       String        @id @default(uuid()) @db.Uuid
+  /// NOTE: unique among LIVE products only. Prisma's schema language has no
+  /// `WHERE` clause for `@unique`, so the constraint is a PARTIAL index created
+  /// in `20260911190000_release_unique_keys_on_soft_delete` as:
+  ///
+  ///   CREATE UNIQUE INDEX "product_slug_key"
+  ///     ON "product" ("slug") WHERE "deletedAt" IS NULL;
+  ///
+  /// A soft-deleted product keeps its row for order history but RELEASES its
+  /// slug, so the same product can be created again. Declaring `@unique` here
+  /// would recreate the unconditional index and break that.
+  slug     String        @db.VarChar(160)
+  status   ProductStatus @default(DRAFT)
+  taxClass TaxClass      @default(STANDARD)
+
+  /// Countries this product may NOT ship to. Enforced in cart validation AND at
+  /// checkout — some peptides/supplements are not legal everywhere.
+  restrictedCountries String[] @default([])
+
+  /// Art. 16(e): sealed goods unsuitable for return once opened are exempt from
+  /// the 14-day withdrawal right. Per-SKU, never a blanket store policy.
+  hygieneExempt Boolean @default(false)
+
+  /// Does this product appear in the /products catalogue listing?
+  ///
+  /// FALSE MAKES IT AN ADD-ON, NOT A SECRET. An unlisted product is still fully
+  /// reachable by slug, still purchasable and still indexable — it is simply
+  /// not merchandised on its own. That is the difference from `status`: DRAFT
+  /// and ARCHIVED mean "not sellable at all", while this means "sellable, but
+  /// reached from another product's page rather than from the grid".
+  ///
+  /// A BOOLEAN AND NOT AN ENUM. The question it answers is closed and binary —
+  /// "does it appear on /products?" — and the two states that an enum would add
+  /// (hidden, unpublished) are already `status`. A second enum overlapping the
+  /// first is how you end up with ACTIVE + HIDDEN and no answer to which wins.
+  ///
+  /// DEFAULTS TRUE so every product that exists keeps the behaviour it has
+  /// today with no backfill.
+  listed Boolean @default(true)
+
+  /// Attach this product, as an add-on, to every product created FROM NOW ON.
+  ///
+  /// It materialises real `ProductAddOn` rows at creation time rather than
+  /// being consulted on read, so the join table stays the single source of
+  /// truth and removing the add-on from one product is still just deleting
+  /// that edge.
+  offerOnNewProducts Boolean @default(false)
+
+  /// Which of THIS product's variants those automatic edges pre-select.
+  ///
+  /// NO PRISMA RELATION, on purpose. The database enforces ownership with a
+  /// composite foreign key on ("id", "newProductDefaultVariantId") -> 
+  /// product_variant("productId", "id"); modelling that here would put this
+  /// model's own @id into a relation's `fields`. The service only ever reads
+  /// and writes the scalar.
+  newProductDefaultVariantId String? @db.Uuid
+
+  /// Applies the fixed, non-configurable volume-discount schedule (2/3/5/10
+  /// units) to every variant, computed from each variant's OWN price. See
+  /// `computeStackDiscountTiers` in @akai/contracts — the API recomputes and
+  /// replaces every affected variant's `priceTiers` whenever this is true.
+  stackDiscountEnabled Boolean @default(false)
+
+  /// The catalogue-wide manual display order — GLOBAL, not per-category (this
+  /// column has no `categoryId`; a product's position is the same everywhere
+  /// it's listed). Lower sorts first. Read only by the `"manual"` `ProductSort`
+  /// mode (`product-query.ts`); every other mode ignores it entirely, so
+  /// setting this never silently changes what "Price ↑" or "Best sellers" show.
+  ///
+  /// DEFAULTS 0, same as every OTHER product ever created before this column
+  /// existed — an admin has to deliberately reorder the catalogue once before
+  /// "manual" says anything more than "insertion order", exactly like
+  /// `ProductCategory.sortOrder` already does for one product's position
+  /// inside a category.
+  sortOrder Int @default(0)
+
+  /// SIMPLE (default) is an ordinary, directly sellable product. PACK means
+  /// this product's own variant exists ONLY to carry a display price and a
+  /// slug/PDP/SEO surface — it is never added to a cart or order. "Add pack to
+  /// cart" resolves `packComponents` and adds THEIR real variants instead, so
+  /// checkout, inventory reservation and tax resolution need no special case
+  /// for packs at all. See `ProductPackComponent`'s own doc comment.
+  kind ProductKind @default(SIMPLE)
+
+  /// The physical form the product ships in — the FORMA cell of the storefront
+  /// spec table. A closed enum rather than free text, so the label is always a
+  /// translated one and never an operator's untranslated string. Defaults to
+  /// LYOPHILIZED, which is what almost the whole catalogue is.
+  form ProductForm @default(LYOPHILIZED)
+
+  /// The product's ONE certificate of analysis: an object key in the PRIVATE
+  /// COA bucket (`coa/products/{productId}/...`), never a URL. Null when none
+  /// is uploaded. Shoppers reach it only through the stable
+  /// `GET /v1/products/:slug/coa` redirect, which signs at click time, and
+  /// only while `showCoa` is on. Lot records (`Batch`) keep their own
+  /// certificates as admin data; they no longer drive the storefront.
+  coaObjectKey String? @db.VarChar(512)
+
+  /// The admin's "Mostrar certificado de análisis" switch. Off by default:
+  /// some certificates are uploaded before they are ready to publish, so an
+  /// upload alone never puts a document in front of a shopper.
+  showCoa Boolean @default(false)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  translations ProductTranslation[]
+  variants     ProductVariant[]
+  media        MediaAsset[]
+  categories   ProductCategory[]
+  slugHistory  ProductSlugHistory[]
+
+  /// The add-ons THIS product's page offers.
+  addOns         ProductAddOn[] @relation("ProductAddOnHost")
+  /// The pages that offer THIS product as an add-on. Needed because both sides
+  /// of `ProductAddOn` point at Product, and Prisma cannot tell two relations to
+  /// the same model apart without naming them.
+  offeredAsAddOn ProductAddOn[] @relation("ProductAddOnOffered")
+
+  /// The 3-6 products THIS pack is made of. Empty unless `kind == PACK`.
+  packComponents ProductPackComponent[] @relation("PackComponents")
+  /// The packs that include THIS product as a component.
+  packMemberships ProductPackComponent[] @relation("PackComponentOf")
+
+  @@index([status, deletedAt])
+  @@index([createdAt])
+  @@index([sortOrder])
+  @@index([kind])
+  @@map("product")
+}
+
+model ProductTranslation {
+  id        String @id @default(uuid()) @db.Uuid
+  productId String @db.Uuid
+  locale    Locale
+
+  name             String @db.VarChar(200)
+  shortDescription String @db.VarChar(500)
+  description      String @db.Text
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, locale])
+  @@map("product_translation")
+}
+
+/// Changed slugs keep resolving. Deleting this table breaks every inbound link
+/// and every search result pointing at the old URL.
+model ProductSlugHistory {
+  id        String   @id @default(uuid()) @db.Uuid
+  productId String   @db.Uuid
+  slug      String   @unique @db.VarChar(160)
+  createdAt DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("product_slug_history")
+}
+
+model ProductVariant {
+  id        String @id @default(uuid()) @db.Uuid
+  productId String @db.Uuid
+
+  /// NOTE: unique among LIVE variants only — a PARTIAL index created in
+  /// `20260911190000_release_unique_keys_on_soft_delete`, for the same reason
+  /// `product.slug` is. See the note on that field.
+  sku String @db.VarChar(64)
+
+  /// Per-locale display name, e.g. {"es":"10 mg","en":"10 mg"}. Null on
+  /// single-variant products.
+  name    Json?
+  /// Option values, e.g. {"size":"10mg"}. The combination is unique per product
+  /// (enforced by a partial index in the migration).
+  options Json  @default("{}")
+
+  /// MONEY: integer minor units. `net + tax === gross` is guaranteed by
+  /// @akai/money's splitGross, not by re-deriving tax at read time.
+  currency       String @db.Char(3)
+  priceNet       Int
+  priceTax       Int
+  priceGross     Int
+  compareAtGross Int?
+  taxRateBps     Int
+
+  /// Scheduled promotions: no manual flip required.
+  saleStartsAt DateTime?
+  saleEndsAt   DateTime?
+
+  /// Grams. Required for weight-based shipping and any carrier quote.
+  /// Volume pricing. Empty means one price at every quantity.
+  priceTiers ProductVariantPriceTier[]
+
+  weightGrams Int?
+  lengthMm    Int?
+  widthMm     Int?
+  heightMm    Int?
+
+  isActive Boolean @default(true)
+
+  /// Optimistic concurrency. A stale write is rejected, never merged.
+  version Int @default(0)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  product      Product                @relation(fields: [productId], references: [id], onDelete: Cascade)
+  inventory    InventoryItem?
+  /// At most one, guaranteed by `@@unique([variantId])` on MediaAsset. Singular
+  /// because the model is singular: a variant has an image or it has none.
+  image        MediaAsset?
+  batches      Batch[]
+  priceHistory PriceHistory[]
+  cartItems    CartItem[]
+  ledger       InventoryLedgerEntry[]
+  reservations StockReservation[]
+  /// Edges that pre-select this variant. Back-reference only; nothing reads it.
+  defaultForAddOns ProductAddOn[] @relation("ProductAddOnDefaultVariant")
+  /// Pack components pinned to exactly this variant. Back-reference only.
+  pinnedByPacks ProductPackComponent[] @relation("PackComponentVariant")
+
+  @@index([productId])
+  @@index([isActive, deletedAt])
+  /// REDUNDANT WITH THE PRIMARY KEY, AND THAT IS THE POINT. `id` alone proves a
+  /// variant exists but not whose it is; this is what a COMPOSITE foreign key
+  /// can reference, which is how "a default add-on variant belongs to that
+  /// add-on" becomes a database guarantee.
+  @@unique([productId, id])
+  @@map("product_variant")
+}
+
+/// "What did this cost in March?" is a question support and finance will ask.
+model PriceHistory {
+  id        String @id @default(uuid()) @db.Uuid
+  variantId String @db.Uuid
+
+  currency   String @db.Char(3)
+  priceNet   Int
+  priceTax   Int
+  priceGross Int
+  taxRateBps Int
+
+  validFrom DateTime  @default(now())
+  validTo   DateTime?
+  changedBy String?   @db.Uuid
+
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@index([variantId, validFrom])
+  @@map("price_history")
+}
+
+/// Stock for one variant. `available` is NOT stored — it is `onHand - reserved`,
+/// computed at read time so it can never go stale.
+model InventoryItem {
+  variantId String @id @db.Uuid
+
+  onHand   Int @default(0)
+  reserved Int @default(0)
+
+  lowStockThreshold Int     @default(5)
+  allowBackorder    Boolean @default(false)
+
+  version   Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@map("inventory_item")
+}
+
+/// APPEND-ONLY. The runtime role has INSERT + SELECT only (see migration).
+/// Current stock is always reconstructable by replaying these.
+model InventoryLedgerEntry {
+  id        String            @id @default(uuid()) @db.Uuid
+  variantId String            @db.Uuid
+  movement  InventoryMovement
+
+  /// Signed: negative for SALE and RESERVATION, positive for RESTOCK and RETURN.
+  quantityDelta   Int
+  resultingOnHand Int
+
+  orderId String? @db.Uuid
+  actorId String? @db.Uuid
+  /// Mandatory on manual ADJUSTMENT — enforced by the application, since the
+  /// reason is meaningless for automated movements.
+  reason  String? @db.VarChar(500)
+
+  createdAt DateTime @default(now())
+
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Restrict)
+
+  @@index([variantId, createdAt])
+  @@index([orderId])
+  @@map("inventory_ledger")
+}
+
+/// Stock held during an in-flight checkout, with a TTL. A cron job releases
+/// expired rows; without this, an abandoned checkout holds stock forever.
+model StockReservation {
+  id        String  @id @default(uuid()) @db.Uuid
+  variantId String  @db.Uuid
+  cartId    String? @db.Uuid
+  orderId   String? @db.Uuid
+
+  quantity Int
+
+  expiresAt  DateTime
+  releasedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt, releasedAt])
+  @@index([variantId])
+  @@map("stock_reservation")
+}
+
+/// Lot traceability. The live Spanish FAQ contractually promises a lot id and
+/// COA access with every order, so this is a commitment, not a nice-to-have.
+model Batch {
+  id        String @id @default(uuid()) @db.Uuid
+  variantId String @db.Uuid
+
+  lotCode       String   @db.VarChar(64)
+  purityPercent Decimal  @db.Decimal(5, 2)
+  testedAt      DateTime
+  testMethod    String   @db.VarChar(64)
+
+  /// S3 key. Served via an expiring signed URL, never a public bucket path.
+  coaObjectKey String?   @db.VarChar(512)
+  expiresAt    DateTime?
+
+  createdAt DateTime @default(now())
+
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@unique([variantId, lotCode])
+  @@index([variantId])
+  @@map("batch")
+}
+
+model MediaAsset {
+  id        String  @id @default(uuid()) @db.Uuid
+  productId String  @db.Uuid
+  /// Set when this asset IS the image of one variant; NULL when it is a
+  /// product-gallery image. Nullable is the whole design: every row written
+  /// before this column existed stays a gallery image, so there is no backfill
+  /// and no window in which a read sees a half-migrated table.
+  ///
+  /// `productId` stays NOT NULL on a variant image too. That is deliberate —
+  /// it is what keeps `removeMedia`'s two-id ownership scoping (productId AND
+  /// mediaId) working unchanged for variant images as well as gallery ones.
+  variantId String? @db.Uuid
+
+  /// S3 object key. Binaries are uploaded direct-to-S3 via signed URLs and are
+  /// never streamed through the API.
+  objectKey String @db.VarChar(512)
+  url       String @db.VarChar(1024)
+  /// Per-locale alt text: it is user-facing copy like any other.
+  alt       Json   @default("{}")
+  width     Int
+  height    Int
+  sortOrder Int    @default(0)
+
+  createdAt DateTime @default(now())
+
+  product Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  /// UNIQUE ON A NULLABLE COLUMN IS THE POINT. Postgres treats NULLs as
+  /// distinct, so a product keeps any number of gallery images while a variant
+  /// holds AT MOST ONE image — the requirement, enforced by the database rather
+  /// than by an application "delete the old one first" that races with itself.
+  /// It is also the index the variant read uses and the one the FK's
+  /// ON DELETE CASCADE needs to avoid a seq scan per deleted variant.
+  ///
+  /// CONSEQUENCE FOR WRITERS: attaching an image to a variant that already has
+  /// one is a REPLACE (delete-then-create in one transaction), never an append.
+  /// A bare create raises P2002.
+  @@unique([variantId])
+  @@index([productId, sortOrder])
+  @@map("media_asset")
+}
+
+model Category {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// NOTE: unique among LIVE categories only. Prisma's schema language has no
+  /// `WHERE` clause for `@unique`, so the constraint is a PARTIAL index created
+  /// in `20260915100000_category_admin_crud` as:
+  ///
+  ///   CREATE UNIQUE INDEX "category_slug_key"
+  ///     ON "category" ("slug") WHERE "deletedAt" IS NULL;
+  ///
+  /// Same reasoning, same fix, as `Product.slug` and `ProductVariant.sku` in
+  /// `20260911190000_release_unique_keys_on_soft_delete`: a soft-deleted
+  /// category keeps its row (a deleted product may still reference it) but
+  /// RELEASES its slug, so an admin can delete "bundles" and later create a
+  /// new "bundles" category without inventing a different name. Declaring
+  /// `@unique` here would recreate the unconditional index and break that.
+  slug String @db.VarChar(160)
+
+  /// Per-locale names, e.g. {"es":"Recuperación","en":"Recovery"}.
+  name      Json
+  sortOrder Int    @default(0)
+
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
+
+  products ProductCategory[]
+
+  @@map("category")
+}
+
+/// Which products a product page offers alongside itself.
+///
+/// ORTHOGONAL TO `Product.listed`, and the two are easy to confuse. `listed`
+/// decides whether a product is merchandised on /products at all — a property
+/// of the product. This decides which products a given page offers — a property
+/// of the PAIR. Attaching a product here never changes its own `listed` flag.
+/// Volume pricing for one variant: the unit price once a line reaches
+/// `minQuantity`. Quantity 1 is the variant's own `priceGross`.
+///
+/// NOT A DISCOUNT. `Discount` is a coupon — a code, redemption counts, stacking
+/// rules. This is a property of the variant, applied automatically and visible
+/// before anything is in the cart.
+model ProductVariantPriceTier {
+  id             String @id @default(uuid()) @db.Uuid
+  variantId      String @db.Uuid
+  /// >= 2, enforced by a CHECK: quantity 1 is the variant's own price.
+  minQuantity    Int
+  unitPriceGross Int
+
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@unique([variantId, minQuantity])
+  @@map("product_variant_price_tier")
+}
+
+model ProductAddOn {
+  /// The product whose page offers the add-on.
+  productId String @db.Uuid
+  /// The product being offered. A product like any other: it has a slug, a
+  /// detail page, variants and a price.
+  addOnId   String @db.Uuid
+  /// The operator's merchandising order, on the edge — the same place
+  /// `ProductCategory` keeps it, because the same product can sit differently
+  /// on two different pages.
+  sortOrder Int    @default(0)
+  /// The add-on VARIANT this host page arrives with pre-selected, or null.
+  /// A variant rather than a boolean: an add-on sold in two sizes has no single
+  /// thing to pre-select. A suggestion the shopper may decline, never a
+  /// compulsory line.
+  defaultVariantId String? @db.Uuid
+
+  product Product @relation("ProductAddOnHost", fields: [productId], references: [id], onDelete: Cascade)
+  addOn   Product @relation("ProductAddOnOffered", fields: [addOnId], references: [id], onDelete: Cascade)
+  /// COMPOSITE, carrying `addOnId` into the reference so the database itself
+  /// rejects a default naming some other product's variant. Needs
+  /// `@@unique([productId, id])` on ProductVariant to point at.
+  defaultVariant ProductVariant? @relation("ProductAddOnDefaultVariant", fields: [addOnId, defaultVariantId], references: [productId, id])
+
+  @@id([productId, addOnId])
+  /// For the addOnId cascade only. `sortOrder` orders add-ons within one host,
+  /// so grouped by add-on it would sort nothing.
+  @@index([addOnId])
+  @@map("product_add_on")
+}
+
+/// The 3-6 products one PACK product (`Product.kind == PACK`) is made of.
+///
+/// UNLIKE `ProductAddOn.defaultVariantId`, `componentVariantId` here is
+/// REQUIRED, not nullable — an add-on's default is a suggestion the shopper
+/// may decline; a pack's pinned variant IS the sale. The admin pins one
+/// variant per component; the shopper never chooses.
+///
+/// `onDelete: Restrict` on `component` (not Cascade, unlike `ProductAddOn`):
+/// a product that is a live pack component must not vanish out from under a
+/// pack silently. The service layer additionally refuses to soft-delete a
+/// product still referenced here (409), the same guard shape
+/// `removeCategory` already applies to a category still assigned to a
+/// product.
+model ProductPackComponent {
+  packProductId      String @db.Uuid
+  componentProductId String @db.Uuid
+  componentVariantId String @db.Uuid
+  /// Display order of the components on the pack's own PDP.
+  sortOrder Int @default(0)
+  /// How many of THIS component one pack contains — "5x Reta 20mg" as one
+  /// slot, not five identical slots. `CHECK (quantity > 0)` lives in the
+  /// migration's raw SQL (Prisma has no check-constraint syntax here, same
+  /// note as everywhere else this schema needs one). Weights the pro-rata
+  /// price allocation in `pack-pricing.ts` by `quantity × liveUnitPrice`
+  /// rather than just `liveUnitPrice`, and scales the cart/order line
+  /// quantity written for this component — see that file's doc comment for
+  /// why a component can legitimately need up to 2 lines once this is > 1.
+  quantity Int @default(1)
+
+  pack      Product        @relation("PackComponents", fields: [packProductId], references: [id], onDelete: Cascade)
+  component Product        @relation("PackComponentOf", fields: [componentProductId], references: [id], onDelete: Restrict)
+  /// COMPOSITE, carrying `componentProductId` into the reference so the
+  /// database itself rejects a pinned variant that belongs to some OTHER
+  /// product — the exact mechanism `ProductAddOn.defaultVariant` already
+  /// uses against `ProductVariant`'s own `@@unique([productId, id])`.
+  componentVariant ProductVariant @relation("PackComponentVariant", fields: [componentProductId, componentVariantId], references: [productId, id])
+
+  @@id([packProductId, componentProductId])
+  @@index([componentProductId])
+  @@map("product_pack_component")
+}
+
+model ProductCategory {
+  productId  String @db.Uuid
+  categoryId String @db.Uuid
+  sortOrder  Int    @default(0)
+
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([productId, categoryId])
+  @@index([categoryId, sortOrder])
+  @@map("product_category")
+}
+
+// =============================================================================
+// Cart
+// =============================================================================
+
+model Cart {
+  id         String  @id @default(uuid()) @db.Uuid
+  /// Null for an anonymous cart. Set on login via the quantity-sum merge policy.
+  customerId String? @db.Uuid
+  /// Opaque bearer token for anonymous carts. Hashed: it grants cart access.
+  tokenHash  String  @unique
+
+  currency     String  @db.Char(3)
+  discountCode String? @db.VarChar(64)
+
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  customer Customer?  @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  items    CartItem[]
+
+  @@index([customerId])
+  @@index([expiresAt])
+  @@map("cart")
+}
+
+model CartItem {
+  id        String @id @default(uuid()) @db.Uuid
+  cartId    String @db.Uuid
+  variantId String @db.Uuid
+
+  quantity Int
+
+  /// Snapshotted at ADD time for display only. Checkout RE-PRICES from the live
+  /// variant and surfaces any change rather than silently charging the new one.
+  unitPriceGross Int
+  currency       String @db.Char(3)
+
+  /// Set together, or both null. Identify which PACK product this line came
+  /// from and which "add pack to cart" event it belongs to — every component
+  /// line of one pack purchase shares the same `packInstanceId`, minted once
+  /// per add. Never set on an ordinary, directly-added line.
+  packProductId  String? @db.Uuid
+  packInstanceId String? @db.Uuid
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cart    Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Restrict)
+
+  /// NOTE: "one line per variant" no longer holds unconditionally. It is now
+  /// TWO partial unique indexes, created in `<migration>_product_packs` and
+  /// widened in `<migration>_pack_component_quantity` as:
+  ///
+  ///   CREATE UNIQUE INDEX "cart_item_standalone_key"
+  ///     ON "cart_item" ("cartId", "variantId") WHERE "packInstanceId" IS NULL;
+  ///   CREATE UNIQUE INDEX "cart_item_pack_key"
+  ///     ON "cart_item" ("cartId", "variantId", "packInstanceId", "unitPriceGross")
+  ///     WHERE "packInstanceId" IS NOT NULL;
+  ///
+  /// A single `@@unique([cartId, variantId, packInstanceId])` would NOT do
+  /// this: Postgres treats every NULL as distinct from every other NULL in a
+  /// unique index, so it would silently stop enforcing "one standalone line
+  /// per variant" at all. The split preserves that existing rule while still
+  /// letting the SAME variant appear as its own standalone line AND,
+  /// separately, inside a pack instance — correctly priced differently in
+  /// each.
+  ///
+  /// `unitPriceGross` JOINED the pack key once a component could need a
+  /// quantity > 1: `pack-pricing.ts`'s two-level allocation can legitimately
+  /// split ONE component into up to two lines at two adjacent per-unit
+  /// prices (see that file), so "one row per (cart, variant, instance)" is
+  /// no longer true — "one row per (cart, variant, instance, PRICE)" is.
+  @@index([cartId, variantId])
+  @@index([cartId])
+  @@map("cart_item")
+}
+
+// =============================================================================
+// Discounts, tax, shipping
+// =============================================================================
+
+model Discount {
+  id   String       @id @default(uuid()) @db.Uuid
+  code String       @unique @db.VarChar(64)
+  type DiscountType
+
+  /// PERCENTAGE: basis points. FIXED_AMOUNT: minor units. FREE_SHIPPING: unused.
+  value Int
+
+  minimumSubtotal Int?
+  currency        String? @db.Char(3)
+
+  /// Null means unlimited.
+  maxRedemptions            Int?
+  maxRedemptionsPerCustomer Int?
+  timesRedeemed             Int  @default(0)
+
+  /// Whether this may combine with another discount. Stacking rules must be
+  /// explicit — implicit stacking is how a 100%-off order happens.
+  stackable Boolean @default(false)
+
+  startsAt DateTime?
+  endsAt   DateTime?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  redemptions DiscountRedemption[]
+
+  /// Which partner this coupon currently belongs to, or none — §14 of
+  /// `docs/superpowers/specs/2026-09-15-storefront-admin-expansion.md`. NULLABLE,
+  /// on the DISCOUNT side rather than a single `couponId` on `Affiliate`, because
+  /// the decision recorded there is that one affiliate may hold MULTIPLE codes
+  /// over time (useful if a code is ever reissued) — so this is a plain
+  /// many-codes-to-one-affiliate FK, set through the existing admin discount
+  /// write path (`PATCH /admin/discounts/:id`), not a new endpoint.
+  ///
+  /// REASSIGNING THIS IS NOT RETROACTIVE-SAFE, DELIBERATELY. There is no
+  /// snapshot of "who owned this code at the time" a redemption happened — an
+  /// affiliate's stats are computed by joining `DiscountRedemption` through
+  /// this CURRENT column, so moving a code to a different affiliate moves that
+  /// code's entire redemption history with it. Building point-in-time
+  /// ownership snapshotting was considered and rejected: reassignment is a
+  /// rare, deliberate admin action, and the added storage/complexity was not
+  /// worth it for a case nobody asked to handle differently.
+  affiliateId String?    @db.Uuid
+  affiliate   Affiliate? @relation(fields: [affiliateId], references: [id], onDelete: Restrict)
+
+  @@index([code, deletedAt])
+  @@index([affiliateId])
+  @@map("discount")
+}
+
+/// A referral partner — §5 and §14 of
+/// `docs/superpowers/specs/2026-09-15-storefront-admin-expansion.md`.
+///
+/// LOGIN IS OPT-IN, PER ROW. This model started admin-only — staff read an
+/// affiliate's own stats on their behalf, never the affiliate signing in —
+/// and that doc comment said adding self-service accounts later would need
+/// "a login, a session, a scoped read API." `customerId` is exactly that,
+/// added 2026-09-20: an admin action links a `Customer` (role PARTNER) to
+/// this row, and everything else about the affiliate — application intake,
+/// discount assignment, staff-side stats — is unchanged. Most affiliates
+/// still have no login at all; `customerId` stays null until an admin
+/// explicitly activates one.
+///
+/// REVENUE AND REDEMPTION COUNT ARE NOT STORED HERE. They are computed at
+/// read time by joining this row's `Discount`s to `DiscountRedemption` and
+/// `Order` — see `AffiliateAdminService`'s own doc comment for exactly which
+/// order statuses count and why. A denormalized counter (the way
+/// `Discount.timesRedeemed` works) was rejected here because "revenue" needs
+/// a JOIN to `Order.grandTotal` that a single-row increment cannot express.
+/// `AffiliateLinkClick` below follows the identical reasoning for click counts.
+model Affiliate {
+  id String @id @default(uuid()) @db.Uuid
+
+  name String @db.VarChar(200)
+
+  /// ISO-3166-1 alpha-2, matching `countryCodeSchema` — the same closed
+  /// vocabulary shipping destinations already use, chosen for admin-list
+  /// consistency (sortable, filterable, renders via the same
+  /// `Intl.DisplayNames` helper), NOT because an affiliate must be based
+  /// somewhere the store ships to. An affiliate can be anywhere in the world.
+  country String @db.Char(2)
+
+  /// Free text on purpose — "cuenta red social" in the request names no
+  /// specific platform, and an affiliate applicant may hand over an
+  /// Instagram handle, a TikTok URL or a YouTube channel name interchangeably.
+  socialHandle String @db.VarChar(200)
+
+  email String @db.VarChar(320)
+
+  /// Null until an admin activates a partner login. `@unique` so one
+  /// `Customer` can never be linked to two affiliate rows — that would let a
+  /// single login read two affiliates' worth of stats, defeating the whole
+  /// point of scoping the read to `principal.customerId`.
+  customerId String? @unique @db.Uuid
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  customer  Customer?       @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  discounts Discount[]
+  links     AffiliateLink[]
+
+  @@index([deletedAt])
+  @@map("affiliate")
+}
+
+/// A vanity URL (`akai.shop/<slug>`) that redirects to the storefront,
+/// records a click, and hands the visitor the affiliate's live discount code
+/// to auto-apply — see `AffiliateLinkClick` and the storefront's
+/// `[partnerSlug]/route.ts`.
+///
+/// `slug` IS THE PATH SEGMENT, validated server-side (on create) against
+/// every existing top-level storefront route so a partner link can never
+/// shadow `/products`, `/cart`, etc. Next's router would not actually let a
+/// dynamic catch-all win over a static route either way, but refusing the
+/// collision at creation time is what stops an admin from shipping a link
+/// that silently never works.
+model AffiliateLink {
+  id          String @id @default(uuid()) @db.Uuid
+  affiliateId String @db.Uuid
+
+  slug String @db.VarChar(80)
+
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
+
+  affiliate Affiliate            @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  clicks    AffiliateLinkClick[]
+
+  @@unique([slug])
+  @@index([affiliateId])
+  @@map("affiliate_link")
+}
+
+/// One recorded visit to an `AffiliateLink`. APPEND-ONLY, same convention as
+/// `audit_log`/`inventory_ledger`/`price_history` elsewhere in this schema —
+/// the click COUNT is a `count()` over this table at read time, never a
+/// denormalized counter on `AffiliateLink`, for the identical reason
+/// `Affiliate`'s own doc comment gives for computing revenue at read time
+/// rather than storing it.
+model AffiliateLinkClick {
+  id        String   @id @default(uuid()) @db.Uuid
+  linkId    String   @db.Uuid
+  createdAt DateTime @default(now())
+
+  link AffiliateLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
+
+  @@index([linkId])
+  @@map("affiliate_link_click")
+}
+
+model DiscountRedemption {
+  id         String  @id @default(uuid()) @db.Uuid
+  discountId String  @db.Uuid
+  orderId    String  @db.Uuid
+  customerId String? @db.Uuid
+
+  amountApplied Int
+
+  createdAt DateTime @default(now())
+
+  discount Discount @relation(fields: [discountId], references: [id], onDelete: Restrict)
+
+  /// One redemption per discount per order, enforced in the DB rather than by a
+  /// check-then-insert that races.
+  @@unique([discountId, orderId])
+  @@index([customerId])
+  @@map("discount_redemption")
+}
+
+/// Destination-based VAT. Keyed (country, class, validFrom) rather than a single
+/// constant: supplements are reduced-rate in some member states, standard in
+/// others, and rates change on announced dates.
+model TaxRate {
+  id          String    @id @default(uuid()) @db.Uuid
+  countryCode String    @db.Char(2)
+  taxClass    TaxClass
+  rateBps     Int
+  validFrom   DateTime
+  validTo     DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@unique([countryCode, taxClass, validFrom])
+  @@index([countryCode, taxClass])
+  @@map("tax_rate")
+}
+
+model ShippingZone {
+  id           String   @id @default(uuid()) @db.Uuid
+  name         String   @db.VarChar(120)
+  countryCodes String[]
+  sortOrder    Int      @default(0)
+
+  createdAt DateTime  @default(now())
+  /// `@default(now())` as well as `@updatedAt` so the column could be added to
+  /// the rows that pre-date the admin editor (spec §7a) without a backfill.
+  updatedAt DateTime  @default(now()) @updatedAt
+  deletedAt DateTime?
+
+  rates ShippingRate[]
+
+  /// GIN, for "which active zone holds country X" — the quote's lookup and the
+  /// admin editor's one-active-zone-per-country check (enforced in the service:
+  /// an array-overlap exclusion is not expressible as a plain unique index).
+  @@index([countryCodes], type: Gin)
+  @@map("shipping_zone")
+}
+
+model ShippingRate {
+  id     String @id @default(uuid()) @db.Uuid
+  zoneId String @db.Uuid
+
+  /// Per-locale method name, e.g.
+  /// {"es":"Estándar (2-3 días)","en":"Standard (2-3 days)"}.
+  ///
+  /// A Json record and NOT a VARCHAR, for the same reason `Category.name` and
+  /// `ProductVariant.name` are: this string is rendered on the last page before
+  /// payment. A single monolingual column meant a Spanish shopper picked their
+  /// delivery method in English, and — because the chosen name is stamped onto
+  /// `order.shippingMethodName` — inherited that English into the confirmation
+  /// email and the invoice too.
+  name     Json
+  /// "FLAT" | "WEIGHT" | "PRICE"
+  strategy String @db.VarChar(16)
+
+  priceGross Int
+  currency   String @db.Char(3)
+
+  /// Bounds for WEIGHT (grams) and PRICE (minor units) strategies.
+  minValue         Int?
+  maxValue         Int?
+  /// Free over this subtotal. Null disables the threshold.
+  freeOverSubtotal Int?
+
+  isActive Boolean @default(true)
+
+  /// --- Sendcloud mapping (spec §3.1). The customer is charged `priceGross`
+  /// above; these only decide HOW the parcel travels. A rate with no
+  /// `sendcloudOptionCode` is still sellable — its label is made by hand.
+  deliveryType        ShippingDeliveryType @default(HOME)
+  /// Sendcloud carrier code (`inpost_es`, `ups`) — filters the pickup points
+  /// offered for this method, so another carrier's points are never shown.
+  carrierCode         String?              @db.VarChar(64)
+  /// Sendcloud shipping option code, e.g. `inpost_es:service_point,national_c2c`.
+  /// INTERNAL: never on a public DTO.
+  sendcloudOptionCode String?              @db.VarChar(128)
+  /// The "1–2 días" sub-line under the method name. Null = not shown.
+  transitDaysMin      Int?
+  transitDaysMax      Int?
+
+  createdAt DateTime  @default(now())
+  /// See `ShippingZone.updatedAt`.
+  updatedAt DateTime  @default(now()) @updatedAt
+  deletedAt DateTime?
+
+  zone ShippingZone @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  orders Order[]
+
+  @@index([zoneId, isActive])
+  @@map("shipping_rate")
+}
+
+// =============================================================================
+// Orders
+// =============================================================================
+
+model Order {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// Rendered AK-YYYY-NNNNNN from `order_number_seq`. Customers and support
+  /// cannot work with UUIDs.
+  orderNumber String @unique @db.VarChar(20)
+
+  /// Null for a pure guest order until it is claimed by verifying the email.
+  customerId String? @db.Uuid
+  /// Always present — it is the claim key and the confirmation recipient.
+  email      String  @db.Citext
+
+  status   OrderStatus @default(PENDING)
+  locale   Locale      @default(es)
+  currency String      @db.Char(3)
+
+  /// MONEY: separate integer columns, not derived at read time. An invariant
+  /// test asserts lines + adjustments === grandTotal for every order.
+  subtotal      Int
+  discountTotal Int @default(0)
+  shippingTotal Int @default(0)
+  taxTotal      Int @default(0)
+  grandTotal    Int
+  refundedTotal Int @default(0)
+
+  /// SNAPSHOTTED addresses — deliberately columns, not FKs to the address book.
+  shipFirstName   String  @db.VarChar(80)
+  shipLastName    String  @db.VarChar(80)
+  shipCompany     String? @db.VarChar(120)
+  shipLine1       String  @db.VarChar(200)
+  shipLine2       String? @db.VarChar(200)
+  shipCity        String  @db.VarChar(120)
+  shipRegion      String? @db.VarChar(120)
+  shipPostalCode  String  @db.VarChar(20)
+  shipCountryCode String  @db.Char(2)
+  shipPhone       String? @db.VarChar(32)
+
+  billFirstName   String  @db.VarChar(80)
+  billLastName    String  @db.VarChar(80)
+  billCompany     String? @db.VarChar(120)
+  billLine1       String  @db.VarChar(200)
+  billLine2       String? @db.VarChar(200)
+  billCity        String  @db.VarChar(120)
+  billRegion      String? @db.VarChar(120)
+  billPostalCode  String  @db.VarChar(20)
+  billCountryCode String  @db.Char(2)
+  billPhone       String? @db.VarChar(32)
+
+  /// Gap-free, allocated from `invoice_number_seq` at PAID ONLY. Abandoned
+  /// carts must never consume an invoice number.
+  invoiceNumber String? @unique @db.VarChar(32)
+  /// VIES-validated VAT number for B2B reverse charge.
+  vatNumber     String? @db.VarChar(20)
+  /// True when the order was zero-rated under reverse charge.
+  reverseCharge Boolean @default(false)
+
+  shippingMethodName   String? @db.VarChar(120)
+  acceptedTermsVersion String? @db.VarChar(32)
+
+  /// --- Fulfilment snapshot (spec §3.3/§3.4). All nullable: orders placed
+  /// before Sendcloud keep nulls and stay manually fulfillable.
+  ///
+  /// The rate the customer chose. SET NULL, so deleting a rate never touches an
+  /// order — which is why everything the label needs is ALSO copied below.
+  shippingRateId         String? @db.Uuid
+  /// The rate's option code AT CHECKOUT, so remapping a rate later cannot
+  /// change how an already-paid order ships.
+  sendcloudOptionCode    String? @db.VarChar(128)
+  /// The chosen pickup point, re-verified at checkout and snapshotted here: it
+  /// must survive the point disappearing from Sendcloud. `servicePointId` is
+  /// Sendcloud's id as a STRING (the shipment API takes a string, the search
+  /// API returns an integer — spec §1 S7/S10).
+  servicePointId         String? @db.VarChar(32)
+  servicePointCarrierId  String? @db.VarChar(64)
+  servicePointName       String? @db.VarChar(120)
+  /// Single line: "street house, postal city, CC".
+  servicePointAddress    String? @db.VarChar(255)
+  servicePointPostNumber String? @db.VarChar(32)
+  /// Separate house number, required by InPost ES / Mondial Relay (spec §1 S17).
+  shipHouseNumber        String? @db.VarChar(16)
+  /// Computed from the lines at checkout, so a later product purge or weight
+  /// edit cannot change the label weight.
+  parcelWeightGrams      Int?
+
+  /// Correlation rank 2: the `ch_…` checkout configuration this order was sent
+  /// to. Persisted BEFORE the customer reaches the payment page, so it cannot
+  /// lose a race with the webhook that settles the order.
+  ///
+  /// Rank 1 is `metadata.order_id`, which is this row's own `id` round-tripped
+  /// through the provider — see the integration contract §4. There is no rank 3
+  /// and no backfilled provider order id: those existed because TagadaPay's
+  /// payload might have carried none of our keys, and Whop documents metadata
+  /// inheritance.
+  providerCheckoutId String? @unique
+
+  placedAt    DateTime  @default(now())
+  paidAt      DateTime?
+  cancelledAt DateTime?
+  updatedAt   DateTime  @updatedAt
+
+  /// Optimistic concurrency: out-of-order provider webhooks race each other.
+  version Int @default(0)
+
+  customer  Customer?       @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  shippingRate ShippingRate?   @relation(fields: [shippingRateId], references: [id], onDelete: SetNull)
+  items     OrderItem[]
+  events    OrderEvent[]
+  payments  Payment[]
+  refunds   Refund[]
+  shipments Shipment[]
+  returns   ReturnRequest[]
+
+  @@index([customerId, placedAt])
+  @@index([status, placedAt])
+  @@index([email])
+  @@index([placedAt])
+  @@index([shippingRateId])
+  @@map("order")
+}
+
+/// A SNAPSHOT. Historical order display must NEVER join to product/variant.
+model OrderItem {
+  id      String @id @default(uuid()) @db.Uuid
+  orderId String @db.Uuid
+
+  /// Kept for reorder and analytics only. Nullable and ON DELETE SET NULL: the
+  /// order line must survive the product being purged.
+  variantId String? @db.Uuid
+
+  productName String  @db.VarChar(200)
+  variantName String? @db.VarChar(120)
+  sku         String  @db.VarChar(64)
+  imageUrl    String? @db.VarChar(1024)
+
+  quantity Int
+
+  /// MONEY, all integer minor units.
+  unitPriceNet   Int
+  unitPriceGross Int
+  lineDiscount   Int @default(0)
+  taxRateBps     Int
+  taxAmount      Int
+  lineTotalNet   Int
+  lineTotalGross Int
+
+  /// The lot actually shipped, for traceability.
+  batchLotCode String? @db.VarChar(64)
+
+  /// Carried over from `CartItem` at order-creation time, unchanged — see that
+  /// field's own comment. Purely for display/reporting grouping here; no
+  /// uniqueness constraint, `OrderItem` never had one.
+  packProductId  String? @db.Uuid
+  packInstanceId String? @db.Uuid
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([sku])
+  @@map("order_item")
+}
+
+/// Append-only timeline. `isInternal` entries are admin-only.
+model OrderEvent {
+  id      String @id @default(uuid()) @db.Uuid
+  orderId String @db.Uuid
+
+  type       String  @db.VarChar(64)
+  message    String  @db.VarChar(1000)
+  isInternal Boolean @default(false)
+  actorId    String? @db.Uuid
+
+  createdAt DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+  @@map("order_event")
+}
+
+// =============================================================================
+// Payments
+// =============================================================================
+
+/// Separate from Order: one order can have several payment attempts.
+model Payment {
+  id      String @id @default(uuid()) @db.Uuid
+  orderId String @db.Uuid
+
+  provider PaymentProvider @default(WHOP)
+  status   PaymentStatus   @default(REQUIRES_PAYMENT_METHOD)
+
+  amount   Int
+  currency String @db.Char(3)
+
+  /// The provider's payment id — the handle a refund is issued against.
+  providerPaymentId     String? @unique
+  /// The provider's underlying transaction/charge id, where one is exposed.
+  providerTransactionId String? @unique
+
+  /// Display-only card metadata. Never a PAN, never anything replayable.
+  cardBrand String? @db.VarChar(32)
+  cardLast4 String? @db.Char(4)
+
+  failureCode    String? @db.VarChar(64)
+  failureMessage String? @db.VarChar(500)
+
+  capturedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  order   Order    @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  refunds Refund[]
+
+  @@index([orderId])
+  @@index([status])
+  @@map("payment")
+}
+
+model Refund {
+  id        String @id @default(uuid()) @db.Uuid
+  paymentId String @db.Uuid
+  orderId   String @db.Uuid
+
+  status RefundStatus @default(PENDING)
+  reason RefundReason
+
+  amount   Int
+  currency String @db.Char(3)
+
+  providerRefundId String? @unique
+  note             String? @db.VarChar(1000)
+  actorId          String? @db.Uuid
+
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([paymentId])
+  @@map("refund")
+}
+
+/// Chargebacks are time-boxed by the card networks: a missed evidence deadline
+/// is an automatic loss, so `evidenceDueBy` drives an alert.
+model Dispute {
+  id      String @id @default(uuid()) @db.Uuid
+  orderId String @db.Uuid
+
+  providerDisputeId String @unique
+  status            String @db.VarChar(32)
+  reason            String @db.VarChar(64)
+
+  amount   Int
+  currency String @db.Char(3)
+
+  evidenceDueBy DateTime?
+  createdAt     DateTime  @default(now())
+  closedAt      DateTime?
+
+  @@index([orderId])
+  @@map("dispute")
+}
+
+// =============================================================================
+// Fulfilment and returns
+// =============================================================================
+
+/// Covers a SUBSET of an order's lines. Partial shipment is normal, which is why
+/// tracking is here and not a column on Order.
+model Shipment {
+  id      String         @id @default(uuid()) @db.Uuid
+  orderId String         @db.Uuid
+  status  ShipmentStatus @default(PENDING)
+
+  carrier        String  @db.VarChar(64)
+  trackingNumber String? @db.VarChar(128)
+  trackingUrl    String? @db.VarChar(1024)
+
+  /// --- Sendcloud (spec §3.5). All null for MANUAL shipments.
+  provider            ShipmentProvider @default(MANUAL)
+  /// Sendcloud's shipment id (string in v3). UNIQUE: a label is bought at most
+  /// once per order, and a retried job resolving the same shipment (409 on the
+  /// same `external_reference_id`) must land on this row, not a second one.
+  sendcloudShipmentId String?          @unique @db.VarChar(64)
+  /// Sendcloud's parcel id — the key the tracking webhook and the label
+  /// download use. BigInt: Sendcloud parcel ids are 64-bit integers.
+  sendcloudParcelId   BigInt?          @unique
+  /// Key of the label PDF in the private bucket (`labels/{orderId}/{parcelId}.pdf`).
+  /// A key, never a URL — downloads are short-lived signed GETs.
+  labelObjectKey      String?          @db.VarChar(512)
+  /// Sendcloud's own last-seen status code (e.g. `AWAITING_CUSTOMER_PICKUP`),
+  /// kept verbatim beside the mapped `status` so an unmapped/new code is
+  /// visible to staff instead of silently collapsed.
+  sendcloudStatusCode String?          @db.VarChar(64)
+  /// Vendor detail for a FAILED announcement or a refused cancel, for staff.
+  failureReason       String?          @db.Text
+  /// Last time the state was re-read from Sendcloud (webhook or sweep).
+  lastSyncedAt        DateTime?
+
+  shippedAt   DateTime?
+  deliveredAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  order Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  items ShipmentItem[]
+
+  @@index([orderId])
+  @@index([trackingNumber])
+  /// The tracking sweep: non-terminal SENDCLOUD shipments, oldest sync first.
+  @@index([provider, status, lastSyncedAt])
+  @@map("shipment")
+}
+
+model ShipmentItem {
+  id          String @id @default(uuid()) @db.Uuid
+  shipmentId  String @db.Uuid
+  orderItemId String @db.Uuid
+  quantity    Int
+
+  shipment Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  @@unique([shipmentId, orderItemId])
+  @@map("shipment_item")
+}
+
+/// EU 14-day right of withdrawal, as an actual RMA flow rather than policy copy.
+model ReturnRequest {
+  id         String       @id @default(uuid()) @db.Uuid
+  orderId    String       @db.Uuid
+  customerId String?      @db.Uuid
+  status     ReturnStatus @default(REQUESTED)
+
+  reason         String  @db.VarChar(500)
+  adminNote      String? @db.VarChar(1000)
+  returnLabelUrl String? @db.VarChar(1024)
+
+  requestedAt DateTime  @default(now())
+  resolvedAt  DateTime?
+
+  order    Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([status])
+  @@map("return_request")
+}
+
+// =============================================================================
+// Email
+// =============================================================================
+
+model EmailEvent {
+  id          String      @id @default(uuid()) @db.Uuid
+  recipient   String      @db.Citext
+  templateKey String      @db.VarChar(64)
+  locale      Locale      @default(es)
+  status      EmailStatus @default(QUEUED)
+
+  providerMessageId String? @db.VarChar(200)
+  orderId           String? @db.Uuid
+  error             String? @db.VarChar(1000)
+  attempts          Int     @default(0)
+
+  /// Widens the idempotency key beyond (order, template). "" means the whole
+  /// order, which is the right scope for every template that fires once per
+  /// order; a shipment id scopes a per-parcel send. NOT NULL on purpose —
+  /// NULLs are DISTINCT for uniqueness in Postgres, so a nullable scope would
+  /// quietly let duplicate order confirmations through.
+  dedupeScope String @default("") @db.VarChar(64)
+
+  sentAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  /// THE idempotency guarantee: one send per (order, template, scope). This is
+  /// what stops a provider webhook retry mailing three order confirmations.
+  /// Enforced in the DB because application-level checks race. `dedupeScope`
+  /// defaults to "", so an order-scoped template behaves exactly as it did
+  /// under the old two-column key.
+  @@unique([orderId, templateKey, dedupeScope])
+  @@index([recipient])
+  @@index([status, createdAt])
+  @@map("email_event")
+}
+
+/// Hard bounces and complaints. Continuing to send to these addresses destroys
+/// sender reputation for every other customer.
+model EmailSuppression {
+  email     String   @id @db.Citext
+  reason    String   @db.VarChar(64)
+  createdAt DateTime @default(now())
+
+  @@map("email_suppression")
+}
+
+// =============================================================================
+// Reliability: outbox, idempotency, webhook dedupe, audit
+// =============================================================================
+
+/// Transactional outbox. The domain write and the outbox row commit in ONE
+/// transaction; a worker then performs the external call with retry and DLQ.
+/// An inline fetch in a request handler loses the side effect whenever the
+/// provider is degraded — exactly what "kept in sync automatically" must survive.
+model OutboxMessage {
+  id      String @id @default(uuid()) @db.Uuid
+  topic   String @db.VarChar(64)
+  payload Json
+
+  attempts    Int       @default(0)
+  lastError   String?   @db.VarChar(1000)
+  processedAt DateTime?
+  /// Set when attempts are exhausted; surfaced at /admin/jobs with a replay action.
+  deadAt      DateTime?
+
+  availableAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  @@index([processedAt, availableAt])
+  @@index([topic])
+  @@map("outbox_message")
+}
+
+/// Replay protection for money-creating POSTs. A duplicate key replays the
+/// stored response; the same key with a different body is a 409.
+model IdempotencyRecord {
+  key    String @db.VarChar(128)
+  userId String @db.VarChar(64)
+  route  String @db.VarChar(128)
+
+  requestHash      String @db.Char(64)
+  responseSnapshot Json?
+  statusCode       Int?
+
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@id([key, userId, route])
+  @@index([expiresAt])
+  @@map("idempotency_record")
+}
+
+/// Provider webhook dedupe. The INSERT happens INSIDE the same transaction as
+/// the state change, so a unique violation aborts the duplicate atomically —
+/// strictly stronger than a check-then-write, which races against the vendor's
+/// own retries.
+///
+/// Whop signs `{webhook-id}.{webhook-timestamp}.{body}` and enforces a 5-minute
+/// tolerance, so the transport already closes the replay window this table used
+/// to hold alone. It stays as defence in depth AND as the thing that makes a
+/// redelivery — which Whop performs up to 12 times over ~71 hours — idempotent.
+model ProviderEvent {
+  /// The `webhook-id` header Whop sends on every delivery (`msg_…`), or an
+  /// `unparsable:<sha256>` synthetic key. 128 chars, not 64: silent truncation
+  /// of a dedupe key is a duplicate payment.
+  ///
+  /// THE `derived` COLUMN IS GONE, with the content-fingerprint fallback it
+  /// audited. TagadaPay might supply no event id at all, so a composite hash of
+  /// the event's financial fields had to stand in and the column existed to
+  /// report, from production, how often that weaker path was live. Whop assigns
+  /// a real id on every delivery, so there is no fallback and nothing to audit.
+  id   String @id @db.VarChar(128)
+  type String @db.VarChar(64)
+
+  processedAt DateTime @default(now())
+
+  @@index([type])
+  @@map("provider_event")
+}
+
+/// APPEND-ONLY. Runtime role holds INSERT + SELECT only (see migration).
+/// Written in the SAME transaction as the change it describes.
+model AuditLogEntry {
+  id String @id @default(uuid()) @db.Uuid
+
+  actorId   String? @db.Uuid
+  actorRole Role?
+
+  action     String @db.VarChar(80)
+  entityType String @db.VarChar(64)
+  entityId   String @db.VarChar(64)
+
+  /// PII-REDACTED before/after diff. Redaction happens at WRITE time — an
+  /// unredacted value written once is leaked forever.
+  diff Json
+
+  ipAddress String? @db.VarChar(45)
+  userAgent String? @db.VarChar(512)
+  requestId String  @db.VarChar(64)
+
+  createdAt DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([actorId])
+  @@index([createdAt])
+  @@map("audit_log")
+}
+
+/// GDPR consent record. Stores the VERSION of the text consented to.
+model ConsentRecord {
+  id         String  @id @default(uuid()) @db.Uuid
+  customerId String? @db.Uuid
+  email      String? @db.Citext
+
+  kind    String  @db.VarChar(32)
+  version String  @db.VarChar(32)
+  granted Boolean
+
+  ipAddress String?  @db.VarChar(45)
+  createdAt DateTime @default(now())
+
+  @@index([customerId])
+  @@index([email])
+  @@map("consent_record")
+}
+
+/// Cross-instance fixed-window rate limiter (spec §5: the throttler store lives
+/// in Postgres, not Redis, because pg-boss is already the one stateful service).
+///
+/// This is what makes login/registration throttling hold under horizontal
+/// scaling. The in-process counter (InMemoryAuthRateLimiter) is a per-replica
+/// pre-filter; an attacker spread across replicas is only bounded by a SHARED
+/// counter, which is this table. One row per rate-limit key; the atomic
+/// increment (INSERT ... ON CONFLICT with a CASE reset) is the whole mechanism.
+///
+/// NOT append-only: rows are updated (increment), reset (window roll-over) and
+/// swept (expiry). The runtime role holds full DML on it, unlike the ledger
+/// tables. A `retention-sweep`/cron deletes rows past `resetAt`.
+model RateLimitCounter {
+  /// The limiter key, e.g. "login:ip:1.2.3.4" or "login:email:a@b.com".
+  key String @id @db.VarChar(200)
+
+  /// Hits recorded in the current window.
+  count Int @default(0)
+
+  /// When the current window ends. A hit at or after this instant starts a new
+  /// window rather than incrementing the old count.
+  resetAt DateTime
+
+  createdAt DateTime @default(now())
+  /// `@default(now())` alongside `@updatedAt`: the atomic upsert is issued as
+  /// raw SQL (Prisma cannot express the conditional-reset ON CONFLICT), so the
+  /// DB default covers the column when the app layer does not manage it.
+  updatedAt DateTime @default(now()) @updatedAt
+
+  /// The sweep deletes expired rows in bulk; index the column it filters on.
+  @@index([resetAt])
+  @@map("rate_limit_counter")
+}
+
+/// THE INVOICE NUMBER SERIES, as a row rather than a sequence.
+///
+/// EU member states require invoice numbering to be gap-free, and a Postgres
+/// sequence structurally cannot be: `nextval` is deliberately non-transactional,
+/// so a settlement that rolls back — or a losing concurrent UPDATE whose
+/// target-list `nextval` was evaluated before the tuple lock — burns a number
+/// permanently. Measured on postgres:16-alpine; see
+/// `20260910000000_invoice_counter` for the transcript.
+///
+/// A row updated under its own lock is MVCC state: it rolls back with its
+/// transaction, and a competing allocation waits instead of drawing a second
+/// number. Allocation happens once per order, only at PAID, so the contention a
+/// sequence exists to avoid is not a cost this table pays.
+///
+/// SINGLETON BY CONSTRUCTION: `id` is a boolean pinned to true, so the primary
+/// key is also the "there is exactly one counter" constraint. Two counters would
+/// mean two orders receiving the same number.
+///
+/// NEVER READ OR WRITTEN THROUGH THIS DELEGATE. Allocation is
+/// `allocate_invoice_number()` — one INSERT … ON CONFLICT DO UPDATE … RETURNING
+/// that increments and formats `INV-YYYY-NNNNNN` atomically. The model exists so
+/// the table is part of the schema Prisma knows about, not so application code
+/// can increment it in two steps.
+model InvoiceCounter {
+  /// Pinned to true by a CHECK constraint. The key IS the singleton guarantee.
+  id Boolean @id @default(true)
+
+  /// The last number ISSUED, so allocation is `+ 1 … RETURNING` and an untouched
+  /// counter reads 0. BIGINT to match the sequence it supersedes.
+  lastNumber BigInt @default(0)
+
+  @@map("invoice_counter")
+}
+
+/// The first (and, today, only) admin-togglable site-wide setting —
+/// §2 of `docs/superpowers/specs/2026-09-15-storefront-admin-expansion.md`.
+///
+/// SAME SINGLETON SHAPE AS `InvoiceCounter`: `id Boolean @id @default(true)`,
+/// pinned by a CHECK constraint in the migration so the primary key doubles as
+/// the "there is exactly one row" guarantee. A generic key-value settings
+/// table was considered and rejected — this schema's convention throughout is
+/// explicit typed columns, not a JSON blob nobody can grep for — so a future
+/// second setting is a new column on this same row, not a new kind of table.
+///
+/// READ AT REQUEST TIME, DELIBERATELY NOT AT BOOT. `PAYMENTS_ENABLED` is this
+/// codebase's one existing operational flag and it is a boot-time env var —
+/// wrong for THIS flag because this deployment's own quirk (a `git push`
+/// deploys nothing; redeploys are a manual, explicit action) would turn "flip
+/// a switch" into "redeploy the API," defeating the point of an admin toggle.
+model SiteSettings {
+  id Boolean @id @default(true)
+
+  /// Whole-site gate: non-privileged storefront traffic sees a 503 maintenance
+  /// page; STAFF/ADMIN (proven by the shared session cookie) keep browsing.
+  /// `apps/storefront/src/middleware.ts` polls `GET /v1/site-settings` through
+  /// a short-TTL in-memory cache — see that file's own doc comment for the
+  /// fail-open reasoning and the exact latency/staleness trade-off.
+  maintenanceMode Boolean @default(false)
+
+  updatedAt DateTime @updatedAt
+
+  @@map("site_settings")
+}
+
+// =============================================================================
+// Blog — spec 2026-09-24 §8
+// =============================================================================
+
+/// A blog post. Its copy lives in `BlogPostTranslation`, one row per locale —
+/// the same per-locale shape as `ProductTranslation`.
+///
+/// NOT SOFT-DELETED, unlike almost everything else in this schema: the rule
+/// above is "soft delete wherever a record can be referenced by an order", and
+/// nothing references a post. A deleted post is gone, translations included.
+///
+/// `publishedAt` is stamped on the FIRST publish and kept across an
+/// unpublish/republish cycle, so re-publishing a corrected post does not jump
+/// it to the top of the list as if it were news.
+model BlogPost {
+  id     String         @id @default(uuid()) @db.Uuid
+  /// Unique across every post, draft or published: it is the public URL.
+  slug   String         @unique @db.VarChar(160)
+  status BlogPostStatus @default(DRAFT)
+
+  publishedAt    DateTime?
+  /// `blog/{postId}/…` in the public media bucket. The key, never a URL — the
+  /// public URL is derived at read time exactly as product media URLs are.
+  coverObjectKey String?      @db.VarChar(512)
+  category       BlogCategory
+
+  /// Nullable, with ON DELETE SET NULL: a post outlives the operator account
+  /// that wrote it.
+  authorId String? @db.Uuid
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  author       Customer?             @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  translations BlogPostTranslation[]
+
+  @@index([status, publishedAt])
+  @@index([authorId])
+  @@map("blog_post")
+}
+
+/// Per-locale post copy. Decision D8c: a post may exist in Spanish only — the
+/// storefront lists a post in a locale only when a row for that locale exists.
+model BlogPostTranslation {
+  id     String @id @default(uuid()) @db.Uuid
+  postId String @db.Uuid
+  locale Locale
+
+  title           String  @db.VarChar(200)
+  excerpt         String  @db.VarChar(500)
+  /// Sanitised with `@akai/rich-text` on write (and again on render).
+  bodyHtml        String  @db.Text
+  metaTitle       String? @db.VarChar(200)
+  metaDescription String? @db.VarChar(320)
+  coverAlt        String  @default("") @db.VarChar(300)
+
+  post BlogPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, locale])
+  @@index([locale])
+  @@map("blog_post_translation")
+}

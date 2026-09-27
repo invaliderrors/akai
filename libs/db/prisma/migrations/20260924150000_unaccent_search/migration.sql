@@ -1,0 +1,29 @@
+-- UNACCENT FOR CATALOG SEARCH (spec 2026-09-24 §5, decision D5).
+--
+-- The public product search folds accents on BOTH sides of every comparison
+-- (`unaccent(t.name) ILIKE …`, `unaccent(${term})`), so "proteina" finds
+-- "Proteína" and "protéine" finds "Proteine". See
+-- apps/api/src/modules/catalog/product-query.ts.
+--
+-- `unaccent` is a stock contrib extension shipped with every official Postgres
+-- image (including the postgres:16-alpine the api-e2e harness runs), and it has
+-- been a TRUSTED extension since Postgres 13 — a non-superuser role holding
+-- CREATE on the database may install it, which is the role `migrate deploy`
+-- runs as.
+--
+-- IF NOT EXISTS: an environment where someone already installed it by hand must
+-- not fail this migration.
+--
+-- NO SCHEMA.PRISMA CHANGE, deliberately. Declaring it there needs the
+-- `postgresqlExtensions` preview feature, which would put every extension under
+-- Prisma's drift detection; the function is called only from raw SQL.
+--
+-- NO GRANT: functions are EXECUTE-able by PUBLIC by default, so the runtime
+-- role (akai_app) can call unaccent() without one.
+--
+-- NO INDEX: the catalogue is small enough that a sequential scan over the
+-- folded text is cheaper than maintaining an expression index, and
+-- `unaccent()` is only STABLE, so indexing it would need an IMMUTABLE wrapper.
+-- Revisit if the product count grows by orders of magnitude.
+
+CREATE EXTENSION IF NOT EXISTS unaccent;

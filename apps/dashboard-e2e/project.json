@@ -1,0 +1,25 @@
+{
+  "name": "dashboard-e2e",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "apps/dashboard-e2e/src",
+  "tags": ["scope:web", "type:e2e"],
+  "implicitDependencies": ["dashboard"],
+  "targets": {
+    "e2e": {
+      "executor": "nx:run-commands",
+      "options": { "command": "playwright test", "cwd": "apps/dashboard-e2e" }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsc -p tsconfig.json --noEmit",
+        "cwd": "apps/dashboard-e2e"
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": { "command": "eslint apps/dashboard-e2e" }
+    }
+  }
+}

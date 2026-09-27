@@ -1,0 +1,81 @@
+import { expect, test } from "@playwright/test";
+
+/**
+ * The auth shell's end-to-end contract.
+ *
+ * These assertions cover what unit tests structurally cannot: that
+ * `src/i18n/request.ts`'s TEMPLATE-LITERAL message import actually resolves.
+ * That line is invisible to both tsc and eslint, so typecheck and lint stay
+ * green while every page 500s — the exact failure mode spec §16 R1 calls out.
+ * A test that loads a real page in both locales is the only thing that catches
+ * it.
+ *
+ * REQUIRES `apps/dashboard/.env.local` (copy `.env.local.example`). Without
+ * SESSION_SECRET the app fails fast on the first request by design, and these
+ * tests will report that rather than a routing failure.
+ */
+
+test.describe("route protection", () => {
+  test("sends an anonymous visitor from the dashboard root to sign-in", async ({ page }) => {
+    await page.goto("/");
+    await expect(page).toHaveURL(/\/sign-in\?next=%2F$/);
+  });
+
+  test("preserves the requested destination through the redirect", async ({ page }) => {
+    await page.goto("/orders");
+    await expect(page).toHaveURL(/\/sign-in\?next=%2Forders$/);
+  });
+
+  test("keeps an English visitor in English when redirecting", async ({ page }) => {
+    // A redirect that drops the locale prefix silently returns EN users to the
+    // Spanish default for the rest of the visit.
+    await page.goto("/en/admin/products");
+    await expect(page).toHaveURL(/\/en\/sign-in/);
+  });
+});
+
+test.describe("bilingual auth shell", () => {
+  test("renders Spanish copy at the default locale", async ({ page }) => {
+    await page.goto("/sign-in");
+    await expect(page.getByRole("heading", { name: "Entra en tu cuenta" })).toBeVisible();
+    await expect(page.locator("html")).toHaveAttribute("lang", "es");
+  });
+
+  test("renders English copy under /en", async ({ page }) => {
+    await page.goto("/en/sign-in");
+    await expect(page.getByRole("heading", { name: "Sign in to your account" })).toBeVisible();
+    await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  });
+
+  test("reaches sign-up and forgot-password from sign-in", async ({ page }) => {
+    await page.goto("/sign-in");
+
+    await page.getByRole("link", { name: "Crear cuenta" }).click();
+    await expect(page).toHaveURL(/\/sign-up$/);
+
+    await page.goto("/sign-in");
+    await page.getByRole("link", { name: "¿Has olvidado tu contraseña?" }).click();
+    await expect(page).toHaveURL(/\/forgot-password$/);
+  });
+});
+
+test.describe("CSRF", () => {
+  test("seeds a readable CSRF cookie on the first request", async ({ page, context }) => {
+    // The very first visitor has no cookies at all. If middleware did not seed
+    // one here, their first sign-in attempt would be rejected with a 403.
+    await page.goto("/sign-in");
+
+    const csrf = (await context.cookies()).find((cookie) => cookie.name === "akai_csrf");
+    expect(csrf?.value).toBeTruthy();
+    // Must be script-readable — the double-submit mechanism depends on it.
+    expect(csrf?.httpOnly).toBe(false);
+  });
+
+  test("rejects a BFF post with no CSRF header", async ({ request }) => {
+    const response = await request.post("/api/auth/login", {
+      data: { email: "nobody@example.com", password: "irrelevant" },
+    });
+
+    expect(response.status()).toBe(403);
+  });
+});

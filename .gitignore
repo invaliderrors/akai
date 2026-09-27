@@ -1,0 +1,21 @@
+node_modules/
+.next/
+out/
+dist/
+# Every real env file. The previous rule was `.env*.local` ALONE, which does not
+# match a plain `.env` — the exact filename Nx loads for every task and the one
+# a developer is most likely to fill with real credentials. `!*.example` keeps
+# the committed placeholder templates visible.
+.env
+.env.*
+!.env.example
+!.env*.example
+.vercel
+*.tsbuildinfo
+next-env.d.ts
+test-results/
+playwright-report/
+
+# Nx
+.nx/cache
+.nx/workspace-data

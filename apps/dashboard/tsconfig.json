@@ -1,0 +1,39 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "noEmit": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "plugins": [{ "name": "next" }],
+    "types": ["node"],
+
+    // See apps/storefront/tsconfig.json: `paths` shallow-overrides the base,
+    // so cross-project aliases must be repeated alongside the app-local `@/*`.
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@akai/contracts": ["../../libs/contracts/src/index.ts"],
+      "@akai/money": ["../../libs/money/src/index.ts"],
+      "@akai/rich-text": ["../../libs/rich-text/src/index.ts"],
+      "@akai/config": ["../../libs/config/src/index.ts"],
+      "@akai/i18n": ["../../libs/i18n/src/index.ts"],
+      "@akai/session": ["../../libs/session/src/index.ts"],
+      "@akai/ui": ["../../libs/ui/src/index.ts"],
+      "@akai/observability": ["../../libs/observability/src/index.ts"]
+    }
+  },
+  "include": [
+    "next-env.d.ts",
+    "next.config.ts",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": ["node_modules", ".next", "src/**/*.test.ts", "src/**/*.test.tsx"]
+}

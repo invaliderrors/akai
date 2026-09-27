@@ -1,0 +1,8 @@
+The dashboard ships no static assets today, but its Dockerfile COPYs this
+directory the same way the storefront's does. Git does not track an empty
+directory and Docker's build context does not carry one, so without this file
+that COPY fails the image build outright — which is exactly how it failed.
+
+Keeping the directory (rather than deleting the COPY) means the first asset
+dropped in here is served with no Dockerfile change. Deleting the COPY would
+make that same addition silently 404 in production instead.

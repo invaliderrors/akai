@@ -1,0 +1,6 @@
+{
+  "extends": "./tsconfig.lib.json",
+  "compilerOptions": { "types": ["node"] },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "vitest.config.ts"],
+  "exclude": ["node_modules"]
+}

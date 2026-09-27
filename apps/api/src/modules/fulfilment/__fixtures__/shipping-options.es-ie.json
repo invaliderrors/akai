@@ -1,0 +1,295 @@
+{
+  "data": [
+    {
+      "code": "sendcloud:letter",
+      "name": "Unstamped letter",
+      "carrier": {
+        "code": "sendcloud",
+        "name": "Sendcloud"
+      },
+      "product": {
+        "code": "sendcloud:letter",
+        "name": "Unstamped letter"
+      },
+      "functionalities": {
+        "b2b": true,
+        "b2c": true,
+        "ers": false,
+        "size": null,
+        "tyres": false,
+        "sorted": false,
+        "boxable": false,
+        "premium": false,
+        "returns": false,
+        "segment": null,
+        "tracked": false,
+        "id_check": false,
+        "incoterm": null,
+        "manually": false,
+        "priority": null,
+        "age_check": null,
+        "insurance": null,
+        "labelless": false,
+        "last_mile": "home_delivery",
+        "signature": false,
+        "surcharge": false,
+        "first_mile": "dropoff",
+        "multicollo": true,
+        "bulky_goods": false,
+        "form_factor": "mailbox",
+        "fresh_goods": false,
+        "eco_delivery": false,
+        "service_area": "domestic",
+        "flex_delivery": false,
+        "fragile_goods": false,
+        "non_conveyable": false,
+        "dangerous_goods": false,
+        "delivery_before": null,
+        "cash_on_delivery": null,
+        "harmonized_label": false,
+        "weekend_delivery": null,
+        "carrier_insurance": false,
+        "delivery_attempts": 1,
+        "delivery_deadline": "best_effort",
+        "neighbor_delivery": true,
+        "customs_value_limit": null,
+        "registered_delivery": false,
+        "carrier_billing_type": null,
+        "personalized_delivery": false,
+        "direct_contract_only": false
+      },
+      "max_dimensions": {
+        "width": "0.00",
+        "length": "0.00",
+        "height": "0.00",
+        "unit": "cm"
+      },
+      "weight": {
+        "min": {
+          "value": "0.001",
+          "unit": "kg"
+        },
+        "max": {
+          "value": "1000.000",
+          "unit": "kg"
+        }
+      },
+      "parcel_billed_weights": [
+        {
+          "unit": "kg",
+          "value": "0.500",
+          "volumetric": false,
+          "calculation": null,
+          "parcel_number": 1
+        }
+      ],
+      "contract": null,
+      "requirements": {
+        "fields": [],
+        "export_documents": false,
+        "is_service_point_required": false
+      },
+      "quotes": [
+        {
+          "weight": {
+            "min": {
+              "value": "0.001",
+              "unit": "kg"
+            },
+            "max": {
+              "value": "1000.000",
+              "unit": "kg"
+            }
+          },
+          "price": {
+            "breakdown": [
+              {
+                "price": {
+                  "value": "0.00",
+                  "currency": "EUR"
+                },
+                "label": "Label",
+                "type": "price_without_insurance"
+              },
+              {
+                "price": {
+                  "value": "0",
+                  "currency": "EUR"
+                },
+                "label": "Shipment protection (tax-exempt)",
+                "type": "insurance_price"
+              }
+            ],
+            "total": {
+              "value": "0",
+              "currency": "EUR"
+            }
+          },
+          "estimated_surcharges": [],
+          "lead_time": 10
+        }
+      ],
+      "charging_type": "label_creation",
+      "quote_source": "sendcloud_prices",
+      "quote_error": null
+    },
+    {
+      "code": "ups:standard/service_point",
+      "name": "UPS Standard to Access Point",
+      "carrier": {
+        "code": "ups",
+        "name": "UPS"
+      },
+      "product": {
+        "code": "ups:standard/service_point",
+        "name": "UPS Standard to Access Point"
+      },
+      "functionalities": {
+        "b2b": true,
+        "b2c": true,
+        "ers": false,
+        "size": null,
+        "tyres": false,
+        "sorted": false,
+        "boxable": false,
+        "premium": false,
+        "returns": false,
+        "segment": null,
+        "tracked": true,
+        "id_check": false,
+        "incoterm": "dap",
+        "manually": false,
+        "priority": null,
+        "age_check": null,
+        "insurance": null,
+        "labelless": false,
+        "last_mile": "service_point",
+        "signature": false,
+        "surcharge": true,
+        "first_mile": "pickup_dropoff",
+        "multicollo": true,
+        "bulky_goods": false,
+        "form_factor": "parcel",
+        "fresh_goods": false,
+        "eco_delivery": false,
+        "service_area": "international",
+        "flex_delivery": false,
+        "fragile_goods": false,
+        "non_conveyable": false,
+        "dangerous_goods": false,
+        "delivery_before": null,
+        "cash_on_delivery": null,
+        "harmonized_label": false,
+        "weekend_delivery": null,
+        "carrier_insurance": false,
+        "delivery_attempts": 1,
+        "delivery_deadline": "best_effort",
+        "neighbor_delivery": false,
+        "customs_value_limit": null,
+        "registered_delivery": false,
+        "carrier_billing_type": null,
+        "personalized_delivery": false,
+        "direct_contract_only": false
+      },
+      "max_dimensions": {
+        "width": "0.00",
+        "length": "97.00",
+        "height": "0.00",
+        "unit": "cm"
+      },
+      "weight": {
+        "min": {
+          "value": "0.001",
+          "unit": "kg"
+        },
+        "max": {
+          "value": "20.001",
+          "unit": "kg"
+        }
+      },
+      "parcel_billed_weights": [
+        {
+          "unit": "kg",
+          "value": "0.500",
+          "volumetric": false,
+          "calculation": null,
+          "parcel_number": 1
+        }
+      ],
+      "contract": {
+        "id": 17191,
+        "client_id": "",
+        "carrier_code": "ups",
+        "name": "Sendcloud broker (bulk)"
+      },
+      "requirements": {
+        "fields": [
+          "to_telephone",
+          "to_email"
+        ],
+        "export_documents": false,
+        "is_service_point_required": true
+      },
+      "quotes": [
+        {
+          "weight": {
+            "min": {
+              "value": "0.001",
+              "unit": "kg"
+            },
+            "max": {
+              "value": "1.001",
+              "unit": "kg"
+            }
+          },
+          "price": {
+            "breakdown": [
+              {
+                "price": {
+                  "value": "12.85",
+                  "currency": "EUR"
+                },
+                "label": "Base rate (without add-ons or surcharges)",
+                "type": "base_rate"
+              },
+              {
+                "price": {
+                  "value": "0.00",
+                  "currency": "EUR"
+                },
+                "label": "Insurance price",
+                "type": "insurance_price"
+              },
+              {
+                "price": {
+                  "value": "0.75",
+                  "currency": "EUR"
+                },
+                "label": "Seasonal",
+                "type": "seasonal"
+              },
+              {
+                "price": {
+                  "value": "0.50",
+                  "currency": "EUR"
+                },
+                "label": "Service fee",
+                "type": "service_fee"
+              }
+            ],
+            "total": {
+              "value": "14.10",
+              "currency": "EUR"
+            }
+          },
+          "estimated_surcharges": [],
+          "lead_time": 72
+        }
+      ],
+      "charging_type": "label_creation",
+      "quote_source": "sendcloud_prices_api",
+      "quote_error": null
+    }
+  ],
+  "message": null
+}

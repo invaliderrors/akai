@@ -1,0 +1,61 @@
+# =============================================================================
+# Build-context exclusions.
+#
+# Every Dockerfile here builds from the WORKSPACE ROOT, so without this file the
+# context is the entire repo including node_modules, .next and dist — hundreds of
+# megabytes shipped to the daemon on every build, and worse, a host-built
+# node_modules can shadow the one the image installs. Native binaries compiled
+# for Windows do not run on Alpine, so that shadowing fails at runtime rather
+# than at build.
+# =============================================================================
+
+# Dependencies — the image installs its own with --frozen-lockfile.
+node_modules
+**/node_modules
+
+# Build output — the image builds its own.
+dist
+**/dist
+.next
+**/.next
+out
+**/out
+
+# Nx local cache and daemon state.
+.nx
+
+# Secrets. `.env` MUST NOT enter an image: the Dockerfiles take configuration
+# through build args and runtime environment, and a baked-in secret survives in
+# the layer history even if a later layer deletes it.
+.env
+.env.*
+!.env.example
+!.env*.example
+
+# VCS and tooling.
+.git
+.gitignore
+.github
+.vscode
+.idea
+
+# Tests and fixtures — not needed to build a runtime image.
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/vitest.config.ts
+**/vitest.setup.ts
+**/playwright.config.ts
+apps/*-e2e
+
+# Docs and local reference material.
+docs
+reference
+*.md
+!README.md
+
+# Local artefacts.
+coverage
+*.log
+.DS_Store
+Thumbs.db

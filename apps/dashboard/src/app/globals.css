@@ -1,0 +1,518 @@
+@import "tailwindcss";
+
+/* Tailwind v4 roots content detection at the nearest package (apps/dashboard),
+   so libs/ui falls outside the scan and its utilities would silently never be
+   generated. No error, just unstyled components — declare it explicitly. */
+@source "../../../../libs/ui/src/**/*.{ts,tsx}";
+
+/* ============================================================
+   Akai — dashboard
+   ------------------------------------------------------------
+   The token block below is COPIED VERBATIM from
+   apps/storefront/src/app/globals.css. Same names, same values, so a
+   component moved between the two apps renders identically and the shop and
+   the account area read as one product rather than two vendors.
+
+   Copied rather than imported because Tailwind v4 resolves @theme relative to
+   the app package; the shared home for these is libs/ui, which is still a
+   shell (see followUps). Any change to a value here MUST be mirrored in the
+   storefront — divergence shows up as a subtly different blue on sign-in,
+   which is exactly the kind of thing nobody files a bug for and everybody
+   notices.
+   ============================================================ */
+
+@theme {
+  --color-paper: #ffffff;
+  --color-surface: #f3f4f8;
+  --color-base: #ffffff;
+  --color-ink: #0d0f15;
+  --color-ink2: #21242e;
+  --color-muted: #565b67;
+  --color-muted2: #878d9a;
+  --color-line: rgba(13, 15, 21, 0.11);
+  --color-accent: #2b2fd9;
+  --color-accent-bright: #5256ff;
+  --color-accent-ink: #2326c0;
+  --color-dark: #0a0b12;
+  --color-on-dark: #f3f4f8;
+  --color-on-dark-muted: #9aa0b0;
+  --color-dark-line: rgba(255, 255, 255, 0.12);
+  --color-warn: #c2442f;
+
+  --font-sans: var(--font-schibsted), system-ui, sans-serif;
+  /* No var(--font-instrument) leg: an undefined var() with no fallback is
+     invalid-at-computed-value-time and drops the whole declaration. Read by
+     zero rules today, so this changes no pixel — but it is a recorded
+     divergence from the storefront block, not a silent one. */
+  --font-serif: Georgia, serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
+}
+
+:root {
+  --paper: #ffffff;
+  --paper-2: #f3f4f8;
+  --card: #ffffff;
+  --ink: #0d0f15;
+  --ink-2: #21242e;
+  --muted: #565b67;
+  --muted-2: #878d9a;
+  --line: rgba(13, 15, 21, 0.11);
+  --line-soft: rgba(13, 15, 21, 0.06);
+
+  --dark: #0a0b12;
+  --dark-line: rgba(255, 255, 255, 0.12);
+  --on-dark: #f3f4f8;
+  --on-dark-muted: #9aa0b0;
+
+  --accent: #2b2fd9;
+  --accent-bright: #5256ff;
+  --accent-soft: rgba(43, 47, 217, 0.09);
+  --accent-ink: #2326c0;
+  --warn: #c2442f;
+  --ok: #1f7a4d;
+
+  --radius: 14px;
+  --radius-lg: 22px;
+  --radius-sm: 9px;
+  --maxw: 1240px;
+  --pad: clamp(20px, 5vw, 64px);
+}
+
+/* ============================================================
+   HIG role tokens — ADDITIVE. Nothing above is renamed or deleted.
+   ------------------------------------------------------------
+   The block above is the storefront's, copied verbatim, and stays the single
+   declaration site for every shared value: #ffffff, #2b2fd9 and #2326c0 are
+   each declared exactly once, up there, and the role names below alias them.
+   `--accent` is deliberately NOT redeclared here — a second declaration would
+   create two edit sites for one value whose own comment demands a mirrored
+   storefront commit.
+
+   Three divergences from the storefront are accepted and recorded (CLAUDE.md):
+     --bg-grouped #f5f5f7   vs storefront --color-surface #f3f4f8
+     --label      #1d1d1f   vs storefront ink            #0d0f15
+     --font-serif loses its var(--font-instrument) leg
+   ============================================================ */
+
+/* Density defaults on BARE :root, before the [data-density] blocks.
+   `app/[locale]/(auth)/` holds five page directories and NO layout, so auth
+   renders outside DashboardShell and can never receive a data-density
+   attribute. Without these, every h-[var(--control-h)] on the auth screens, on
+   not-found, on an error boundary and in every Vitest render resolves to
+   nothing and is dropped silently. The comfortable values are the default, so
+   an out-of-shell surface renders at touch size — correct for auth, which is
+   phone-first. */
+:root {
+  --font-body: 17px;
+  --control-h: 44px;
+  --control-px: 16px;
+  --row-h: 44px;
+  --cell-py: 11px;
+  --cell-px: 16px;
+  --card-p: 16px;
+  --badge-h: 24px;
+}
+
+:root {
+  /* backgrounds and fills */
+  --bg-grouped: #f5f5f7;
+  --bg-grouped-secondary: var(--card);
+  --fill-tertiary: #e8e8ed;
+  --fill-quaternary: #d1d1d6;
+  --separator: rgba(60, 60, 67, 0.29);
+  --separator-weak: rgba(60, 60, 67, 0.12);
+  --zebra: #f5f5f7;
+
+  /* labels */
+  --label: #1d1d1f;
+  --label-secondary: #6e6e73;
+  --label-tertiary: #aeaeb2;
+  --label-on-accent: #ffffff;
+  --chevron: #c7c7cc;
+
+  /* accent — interactive only, never a status */
+  --accent-pressed: var(--accent-ink);
+  --accent-tint: rgba(43, 47, 217, 0.12);
+  --accent-tint-strong: rgba(43, 47, 217, 0.14);
+  --accent-disabled: #9b9dff;
+  --accent-hover: #3438e0;
+  --focus-ring: rgba(43, 47, 217, 0.5);
+
+  /* state — indicator / text / fill. The text variant is the one that meets AA
+     on its own fill; the indicator is for dots and symbols only. */
+  --success: #34c759;
+  --success-text: #248a3d;
+  --success-fill: #e8f8ec;
+  --warning: #ff9500;
+  --warning-text: #c93400;
+  --warning-fill: #fff3e0;
+  --danger: #ff3b30;
+  --danger-text: #d70015;
+  --danger-fill: #ffeceb;
+  --danger-fill-pressed: #ffd9d6;
+  --danger-ring: #ffb4ad;
+  --danger-hover: #e0111f;
+  --danger-pressed: #b00011;
+  --progress: #30b0c7;
+  --progress-text: #0071a4;
+  --progress-fill: #e5f5f9;
+  --neutral: #8e8e93;
+  --neutral-text: #48484a;
+  --neutral-fill: #f2f2f7;
+
+  /* attention — exactly two uses: order PAYMENT_MISMATCH, and zero-available
+     on an ACTIVE product. A third case has to be re-argued. */
+  --attention-fill: #d70015;
+  --attention-text: #ffffff;
+
+  /* shape — pill is a state you read, rounded rect is a thing you operate */
+  --r-control: 6px;
+  --r-check: 4px;
+  --r-card: 10px;
+  --r-sheet: 12px;
+  --r-pill: 999px;
+
+  /* glass — functional layer only; the content layer never uses it */
+  --glass-fill: rgba(255, 255, 255, 0.72);
+  --glass-fill-strong: rgba(255, 255, 255, 0.92);
+  --glass-blur: blur(24px) saturate(1.4);
+
+  /* elevation — content is flat, only the functional layer floats */
+  --e-0: 0 0 0 1px rgba(0, 0, 0, 0.06);
+  --e-1: 0 0 0 1px rgba(0, 0, 0, 0.08), 0 4px 16px -4px rgba(0, 0, 0, 0.14);
+  --e-2: 0 0 0 1px rgba(0, 0, 0, 0.08), 0 16px 48px -12px rgba(0, 0, 0, 0.3);
+  --ring-control: 0 0 0 1px rgba(0, 0, 0, 0.12), 0 1px 1px rgba(0, 0, 0, 0.06);
+
+  /* measure */
+  --w-admin: 1560px;
+  --w-reading: 880px;
+  --w-table: 1240px;
+  --toolbar-h: 52px;
+  --gutter: 16px;
+}
+
+/* Compact follows the macOS text table, comfortable the iOS one. Switched by
+   data-density on the shell, so one component set serves both. */
+[data-density="compact"] {
+  --font-body: 13px;
+  --control-h: 28px;
+  --control-px: 12px;
+  --row-h: 30px;
+  --cell-py: 5px;
+  --cell-px: 12px;
+  --card-p: 12px;
+  --badge-h: 18px;
+}
+
+[data-density="comfortable"] {
+  --font-body: 17px;
+  --control-h: 44px;
+  --control-px: 16px;
+  --row-h: 44px;
+  --cell-py: 11px;
+  --cell-px: 16px;
+  --card-p: 16px;
+  --badge-h: 24px;
+  --r-control: 10px;
+}
+
+@media (min-width: 640px) { :root { --gutter: 20px; } }
+@media (min-width: 1024px) { :root { --gutter: 24px; } }
+
+/* Opaque under Reduce Transparency. One swap, four consumers. */
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --glass-fill: #ffffff;
+    --glass-fill-strong: #ffffff;
+    --glass-blur: none;
+  }
+}
+
+/* The only new class. Toolbar, sheet, popover and toast share it, so the
+   reduced-transparency swap above has exactly one place to land. Everything
+   else reads these tokens through Tailwind arbitrary values. */
+@layer components {
+  .nx-glass {
+    background: var(--glass-fill);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+  }
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background: var(--paper-2);
+  color: var(--ink);
+  line-height: 1.5;
+  font-size: 16px;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* IN @layer base ON PURPOSE. Tailwind v4 puts utilities in `@layer utilities`,
+   and UNLAYERED css beats any layered rule regardless of specificity — so an
+   unlayered `a { color: inherit }` silently overrode `text-white` on every
+   anchor. The visible symptom was the "New product" button rendering black text
+   on its black fill: `bg-zinc-900` applied, `text-white` did not. Same trap for
+   `button { font: inherit }` versus `text-sm`. Declaring the reset in `base`
+   restores the intended order — reset first, utilities win. */
+@layer base {
+  a { color: inherit; text-decoration: none; }
+  button { font: inherit; cursor: pointer; }
+
+  /* Same trap, and the one a component kit walks straight into. An UNLAYERED
+     `:focus-visible` outline beats `focus-visible:outline-none` from
+     `@layer utilities`, so every primitive that paints its own focus ring would
+     render two — the browser outline and the ring — with no error and nothing
+     jsdom can observe. Layered, the utility wins and a primitive can opt out. */
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+}
+
+h1, h2, h3 { font-weight: 600; letter-spacing: -0.03em; line-height: 1.08; margin: 0; }
+
+/* ---------- rich-text preview (admin product form) ---------- */
+/* UNLAYERED, exactly like the h1/h2/h3 rule above and for the same reason the
+   reset block two comments up spells out: an unlayered declaration beats any
+   rule in `@layer utilities` regardless of specificity. So `margin: 0` above
+   would silently win over an `[&_h2]:mt-4` arbitrary variant on the preview
+   container — the utility would apply, compile and do nothing. These rules also
+   have to beat Tailwind's preflight, which lives in `@layer base` and strips
+   list markers and table borders: the two things an amino-acid profile needs.
+
+   Scoped to `.rich-preview`, which is only ever put on markup that has been
+   through `sanitizeRichText`. The selector list mirrors that allowlist, so a tag
+   with no rule here is a tag the sanitiser already dropped. */
+.rich-preview { line-height: 1.5; }
+.rich-preview > :first-child { margin-top: 0; }
+.rich-preview > :last-child { margin-bottom: 0; }
+.rich-preview p,
+.rich-preview ul,
+.rich-preview ol,
+.rich-preview blockquote,
+.rich-preview table { margin: 0 0 8px; }
+.rich-preview h2, .rich-preview h3, .rich-preview h4 { margin: 14px 0 6px; line-height: 1.25; }
+.rich-preview h2 { font-size: 15px; }
+.rich-preview h3 { font-size: 14px; }
+.rich-preview h4 { font-size: 13px; }
+.rich-preview ul { list-style: disc; padding-left: 20px; }
+.rich-preview ol { list-style: decimal; padding-left: 20px; }
+.rich-preview li { margin-bottom: 2px; }
+.rich-preview a { color: var(--accent-ink); text-decoration: underline; text-underline-offset: 2px; }
+.rich-preview blockquote { padding-left: 10px; border-left: 2px solid var(--line); color: var(--muted); }
+.rich-preview hr { border: 0; border-top: 1px solid var(--line); margin: 12px 0; }
+/* Matches the storefront's `.rich-text hr.divider--accent` exactly, so the
+   preview dialog shows the real result rather than a plain gray line. */
+.rich-preview hr.divider--accent { border-top: 2px solid var(--accent); }
+.rich-preview table { border-collapse: collapse; width: 100%; }
+.rich-preview caption { text-align: left; font-size: 11px; color: var(--muted); padding-bottom: 4px; }
+.rich-preview th, .rich-preview td { border: 1px solid var(--line); padding: 4px 7px; text-align: left; vertical-align: top; }
+.rich-preview th { font-weight: 600; background: var(--paper-2); }
+.rich-preview sub, .rich-preview sup { font-size: 0.75em; }
+
+/* ---------- shared type (storefront parity) ---------- */
+.eyebrow {
+  font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--accent-ink);
+  display: inline-flex; align-items: center; gap: 9px; font-weight: 500;
+}
+.eyebrow::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.lede { font-size: 16px; color: var(--muted); line-height: 1.5; max-width: 56ch; letter-spacing: -0.012em; }
+
+/* ---------- buttons (storefront parity) ---------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+  padding: 13px 22px; border-radius: 100px; font-weight: 500; font-size: 15px;
+  letter-spacing: -0.01em; border: 1px solid transparent;
+  transition: transform .18s ease, background .18s ease, color .18s ease, border-color .18s ease;
+  white-space: nowrap;
+}
+.btn--primary { background: var(--accent); color: #fff; }
+.btn--primary:hover:not(:disabled) { background: var(--accent-ink); transform: translateY(-1px); }
+.btn--ghost { background: transparent; color: var(--ink); border-color: var(--line); }
+.btn--ghost:hover:not(:disabled) { background: rgba(13, 15, 21, 0.05); border-color: rgba(13, 15, 21, 0.25); }
+.btn--sm { padding: 9px 15px; font-size: 14px; }
+.btn--block { width: 100%; }
+.btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+
+.link-accent { color: var(--accent-ink); font-weight: 500; }
+.link-accent:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+/* ============================================================
+   Auth screens
+   ============================================================ */
+
+.auth {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: 1fr;
+  background: var(--paper-2);
+}
+
+/* The dark brand panel only appears where there is room for it. Below 900px it
+   is removed entirely rather than stacked: on a phone it would push the form —
+   the only thing the user came for — below the fold. */
+.auth__brand { display: none; }
+
+@media (min-width: 900px) {
+  .auth { grid-template-columns: 0.9fr 1.1fr; }
+  .auth__brand {
+    display: flex; flex-direction: column; justify-content: space-between;
+    padding: clamp(32px, 4vw, 56px);
+    background: radial-gradient(120% 90% at 20% 10%, #1c2034 0%, var(--dark) 62%);
+    color: var(--on-dark);
+    position: relative; overflow: hidden;
+  }
+  .auth__brand::before {
+    content: ""; position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+    background-size: 38px 38px;
+    mask-image: radial-gradient(80% 80% at 40% 30%, #000, transparent 78%);
+  }
+}
+
+.auth__brand-inner { position: relative; z-index: 1; }
+.auth__brand-mark {
+  font-family: var(--font-mono); font-size: 13px; letter-spacing: 0.34em;
+  text-transform: uppercase; color: rgba(255, 255, 255, 0.62);
+}
+.auth__brand-line {
+  margin-top: 22px; font-size: clamp(26px, 2.6vw, 38px); font-weight: 500;
+  letter-spacing: -0.035em; line-height: 1.1; max-width: 18ch;
+}
+.auth__brand-foot {
+  position: relative; z-index: 1;
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--on-dark-muted);
+}
+
+.auth__panel {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: clamp(28px, 6vw, 64px) var(--pad);
+}
+.auth__card { width: 100%; max-width: 424px; }
+.auth__head { margin-bottom: 28px; }
+.auth__head h1 { font-size: clamp(26px, 3vw, 34px); margin: 14px 0 10px; }
+.auth__foot { margin-top: 26px; font-size: 14.5px; color: var(--muted); text-align: center; }
+
+/* ---------- forms ---------- */
+.field { display: flex; flex-direction: column; gap: 7px; margin-bottom: 16px; }
+.field__label { font-size: 13.5px; font-weight: 500; color: var(--ink-2); }
+.field__hint { font-size: 12.5px; color: var(--muted-2); }
+.field__error { font-size: 12.5px; color: var(--warn); font-weight: 500; }
+
+.input {
+  width: 100%; padding: 12px 14px; font-size: 15.5px; font-family: inherit;
+  color: var(--ink); background: var(--card);
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.input::placeholder { color: var(--muted-2); }
+.input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.input[aria-invalid="true"] { border-color: var(--warn); }
+.input--code {
+  font-family: var(--font-mono); letter-spacing: 0.42em; text-align: center; font-size: 20px;
+}
+
+.check { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 18px; font-size: 14px; color: var(--ink-2); }
+.check input { margin-top: 3px; accent-color: var(--accent); width: 16px; height: 16px; }
+
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+@media (max-width: 520px) { .grid-2 { grid-template-columns: 1fr; } }
+
+/* ---------- alerts ---------- */
+.alert {
+  border-radius: var(--radius-sm); padding: 13px 15px; font-size: 14.5px;
+  border: 1px solid; margin-bottom: 18px; line-height: 1.45;
+}
+.alert--error { background: rgba(194, 68, 47, 0.07); border-color: rgba(194, 68, 47, 0.28); color: #8c2f1f; }
+.alert--ok { background: rgba(31, 122, 77, 0.08); border-color: rgba(31, 122, 77, 0.26); color: #17603c; }
+.alert--info { background: var(--accent-soft); border-color: rgba(43, 47, 217, 0.22); color: var(--accent-ink); }
+.alert__ref { display: block; margin-top: 6px; font-family: var(--font-mono); font-size: 11px; opacity: 0.75; }
+
+/* ============================================================
+   Application shell
+   ============================================================ */
+
+.shell { min-height: 100dvh; display: flex; flex-direction: column; }
+
+.shell__top {
+  position: sticky; top: 0; z-index: 40;
+  background: color-mix(in srgb, var(--paper) 86%, transparent);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--line-soft);
+}
+.shell__top-row {
+  display: flex; align-items: center; gap: 18px;
+  height: 64px; max-width: var(--maxw); margin: 0 auto;
+  padding-inline: var(--pad);
+}
+.shell__brand {
+  font-family: var(--font-mono); font-size: 13px; letter-spacing: 0.28em;
+  text-transform: uppercase; color: var(--ink); font-weight: 500;
+}
+.shell__badge {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--accent-ink);
+  background: var(--accent-soft); border: 1px solid rgba(43, 47, 217, 0.22);
+  padding: 3px 8px; border-radius: 100px;
+}
+.shell__spacer { margin-left: auto; }
+.shell__identity { font-size: 13.5px; color: var(--muted); }
+@media (max-width: 700px) { .shell__identity { display: none; } }
+
+.shell__body {
+  flex: 1; width: 100%; max-width: var(--maxw); margin: 0 auto;
+  padding: 28px var(--pad) 64px;
+  display: grid; grid-template-columns: 232px 1fr; gap: clamp(24px, 3vw, 44px);
+  align-items: start;
+}
+@media (max-width: 860px) { .shell__body { grid-template-columns: 1fr; } }
+
+.sidenav { position: sticky; top: 88px; display: flex; flex-direction: column; gap: 22px; }
+@media (max-width: 860px) { .sidenav { position: static; } }
+
+.sidenav__group { display: flex; flex-direction: column; gap: 2px; }
+.sidenav__title {
+  font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--muted-2); margin-bottom: 8px;
+}
+.sidenav__link {
+  display: block; padding: 8px 12px; border-radius: var(--radius-sm);
+  font-size: 14.5px; color: var(--ink-2);
+  transition: background .14s ease, color .14s ease;
+}
+.sidenav__link:hover { background: rgba(13, 15, 21, 0.045); }
+/* aria-current is the accessibility signal AND the styling hook, so the two can
+   never disagree — a highlighted link is always the one screen readers announce
+   as current. */
+.sidenav__link[aria-current="page"] { background: var(--accent-soft); color: var(--accent-ink); font-weight: 500; }
+
+@media (max-width: 860px) {
+  .sidenav { flex-direction: row; flex-wrap: wrap; gap: 10px; }
+  .sidenav__group { flex-direction: row; flex-wrap: wrap; gap: 6px; }
+  .sidenav__title { display: none; }
+  .sidenav__link { border: 1px solid var(--line); background: var(--card); }
+}
+
+.page-head { margin-bottom: 26px; }
+.page-head h1 { font-size: clamp(24px, 3vw, 32px); margin: 12px 0 8px; }
+
+.card {
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 22px;
+  box-shadow: 0 1px 2px rgba(13, 15, 21, 0.04);
+}
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+.card__title { font-size: 17px; font-weight: 600; margin-bottom: 6px; letter-spacing: -0.02em; }
+.card__body { font-size: 14.5px; color: var(--muted); margin: 0 0 14px; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}

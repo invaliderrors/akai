@@ -1,0 +1,23 @@
+{
+  "name": "api-e2e",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "apps/api-e2e/src",
+  "tags": ["scope:server", "type:e2e"],
+  "implicitDependencies": ["api"],
+  "targets": {
+    "e2e": {
+      "//": "No --passWithNoTests here, unlike the shell projects: this suite owns the only test that proves the provider_event transaction boundary (contract 12.1), so a vitest include glob that silently matches zero files must fail rather than look green.",
+      "executor": "nx:run-commands",
+      "options": { "command": "vitest run", "cwd": "apps/api-e2e" }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": { "command": "tsc -p tsconfig.json --noEmit", "cwd": "apps/api-e2e" }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": { "command": "eslint apps/api-e2e" }
+    }
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "//": "Workspace type-safety contract + CROSS-PROJECT module aliases only. Deliberately has no `include`/`files`: every project supplies its own, so adding a NestJS file anywhere can never be swallowed into the Next.js program (the failure mode of the pre-migration root tsconfig). Module/target/lib/jsx are per-project — Next needs esnext+bundler+preserve, Nest needs commonjs+node. App-LOCAL aliases such as `@/*` are deliberately NOT here: a single shared `@/*` can only point at one app, so a dashboard import would silently resolve into storefront source. Each app declares its own.",
+  "compilerOptions": {
+    "strict": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitReturns": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "declaration": false,
+    "baseUrl": ".",
+    "paths": {
+      "@akai/contracts": ["libs/contracts/src/index.ts"],
+      "@akai/db": ["libs/db/src/index.ts"],
+      "@akai/money": ["libs/money/src/index.ts"],
+      "@akai/rich-text": ["libs/rich-text/src/index.ts"],
+      "@akai/config": ["libs/config/src/index.ts"],
+      "@akai/i18n": ["libs/i18n/src/index.ts"],
+      "@akai/session": ["libs/session/src/index.ts"],
+      "@akai/ui": ["libs/ui/src/index.ts"],
+      "@akai/email-templates": ["libs/email-templates/src/index.ts"],
+      "@akai/testing": ["libs/testing/src/index.ts"],
+      "@akai/observability": ["libs/observability/src/index.ts"],
+
+      // THIRD-PARTY SUBPATH, and the one exception to "paths maps our own libs".
+      //
+      // `@whop/sdk` exposes its webhook verifier only at the `./helpers` subpath
+      // of its `exports` map. `apps/api` compiles with
+      // `moduleResolution: "node"` (node10), which predates `exports` and does
+      // not read it, so `import … from "@whop/sdk/helpers"` fails to resolve at
+      // COMPILE time while working perfectly at runtime — Node itself honours
+      // the map. Switching the API to `node16` resolution to fix one import
+      // would drag `module` along with it and rewrite how every file in the
+      // NestJS build resolves.
+      //
+      // This points tsc at the CJS declarations the `require` condition already
+      // selects, so the types and the runtime module are the same artifact.
+      "@whop/sdk/helpers": ["node_modules/@whop/sdk/dist/cjs/helpers/index.d.ts"]
+    }
+  }
+}

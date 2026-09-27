@@ -1,0 +1,116 @@
+{
+  "name": "api",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "apps/api/src",
+  "tags": [
+    "scope:server",
+    "type:app"
+  ],
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "outputs": [
+        "{workspaceRoot}/dist/apps/api"
+      ],
+      "options": {
+        "cwd": "apps/api",
+        "commands": [
+          "tsc -p tsconfig.app.json",
+          "tsc-alias -p tsconfig.app.json"
+        ],
+        "parallel": false
+      }
+    },
+    "dev": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsc -p tsconfig.app.json --watch --preserveWatchOutput",
+        "cwd": "apps/api"
+      }
+    },
+    "serve": {
+      "executor": "nx:run-commands",
+      "dependsOn": [
+        "build"
+      ],
+      "options": {
+        "cwd": ".",
+        "command": "node --watch dist/apps/api/apps/api/src/main.js"
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/api",
+        "commands": [
+          "tsc -p tsconfig.app.json --noEmit",
+          "tsc -p tsconfig.spec.json --noEmit"
+        ],
+        "parallel": false
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "vitest run --passWithNoTests",
+        "cwd": "apps/api"
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "eslint apps/api"
+      }
+    },
+    "seed": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": ".",
+        "command": "tsx --tsconfig apps/api/tsconfig.app.json apps/api/src/seed/seed.ts"
+      }
+    },
+    "seed-categories": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": ".",
+        "command": "tsx --tsconfig apps/api/tsconfig.app.json apps/api/src/seed/seed-categories.ts"
+      }
+    },
+    "seed-shipping": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": ".",
+        "command": "tsx --tsconfig apps/api/tsconfig.app.json apps/api/src/seed/seed-shipping.ts"
+      }
+    },
+    "seed-shipping-2026-09-19": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": ".",
+        "command": "tsx --tsconfig apps/api/tsconfig.app.json apps/api/src/seed/seed-shipping-2026-09-19.ts"
+      }
+    },
+    "seed-shipping-2026-09-24": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": ".",
+        "command": "tsx --tsconfig apps/api/tsconfig.app.json apps/api/src/seed/seed-shipping-2026-09-24.ts"
+      }
+    },
+    "seed-shipping-sendcloud-2026-09-24": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": ".",
+        "command": "tsx --tsconfig apps/api/tsconfig.app.json apps/api/src/seed/seed-shipping-sendcloud-2026-09-24.ts"
+      }
+    },
+    "seed-shipping-ups-2026-09-25": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": ".",
+        "command": "tsx --tsconfig apps/api/tsconfig.app.json apps/api/src/seed/seed-shipping-ups-2026-09-25.ts"
+      }
+    }
+  }
+}

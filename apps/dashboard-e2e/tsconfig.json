@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["dom", "esnext"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "noEmit": true,
+    "types": ["node"],
+    // Playwright's TestConfig types are not exactOptionalPropertyTypes-clean:
+    // a conditionally-undefined `webServer` is both idiomatic and correct here.
+    "exactOptionalPropertyTypes": false
+  },
+  "include": ["src/**/*.ts", "playwright.config.ts"],
+  "exclude": ["node_modules"]
+}

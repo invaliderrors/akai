@@ -1,0 +1,114 @@
+{
+  "data": {
+    "id": "95524bc9-174f-47c8-a03a-e60b83a24fe1",
+    "ship_with": {
+      "type": "shipping_option_code",
+      "properties": {
+        "shipping_option_code": "sendcloud:letter",
+        "contract_id": null
+      }
+    },
+    "from_address": {
+      "name": "Akai",
+      "company_name": "AKAI",
+      "email": "akai.contacto@gmail.com",
+      "phone_number": "+34689896258",
+      "address_line_1": "Urbanización Els Vinyals",
+      "house_number": "2",
+      "address_line_2": "",
+      "postal_code": "08810",
+      "city": "EL VENDRELL",
+      "po_box": null,
+      "state_province_code": null,
+      "country_code": "ES"
+    },
+    "to_address": {
+      "name": "Prueba Integracion",
+      "company_name": "",
+      "email": "akai.contacto@gmail.com",
+      "phone_number": "+34600000000",
+      "address_line_1": "Calle Mayor 1",
+      "house_number": null,
+      "address_line_2": "",
+      "postal_code": "50002",
+      "city": "Zaragoza",
+      "po_box": "",
+      "state_province_code": null,
+      "country_code": "ES"
+    },
+    "to_service_point": null,
+    "customs_information": null,
+    "carrier": {
+      "code": "sendcloud",
+      "name": "Sendcloud"
+    },
+    "parcels": [
+      {
+        "package_type": null,
+        "carrier_fields": {},
+        "parcel_items": [],
+        "dimensions": {
+          "width": "0",
+          "length": "0",
+          "height": "0",
+          "unit": "cm"
+        },
+        "weight": {
+          "value": "0.120",
+          "unit": "kg"
+        },
+        "created_at": "2026-09-24T22:04:26.487937Z",
+        "updated_at": "2026-09-24T22:04:26.715734Z",
+        "announced_at": "2026-09-24T22:04:26.695838Z",
+        "id": 718530367,
+        "status": {
+          "code": "READY_TO_SEND",
+          "message": "Ready to send"
+        },
+        "documents": [
+          {
+            "type": "label",
+            "document_type": "label",
+            "size": "a6",
+            "link": "https://panel.sendcloud.sc/api/v3/parcels/718530367/documents/label"
+          }
+        ],
+        "tracking_number": "SCCWF3P9K4PJ",
+        "tracking_url": "https://tracking.eu-central-1-0.sendcloud.sc/forward?carrier=sendcloud&code=SCCWF3P9K4PJ&destination=ES&lang=es-es&source=ES&type=letter&verification=50002&servicepoint_verification=&shipping_product_code=sendcloud%3Aletter&created_at=2026-09-24",
+        "sscc": null,
+        "additional_carrier_data": {
+          "awb_tracking_number": null,
+          "box_number": null
+        },
+        "tracking_numbers": [
+          {
+            "tracking_number": "SCCWF3P9K4PJ"
+          }
+        ],
+        "label_notes": null,
+        "additional_insured_price": {
+          "value": "0.00",
+          "currency": "EUR"
+        },
+        "label_file": "JVBERi0xLjQK"
+      }
+    ],
+    "order_number": "TEST-SPIKE-1",
+    "total_order_price": null,
+    "reference": null,
+    "external_reference_id": "spike-2026-09-24-1",
+    "brand_id": 782669,
+    "delivery_dates": {
+      "handover_at": null,
+      "deliver_at": null,
+      "earliest_delivery_time": null,
+      "latest_delivery_time": null
+    },
+    "carrier_fields": {},
+    "errors": [],
+    "label_details": {
+      "mime_type": "application/pdf",
+      "dpi": 72
+    }
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "name": "ui",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "library",
+  "sourceRoot": "libs/ui/src",
+  "tags": ["scope:shared", "type:lib"],
+  "targets": {
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "libs/ui",
+        "commands": [
+          "tsc -p tsconfig.lib.json --noEmit",
+          "tsc -p tsconfig.spec.json --noEmit"
+        ],
+        "parallel": false
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": { "command": "vitest run --passWithNoTests", "cwd": "libs/ui" }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": { "command": "eslint libs/ui" }
+    }
+  }
+}

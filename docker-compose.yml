@@ -1,0 +1,212 @@
+# =============================================================================
+# Local development stack.
+#
+# Scope: the BACKING SERVICES only. The apps themselves run on the host via
+# `pnpm nx run <app>:dev`, because containerising them costs a rebuild on every
+# save and buys nothing when Node is already installed.
+#
+# Deliberately absent: Redis. The architecture is Postgres-only (spec §5) —
+# pg-boss backs the queue, the transactional outbox, the idempotency table and
+# the rate-limiter store. One stateful service in production is the whole point;
+# adding Redis here would let code drift into depending on it.
+#
+#   docker compose up -d          start everything
+#   docker compose logs -f api-db tail Postgres
+#   docker compose down -v        stop and DESTROY the data volume
+# =============================================================================
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: akai-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: akai
+      POSTGRES_PASSWORD: akai
+      POSTGRES_DB: akai
+    ports:
+      # Published on the host so Prisma Studio, psql and the apps can all reach
+      # it without exec-ing into the container.
+      #
+      # HOST PORT IS 5434, NOT 5432. A locally-installed PostgreSQL service will
+      # already own 5432, and the resulting failure is genuinely misleading:
+      # Docker still reports the port as published, but connections reach the
+      # NATIVE server instead of this container, so Prisma fails with "P1000
+      # Authentication failed for user akai" — an auth error for a database
+      # that is running perfectly. Publishing on 5434 removes the ambiguity.
+      # The container side stays 5432, so nothing inside the network changes.
+      - "5434:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      # Provisions the `akai_app` runtime role and the citext extension before
+      # the first migration runs. Postgres executes files in this directory
+      # exactly once, on an EMPTY data directory — so editing it later requires
+      # `docker compose down -v` to take effect.
+      - ./tools/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # `pg_isready` alone returns success while the server is still replaying
+      # WAL and refusing connections, so this runs an actual query.
+      test: ["CMD-SHELL", "psql -U akai -d akai -c 'SELECT 1' || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  mailpit:
+    # Catches every outbound email locally. EMAIL_TRANSPORT=smtp binds the
+    # Nodemailer adapter to this, which is what guarantees no development run or
+    # test can reach a real inbox — the failure mode being a test fixture that
+    # mails a customer's real address.
+    image: axllent/mailpit:latest
+    container_name: akai-mailpit
+    restart: unless-stopped
+    ports:
+      - "1025:1025" # SMTP  — matches SMTP_URL in .env.example
+      - "8025:8025" # Web UI — http://localhost:8025
+    environment:
+      MP_MAX_MESSAGES: 5000
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+
+  minio:
+    # S3-compatible object storage for product media and COA documents.
+    # Matches S3_ENDPOINT in .env.example.
+    image: minio/minio:latest
+    container_name: akai-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: akaidev
+      MINIO_ROOT_PASSWORD: akaidev-secret
+    ports:
+      # Host ports are 9002/9003, NOT the MinIO defaults of 9000/9001. The
+      # defaults are commonly already bound by another project's MinIO on a
+      # developer machine, and the failure is an opaque "Bind for 0.0.0.0:9000
+      # failed: port is already allocated" at `compose up`. The CONTAINER side
+      # stays 9000/9001, so nothing inside the network changes — only S3_ENDPOINT
+      # on the host follows this mapping.
+      - "9002:9000" # API     — S3_ENDPOINT=http://localhost:9002
+      - "9003:9001" # Console — http://localhost:9003
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  minio-provision:
+    # One-shot: creates the bucket so the first upload does not 404. Exits 0 and
+    # stays exited; `docker compose ps` showing it as Exited is correct, not a
+    # failure.
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 akaidev akaidev-secret &&
+      mc mb --ignore-existing local/akai-media &&
+      mc anonymous set download local/akai-media &&
+      mc mb --ignore-existing local/akai-coa &&
+      echo 'bucket akai-media ready' &&
+      echo 'bucket akai-coa ready (private — no anonymous policy set, on purpose: certificates of analysis are read through a signed URL, never a bare path)'
+      "
+
+  # ===========================================================================
+  # The applications.
+  #
+  # These four run the SAME images that deploy, which is the point: a bug that
+  # only appears in the container is found here rather than in staging.
+  #
+  # `docker compose up -d` builds them on first run. That is slow — a full pnpm
+  # install plus four builds — and it is a one-off; later runs reuse the layer
+  # cache unless the lockfile changes.
+  #
+  # FOR DAY-TO-DAY WORK, PREFER THE HOST. `pnpm start:all` gives hot reload;
+  # these containers must be rebuilt to pick up a source edit:
+  #   docker compose up -d --build api
+  #
+  # NODE_ENV IS OVERRIDDEN TO development ON PURPOSE. Every image sets
+  # NODE_ENV=production, and libs/config's production guards then (correctly)
+  # refuse a TagadaPay test key, EMAIL_TRANSPORT=smtp, a plaintext CORS origin
+  # and WHOP_BOOT_CHECK=false — i.e. exactly the local placeholder setup. The
+  # override is what lets the production image run against a development
+  # configuration; it does not weaken the deployed one.
+  # ===========================================================================
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: akai-api
+    restart: unless-stopped
+    # Everything from the root .env, then the values that MUST differ inside the
+    # compose network: `localhost` in a container is the container itself, so the
+    # host-published ports (5434, 9002, 1025) are wrong here — service names and
+    # their INTERNAL ports are correct.
+    env_file: .env
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://akai:akai@postgres:5432/akai
+      DIRECT_DATABASE_URL: postgresql://akai:akai@postgres:5432/akai
+      SMTP_URL: smtp://mailpit:1025
+      S3_ENDPOINT: http://minio:9000
+      # Browser-facing origins, so these stay as the host sees them.
+      CORS_ALLOWED_ORIGINS: http://localhost:3100,http://localhost:3101
+      STOREFRONT_URL: http://localhost:3100
+      DASHBOARD_URL: http://localhost:3101
+    ports:
+      - "3333:3333"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    container_name: akai-worker
+    # NOT `unless-stopped`. The worker has no consumers and no /health listener
+    # yet, so it initialises and exits — and a restart policy would turn that
+    # documented shell state into an endless restart loop that looks like a
+    # crashing service.
+    restart: "no"
+    env_file: .env
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://akai:akai@postgres:5432/akai
+      DIRECT_DATABASE_URL: postgresql://akai:akai@postgres:5432/akai
+      SMTP_URL: smtp://mailpit:1025
+      S3_ENDPOINT: http://minio:9000
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: apps/dashboard/Dockerfile
+      args:
+        # Only what the dashboard build actually reads — see its Dockerfile.
+        NEXT_PUBLIC_API_URL: http://localhost:3333
+    container_name: akai-dashboard
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+      # Server-side calls from the dashboard's BFF routes stay on the compose
+      # network, so this one IS the service name.
+      API_INTERNAL_URL: http://api:3333
+    ports:
+      - "3101:3001"
+    depends_on:
+      api:
+        condition: service_started
+
+volumes:
+  postgres-data:
+  minio-data:

@@ -1,0 +1,53 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["esnext"],
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+
+    // MUST stay false and MUST stay explicit. `target: ES2022` flips
+    // useDefineForClassFields to true by default, which turns decorated class
+    // fields into defineProperty declarations and silently destroys the emitted
+    // decorator metadata. The symptom is an opaque runtime DI failure
+    // ("Nest can't resolve dependencies"), never a compile error.
+    "useDefineForClassFields": false,
+
+
+    // Explicit, NOT inferred. `tsc` derives rootDir from the widest common
+    // ancestor of its inputs, so the emitted layout silently changes shape the
+    // first time a file imports a lib through a path alias: apps/worker
+    // currently emits `dist/apps/worker/main.js`, and adding one
+    // `@akai/db` import would move it to
+    // `dist/apps/worker/apps/worker/src/main.js` and break the Dockerfile CMD
+    // — with a successful build and a container that exits instantly. Pinning
+    // it to the workspace root makes both server apps emit the same, stable
+    // shape regardless of what they import.
+    "rootDir": "../..",
+    "outDir": "../../dist/apps/api",
+    "declaration": false,
+    "sourceMap": true,
+    "types": ["node"]
+  },
+  "include": ["src/**/*.ts"],
+  // Test-only code is excluded from the PRODUCTION build, not merely from the
+  // test run. Without these globs, in-memory repositories, fake payment
+  // gateways and always-allow captcha verifiers are compiled into dist/ and
+  // ship to production, where a mis-wired provider token would bind to one
+  // silently. Excluding `*.test.ts` alone does not cover them: the doubles live
+  // in their own files and are only imported BY tests.
+  // The seed is excluded too: it hard-codes a published administrator password
+  // by design, and that string has no business inside a production image.
+  // It still gets typechecked — tsconfig.spec.json includes all of src/ and
+  // excludes only node_modules — and it runs from source via `tsx`, so nothing
+  // here depends on it being compiled.
+  "exclude": [
+    "node_modules",
+    "src/**/*.test.ts",
+    "src/**/test-doubles/**",
+    "src/**/testing/**",
+    "src/seed/**"
+  ]
+}

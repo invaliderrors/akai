@@ -1,0 +1,36 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["esnext"],
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+
+    // MUST stay false and MUST stay explicit. `target: ES2022` flips
+    // useDefineForClassFields to true by default, which turns decorated class
+    // fields into defineProperty declarations and silently destroys the emitted
+    // decorator metadata. The symptom is an opaque runtime DI failure
+    // ("Nest can't resolve dependencies"), never a compile error.
+    "useDefineForClassFields": false,
+
+
+    // Explicit, NOT inferred. `tsc` derives rootDir from the widest common
+    // ancestor of its inputs, so the emitted layout silently changes shape the
+    // first time a file imports a lib through a path alias: apps/worker
+    // currently emits `dist/apps/worker/main.js`, and adding one
+    // `@akai/db` import would move it to
+    // `dist/apps/worker/apps/worker/src/main.js` and break the Dockerfile CMD
+    // — with a successful build and a container that exits instantly. Pinning
+    // it to the workspace root makes both server apps emit the same, stable
+    // shape regardless of what they import.
+    "rootDir": "../..",
+    "outDir": "../../dist/apps/worker",
+    "declaration": false,
+    "sourceMap": true,
+    "types": ["node"]
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "src/**/*.test.ts"]
+}
