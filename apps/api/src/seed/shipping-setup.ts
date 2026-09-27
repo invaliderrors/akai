@@ -16,6 +16,12 @@
  *   | European Union    | PT FR DE IT NL BE  | 2–4 days         | international, 2–4   |
  *   | Ireland           | IE                 | 2–4 days         | NOT AVAILABLE        |
  *
+ * Every zone also gets an UNMAPPED home-delivery rate. The storefront's checkout
+ * offers HOME rates only until the API grows pickup-point search, and Akai's own
+ * Sendcloud contract (so its home option codes) does not exist yet: staff map
+ * the rate in /admin/shipping, and until then label purchase skips it as
+ * RATE_NOT_MAPPED rather than guessing a carrier.
+ *
  * Ireland is its own zone because a zone's rates are offered to every country in
  * it, and InPost cannot ship to IE. Every rate ships free at or above
  * `FREE_SHIPPING_THRESHOLD_MINOR`. Prices are placeholders for the new shop and
@@ -87,6 +93,24 @@ const INPOST_INTERNATIONAL: RateMapping = {
   transitDaysMax: 4,
 };
 
+const HOME_UNMAPPED: RateMapping = {
+  deliveryType: "HOME",
+  carrierCode: null,
+  sendcloudOptionCode: null,
+  transitDaysMin: 2,
+  transitDaysMax: 5,
+};
+
+function homeRate(): SeedRate {
+  return {
+    name: { es: "Envío a domicilio", en: "Home delivery" },
+    strategy: "FLAT",
+    priceGross: 699,
+    freeOverSubtotal: FREE_SHIPPING_THRESHOLD_MINOR,
+    mapping: HOME_UNMAPPED,
+  };
+}
+
 function upsRate(mapping: RateMapping): SeedRate {
   return {
     name: { es: "Envío en punto de recogida UPS", en: "UPS pickup-point shipping" },
@@ -112,19 +136,19 @@ export const SHIPPING_ZONES: readonly SeedZone[] = [
     name: "Spain (mainland)",
     countryCodes: ["ES"],
     sortOrder: 0,
-    rates: [upsRate(UPS_NATIONAL), inpostRate(INPOST_NATIONAL)],
+    rates: [homeRate(), upsRate(UPS_NATIONAL), inpostRate(INPOST_NATIONAL)],
   },
   {
     name: "European Union",
     countryCodes: ["PT", "FR", "DE", "IT", "NL", "BE"],
     sortOrder: 1,
-    rates: [upsRate(UPS_INTERNATIONAL), inpostRate(INPOST_INTERNATIONAL)],
+    rates: [homeRate(), upsRate(UPS_INTERNATIONAL), inpostRate(INPOST_INTERNATIONAL)],
   },
   {
     name: "Ireland",
     countryCodes: ["IE"],
     sortOrder: 2,
-    rates: [upsRate(UPS_INTERNATIONAL)],
+    rates: [homeRate(), upsRate(UPS_INTERNATIONAL)],
   },
 ];
 

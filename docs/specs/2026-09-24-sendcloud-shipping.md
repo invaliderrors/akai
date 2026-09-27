@@ -394,8 +394,9 @@ selection + bulk actions, order detail shipment card.
 
 ## 11a. Spike results (real account, 2026-09-24)
 
-- **Sender address** exists: id `920582`, "Akai / AKAI LABS", Urbanización Els
-  Vinyals 2, 08810 El Vendrell, ES → `SENDCLOUD_SENDER_ADDRESS_ID=920582`.
+- **Sender address** existed on the PREVIOUS shop's Sendcloud account (details
+  redacted). Akai must create its own and set `SENDCLOUD_SENDER_ADDRESS_ID`. The option
+  table below is from that previous account too — re-run the spike on Akai's.
 - **G1 — options from ES (500 g):** the account has **InPost ES** and **UPS** only (plus
   `sendcloud:letter`). **There is no DHL** — today's "DHL pickup-point" rate has no carrier
   behind it.
