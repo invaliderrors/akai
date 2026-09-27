@@ -1,3 +1,17 @@
 packages:
   - 'apps/*'
   - 'libs/*'
+
+# pnpm blocks postinstall scripts by default. These ship native binaries (nx
+# daemon, swc/esbuild transformers, prisma engines, sharp codecs) that do not
+# work without them.
+onlyBuiltDependencies:
+  - '@parcel/watcher'
+  - '@prisma/client'
+  - '@prisma/engines'
+  - '@swc/core'
+  - 'esbuild'
+  - 'nx'
+  - 'prisma'
+  - 'sharp'
+  - 'unrs-resolver'
