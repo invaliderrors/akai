@@ -1,9 +1,6 @@
 import { Module } from "@nestjs/common";
 import { PrismaModule } from "../prisma/prisma.module";
 import { ThrottlerModule } from "../throttler/throttler.module";
-import type { ServerEnv } from "@akai/config";
-import { CLOCK, type Clock, systemClock } from "../auth/ports/clock.port";
-import { SERVER_CONFIG } from "../config/config.module";
 import { CategoriesModule } from "../categories/categories.module";
 import { ProductsService } from "./products.service";
 import { ProductInventoryService } from "./product-inventory.service";
@@ -11,10 +8,6 @@ import { ProductsController } from "./products.controller";
 import { AdminProductsController } from "./admin-products.controller";
 import { AdminCategoriesController } from "./admin-categories.controller";
 import { CATALOG_BASE_COUNTRY, TaxRateResolver } from "./tax-rate.resolver";
-import { COA_FILE_READER, type CoaFileReader, S3CoaFileReader } from "./coa-file.reader";
-
-/** The fixed region every presigner call site uses (see `LabelsModule`). */
-const S3_REGION = "us-east-1";
 
 /**
  * CatalogModule — products, variants, media, categories, inventory.
@@ -64,28 +57,6 @@ const S3_REGION = "us-east-1";
       // as STORE_BASE_COUNTRY. "ES" matches the storefront's default locale.
       provide: CATALOG_BASE_COUNTRY,
       useValue: "ES",
-    },
-    // `ProductsService` signs COA read URLs, and a presigned URL's signature is
-    // a function of the signing time — same reasoning MediaModule's upload
-    // signer is injected for, so a test can fix the clock and assert on it.
-    { provide: CLOCK, useValue: systemClock },
-    {
-      // The server-side read behind `GET /v1/products/:slug/coa/file` — the
-      // in-page certificate viewer. Same private bucket, same presigner, as
-      // `S3LabelStorage`.
-      provide: COA_FILE_READER,
-      inject: [SERVER_CONFIG, CLOCK],
-      useFactory: (config: ServerEnv, clock: Clock): CoaFileReader =>
-        new S3CoaFileReader(
-          {
-            endpoint: config.S3_ENDPOINT,
-            bucket: config.S3_BUCKET_COA,
-            region: S3_REGION,
-            accessKeyId: config.S3_ACCESS_KEY_ID,
-            secretAccessKey: config.S3_SECRET_ACCESS_KEY,
-          },
-          clock,
-        ),
     },
   ],
   exports: [ProductsService, ProductInventoryService],

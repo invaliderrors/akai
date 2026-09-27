@@ -53,9 +53,9 @@ function translation(locale: Locale, overrides: Partial<BlogPostRecord["translat
 function record(overrides: Partial<BlogPostRecord> = {}): BlogPostRecord {
   return {
     id: POST_ID,
-    slug: "que-es-bpc-157",
+    slug: "como-combinar-un-oversize",
     status: "PUBLISHED",
-    category: "PEPTIDES",
+    category: "STYLE_GUIDES",
     publishedAt: new Date("2026-09-20T10:00:00.000Z"),
     coverObjectKey: null,
     authorId: AUTHOR_ID,
@@ -169,7 +169,7 @@ describe("BlogService — public reads", () => {
     const result = await serviceWith(repository).listPublished({ limit: 12 });
 
     expect(publicBlogPostListResponseSchema.parse(result)).toEqual(result);
-    expect(result.items.map((item) => item.slug)).toEqual(["que-es-bpc-157"]);
+    expect(result.items.map((item) => item.slug)).toEqual(["como-combinar-un-oversize"]);
   });
 
   it("filters by locale — a Spanish-only post is absent from the English list (D8c)", async () => {
@@ -200,7 +200,7 @@ describe("BlogService — public reads", () => {
   it("serves a published post by slug with its full copy", async () => {
     const repository = new FakeBlogRepository([record()]);
 
-    const post = await serviceWith(repository).getPublished("que-es-bpc-157", undefined);
+    const post = await serviceWith(repository).getPublished("como-combinar-un-oversize", undefined);
 
     expect(publicBlogPostSchema.parse(post)).toEqual(post);
     expect(post.translations[0]?.bodyHtml).toBe("<p>Body</p>");
@@ -209,7 +209,7 @@ describe("BlogService — public reads", () => {
   it("404s a draft — the public read never reaches an unpublished post", async () => {
     const repository = new FakeBlogRepository([record({ status: "DRAFT", publishedAt: null })]);
 
-    await expect(serviceWith(repository).getPublished("que-es-bpc-157", undefined)).rejects.toMatchObject({
+    await expect(serviceWith(repository).getPublished("como-combinar-un-oversize", undefined)).rejects.toMatchObject({
       code: "NOT_FOUND",
     });
   });
@@ -218,9 +218,9 @@ describe("BlogService — public reads", () => {
     const repository = new FakeBlogRepository([record()]);
     const service = serviceWith(repository);
 
-    await expect(service.getPublished("que-es-bpc-157", "en")).rejects.toBeInstanceOf(BlogError);
-    await expect(service.getPublished("que-es-bpc-157", "es")).resolves.toMatchObject({
-      slug: "que-es-bpc-157",
+    await expect(service.getPublished("como-combinar-un-oversize", "en")).rejects.toBeInstanceOf(BlogError);
+    await expect(service.getPublished("como-combinar-un-oversize", "es")).resolves.toMatchObject({
+      slug: "como-combinar-un-oversize",
     });
   });
 });

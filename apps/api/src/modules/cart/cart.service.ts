@@ -121,8 +121,8 @@ export class CartService {
    * must surface every line-level problem (out of stock, withdrawn, over the
    * per-line max, price moved) BEFORE a card is charged rather than after. Passing
    * a `countryCode` additionally flags lines the destination may not receive
-   * (`COUNTRY_RESTRICTED`) — some supplements/peptides are not legal everywhere,
-   * and that restriction is enforced here and again at checkout, never left to a
+   * (`COUNTRY_RESTRICTED`) — an item may carry licensing, export or carrier
+   * restrictions for some destinations, and that restriction is enforced here and again at checkout, never left to a
    * forgotten `if`.
    *
    * Throws NotFound when the actor owns no cart — the same ownership rule every

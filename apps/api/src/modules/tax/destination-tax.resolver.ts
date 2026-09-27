@@ -29,8 +29,8 @@ export interface DestinationTaxResolverPort {
    * The VAT rate in basis points for a destination + class.
    *
    * @param countryCode ISO-3166-1 alpha-2, uppercase — the SHIP-TO country.
-   * @param taxClass    the product's tax class (a supplement is reduced-rate in
-   *                    some member states and standard in others).
+   * @param taxClass    the product's tax class (clothing is standard-rated;
+   *                    REDUCED/ZERO_RATED exist for the goods that need them).
    */
   resolveBps(countryCode: string, taxClass: TaxClass): Promise<number>;
 }

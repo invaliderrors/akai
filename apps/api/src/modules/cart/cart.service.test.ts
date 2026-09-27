@@ -310,11 +310,11 @@ function variant(overrides: Partial<VariantSnapshot> = {}): VariantSnapshot {
   return {
     variantId: randomUUID(),
     productId: randomUUID(),
-    productSlug: "bpc-157-10mg",
-    name: "BPC-157",
-    variantName: "10 mg",
-    sku: "AK-BPC-10",
-    imageUrl: "https://cdn.akai.shop/bpc-157.png",
+    productSlug: "hoodie-kumo-m",
+    name: "Hoodie Kumo",
+    variantName: "M",
+    sku: "AK-HOOD-M",
+    imageUrl: null,
     currency: "EUR",
     priceGross: 4999,
     // No volume pricing by default — every variant that exists today. The tier
@@ -1233,7 +1233,7 @@ describe("CartService", () => {
 
     describe("a component with quantity > 1", () => {
       it("writes a total quantity of component-quantity × pack-quantity, summing exactly to its fair share", async () => {
-        // "b" claims 5 units per pack — a real "5x Reta 20mg" slot.
+        // "b" claims 5 units per pack — a real "3x Tee Black M" slot.
         registerPack(5499, [1000, 1000, 3000], [1, 5, 1]);
 
         const created = await service.addPack(anonymous(), {

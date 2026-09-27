@@ -17,7 +17,7 @@ function eur(amount: number): { amount: ReturnType<typeof toMinor>; currency: st
 
 const LINES: EmailPayloadFor<"order-confirmation">["lines"] = [
   {
-    name: "Creatine Monohydrate",
+    name: "Oversized Tee",
     variantName: "300 g",
     quantity: 2,
     unitPrice: eur(2499),
@@ -134,14 +134,14 @@ const FIXTURES: { [K in EmailTemplateKey]: EmailPayloadFor<K> } = {
   },
   "contact-autoreply": {
     name: "Marta",
-    subject: "Question about batch purity",
+    subject: "Question about sizing",
     referenceId: "CT-000045",
   },
   "contact-received": {
     referenceId: "CT-000045",
     name: "Marta",
     replyTo: "marta@example.com",
-    subject: "Question about batch purity",
+    subject: "Question about sizing",
     message: "Which lot is currently shipping for AK-CRE-300?",
     submittedAt: "2026-07-20T10:00:00.000Z",
   },
@@ -189,16 +189,6 @@ describe("renderEmail — coverage", () => {
       const en = renderEmail(key, "en", payload);
 
       expect(es.text, `${key} is identical in both locales`).not.toEqual(en.text);
-    }
-  });
-
-  it("no longer carries the old food-supplement disclaimer in any mail", () => {
-    // Removed everywhere, not just from order-confirmation — see
-    // email.renderer.ts's wrapHtml/wrapText doc comments for why.
-    for (const key of ALL_KEYS) {
-      const payload = parseTemplatePayload(key, FIXTURES[key]);
-      expect(renderEmail(key, "es", payload).text).not.toContain("Complemento alimenticio");
-      expect(renderEmail(key, "en", payload).text).not.toContain("Food supplement");
     }
   });
 

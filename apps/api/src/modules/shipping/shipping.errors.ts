@@ -10,8 +10,8 @@ import { ERROR_STATUS, type ErrorCode } from "@akai/contracts";
  * branch on:
  *
  *  * `destinationNotServed` — 422/VALIDATION: we ship nowhere in this country.
- *    This is the country-restriction gate (spec §13 / §18): a peptide catalogue
- *    that may not ship to a jurisdiction has NO shipping zone for it, and that
+ *    This is the country-restriction gate (spec §13 / §18): a destination
+ *    the shop may not ship to has NO shipping zone for it, and that
  *    absence is enforced here rather than by an if-statement someone can forget.
  *  * `methodUnavailable` — the chosen `shippingMethodId` is not offered for this
  *    destination + cart (wrong zone, wrong weight/price bracket, or stale id).

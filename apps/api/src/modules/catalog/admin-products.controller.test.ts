@@ -157,11 +157,6 @@ describe("AdminProductsController authorisation", () => {
     expect(ADMIN_ROUTES).toContain("create");
     expect(ADMIN_ROUTES).toContain("remove");
     expect(ADMIN_ROUTES).toContain("adjustInventory");
-    // The product certificate's upload, confirm and remove: an open write
-    // capability into the private bucket if any of them escaped the guard.
-    expect(ADMIN_ROUTES).toEqual(
-      expect.arrayContaining(["createCoaUploadUrl", "attachCoa", "removeCoa"]),
-    );
   });
 
   it.each(ADMIN_ROUTES)("denies CUSTOMER on %s with 403", (handlerName) => {
@@ -214,7 +209,7 @@ describe("ProductsController exposure", () => {
 
   it("discovers the public routes it claims to be testing", () => {
     expect(publicRoutes).toEqual(
-      expect.arrayContaining(["list", "listAddOns", "detail", "coa"]),
+      expect.arrayContaining(["list", "listAddOns", "detail"]),
     );
   });
 
@@ -281,7 +276,7 @@ function writeResult(sanitizedLocales: ProductWriteResult["sanitizedLocales"]): 
 function productFixture(): ProductWriteResult["product"] {
   return {
     id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-    slug: "creatina",
+    slug: "camiseta",
     status: "ACTIVE",
     taxClass: "STANDARD",
     translations: [],
@@ -296,9 +291,6 @@ function productFixture(): ProductWriteResult["product"] {
     stackDiscountEnabled: false,
     kind: "SIMPLE",
     packComponents: [],
-    form: "LYOPHILIZED",
-    showCoa: false,
-    coaUrl: null,
     createdAt: "2026-03-01T00:00:00.000Z",
     updatedAt: "2026-03-01T00:00:00.000Z",
     deletedAt: null,

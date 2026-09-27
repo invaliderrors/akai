@@ -69,9 +69,9 @@ export function orderSnapshot(overrides: Partial<OrderSnapshot> = {}): OrderSnap
 export function orderLine(overrides: Partial<OrderLineSnapshot> = {}): OrderLineSnapshot {
   return baseOrderLine({
     id: "line-1",
-    productName: "Creatine Monohydrate",
-    variantName: "500 g",
-    sku: "AK-CRE-500",
+    productName: "Oversized Tee",
+    variantName: "L",
+    sku: "AK-TEE-BLK-L",
     unitPriceGross: toMinor(4999),
     lineTotalGross: toMinor(4999),
     ...overrides,

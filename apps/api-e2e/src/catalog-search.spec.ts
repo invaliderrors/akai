@@ -22,7 +22,7 @@ import { isDockerAvailable, startTestDatabase, type TestDatabase } from "./harne
  *
  * `product-query.test.ts` pins the SQL text. What only a database can prove:
  * that `unaccent` is actually installed by the migrations, that the escaped
- * term compiles as a regex, that `\m` really refuses "secretagogo" for "reta",
+ * term compiles as a regex, that `\m` really refuses "tsukumo" for "kumo",
  * and that the rank survives the keyset cursor — a page walk that neither
  * skips nor repeats a product.
  */
@@ -41,7 +41,7 @@ const TEST_ENV: NodeJS.ProcessEnv = {
   EMAIL_FROM: "no-reply@example.com",
   S3_ENDPOINT: "http://localhost:9000",
   S3_BUCKET: "akai-media",
-  S3_BUCKET_COA: "akai-coa",
+  S3_BUCKET_PRIVATE: "akai-private",
   S3_ACCESS_KEY_ID: "key",
   S3_SECRET_ACCESS_KEY: "secret",
   CORS_ALLOWED_ORIGINS: "http://localhost:3000",
@@ -78,51 +78,51 @@ function es(name: string, shortDescription: string, description: string): SeedTr
  */
 const PRODUCTS: readonly SeedProduct[] = [
   {
-    slug: "reta-glp-3",
-    sku: "AK-R1",
+    slug: "kumo-hdy-3",
+    sku: "AK-K1",
     sortOrder: 50,
-    translations: [es("RETA (GLP-3)", "Agonista triple.", "<p>Investigación metabólica.</p>")],
+    translations: [es("KUMO (HDY-3)", "Sudadera pesada.", "<p>Colección de invierno.</p>")],
   },
   {
-    slug: "retatrutide",
-    sku: "AK-R2",
+    slug: "kumogata",
+    sku: "AK-K2",
     sortOrder: 40,
-    translations: [es("Retatrutide", "Péptido de investigación.", "<p>Vial liofilizado.</p>")],
+    translations: [es("Kumogata", "Camiseta de algodón.", "<p>Estampado serigrafiado.</p>")],
   },
   {
-    // Reaches "reta" ONLY through a description word start: ranked last.
-    slug: "tirzepatide",
-    sku: "AK-T1",
+    // Reaches "kumo" ONLY through a description word start: ranked last.
+    slug: "coach-jacket",
+    sku: "AK-C1",
     sortOrder: 0,
     translations: [
-      es("Tirzepatide", "Agonista dual.", "<p>Se compara a menudo con <strong>reta</strong>.</p>"),
+      es("Coach Jacket", "Nailon cortavientos.", "<p>Se combina a menudo con <strong>kumo</strong>.</p>"),
     ],
   },
   {
-    // "reta" is only ever INSIDE a word here — must never match.
-    slug: "ipamorelin",
-    sku: "AK-I1",
+    // "kumo" is only ever INSIDE a word here — must never match.
+    slug: "cargo-pants",
+    sku: "AK-G1",
     sortOrder: 0,
     translations: [
       es(
-        "Ipamorelin",
-        "Péptido secretagogo de GH.",
-        "<p>Un secretagogo selectivo, de acción discreta y concreta.</p>",
+        "Cargo Pants",
+        "Tejido tsukumo.",
+        "<p>Inspirado en el barrio de Akumoto, de corte recto y relajado.</p>",
       ),
     ],
   },
   {
-    slug: "proteina-whey",
-    sku: "AK-P1",
-    translations: [es("Proteína Whey", "Aislado de suero.", "<p>Proteína de suero.</p>")],
+    slug: "sudadera-basica",
+    sku: "AK-B1",
+    translations: [es("Sudadera Básica", "Felpa perchada.", "<p>Sudadera básica.</p>")],
   },
   {
-    // "reta" appears only in the ENGLISH name. An es search reads the es row.
-    slug: "magnesio",
-    sku: "AK-M1",
+    // "kumo" appears only in the ENGLISH name. An es search reads the es row.
+    slug: "tote-bag",
+    sku: "AK-T1",
     translations: [
-      es("Magnesio", "Bisglicinato.", "<p>Mineral.</p>"),
-      { locale: "en", name: "Retaline Magnesium", shortDescription: "Bisglycinate.", description: "<p>Mineral.</p>" },
+      es("Bolsa Tote", "Lona.", "<p>Algodón.</p>"),
+      { locale: "en", name: "Kumoline Tote", shortDescription: "Canvas.", description: "<p>Cotton.</p>" },
     ],
   },
   {
@@ -130,7 +130,7 @@ const PRODUCTS: readonly SeedProduct[] = [
     slug: "english-only",
     sku: "AK-E1",
     translations: [
-      { locale: "en", name: "Nasal Spray Reta", shortDescription: "Spray.", description: "<p>Spray.</p>" },
+      { locale: "en", name: "Six-Panel Cap Kumo", shortDescription: "Cap.", description: "<p>Cap.</p>" },
     ],
   },
 ];
@@ -203,60 +203,60 @@ describe.skipIf(!isDockerAvailable())("Catalog search — ranking, word starts, 
     return result.items.map((item) => item.slug);
   }
 
-  it('"reta": RETA first, then Retatrutide, never the secretagogo product', async () => {
-    const found = await slugs("reta");
+  it('"kumo": KUMO first, then Kumogata, never the tsukumo product', async () => {
+    const found = await slugs("kumo");
 
     // Whole-word prefix → partial prefix → name word start → description word
     // start. Every name hit outranks the description hit, although the manual
     // order (sortOrder 0 vs 40/50) says the opposite.
-    expect(found).toEqual(["reta-glp-3", "retatrutide", "english-only", "tirzepatide"]);
-    expect(found).not.toContain("ipamorelin");
+    expect(found).toEqual(["kumo-hdy-3", "kumogata", "english-only", "coach-jacket"]);
+    expect(found).not.toContain("cargo-pants");
   });
 
   it("matches the active locale's translation, falling back when a product lacks it", async () => {
-    const found = await slugs("reta");
+    const found = await slugs("kumo");
 
-    // "Retaline" is only the en name of a product that HAS an es row.
-    expect(found).not.toContain("magnesio");
+    // "Kumoline" is only the en name of a product that HAS an es row.
+    expect(found).not.toContain("tote-bag");
     // No es row at all: the en row is the one the product is shown in.
     expect(found).toContain("english-only");
 
-    expect(await slugs("retaline", "en")).toEqual(["magnesio"]);
+    expect(await slugs("kumoline", "en")).toEqual(["tote-bag"]);
   });
 
   it("is accent-insensitive in both directions", async () => {
-    expect(await slugs("proteina")).toEqual(["proteina-whey"]);
-    expect(await slugs("PROTEÍNA")).toEqual(["proteina-whey"]);
-    expect(await slugs("rétà")).toContain("reta-glp-3");
+    expect(await slugs("basica")).toEqual(["sudadera-basica"]);
+    expect(await slugs("BÁSICA")).toEqual(["sudadera-basica"]);
+    expect(await slugs("kúmó")).toContain("kumo-hdy-3");
   });
 
   it("an exact SKU ranks first and a partial SKU still finds the product", async () => {
-    expect((await slugs("nx-t1"))[0]).toBe("tirzepatide");
-    expect(await slugs("AK-P")).toEqual(["proteina-whey"]);
+    expect((await slugs("ak-c1"))[0]).toBe("coach-jacket");
+    expect(await slugs("AK-B")).toEqual(["sudadera-basica"]);
   });
 
   it("treats regex and LIKE metacharacters as literals", async () => {
     // "(" unescaped is an invalid regex and would 500; "%" unescaped matches everything.
-    expect(await slugs("(glp")).toEqual(["reta-glp-3"]);
+    expect(await slugs("(hdy")).toEqual(["kumo-hdy-3"]);
     expect(await slugs("%%")).toEqual([]);
-    expect(await slugs("r.ta")).toEqual([]);
+    expect(await slugs("k.mo")).toEqual([]);
   });
 
   it("ignores a one-character term instead of erroring or matching nothing", async () => {
     const all = await page({ limit: "100" });
-    const oneChar = await page({ search: "r", limit: "100" });
+    const oneChar = await page({ search: "k", limit: "100" });
     expect(oneChar.items.map((item) => item.slug)).toEqual(all.items.map((item) => item.slug));
   });
 
   it("paginates ranked results one row at a time without skipping or repeating", async () => {
-    const expected = await slugs("reta");
+    const expected = await slugs("kumo");
     expect(expected.length).toBeGreaterThanOrEqual(4);
 
     const walked: string[] = [];
     let cursor: string | null = null;
     for (let guard = 0; guard < 20; guard += 1) {
       const result = await page({
-        search: "reta",
+        search: "kumo",
         limit: "1",
         ...(cursor === null ? {} : { cursor }),
       });

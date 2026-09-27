@@ -13,7 +13,7 @@
 //    product or an edited address must never rewrite a filed invoice.
 //  * audit_log and inventory_ledger are APPEND-ONLY. The runtime DB role holds
 //    INSERT + SELECT on them and nothing else; migrations run as a separate
-//    role. See the initial migration.
+//    role. See `20260927000100_invariants`.
 //  * Soft delete (`deletedAt`) everywhere a record can be referenced by an
 //    order. Hard deletes destroy financial history.
 // =============================================================================
@@ -27,7 +27,7 @@ datasource db {
   provider   = "postgresql"
   url        = env("DATABASE_URL")
   directUrl  = env("DIRECT_DATABASE_URL")
-  extensions = [citext, pgcrypto]
+  extensions = [citext, pgcrypto, unaccent]
 }
 
 // =============================================================================
@@ -63,14 +63,6 @@ enum ProductKind {
   PACK
 }
 
-/// The form a product ships in. See `Product.form`.
-enum ProductForm {
-  LYOPHILIZED
-  SOLUTION
-  CAPSULE
-  OTHER
-}
-
 enum TaxClass {
   STANDARD
   REDUCED
@@ -99,12 +91,6 @@ enum OrderStatus {
 enum PaymentProvider {
   /// ONE MEMBER, ON PURPOSE. A value no code can produce is a value that only
   /// ever appears in a query someone forgot to update.
-  ///
-  /// The migration RENAMES the `TAGADA` value rather than dropping and
-  /// recreating the type. `ALTER TYPE … RENAME VALUE` preserves every existing
-  /// row, so the change carries no data-migration question and needs no
-  /// per-environment branch — it is correct whether or not any payment has ever
-  /// been taken.
   WHOP
 }
 
@@ -214,8 +200,9 @@ enum BlogPostStatus {
 /// the storefront's category chip is a translated label rather than whatever
 /// an operator typed. Mirrors `blogCategorySchema` in libs/contracts.
 enum BlogCategory {
-  PEPTIDES
-  RESEARCH_GUIDES
+  DROPS
+  LOOKBOOK
+  STYLE_GUIDES
   NEWS
 }
 
@@ -430,7 +417,7 @@ model Address {
   /// NOTE: "exactly one default per (customer, type)" is additionally enforced
   /// by a PARTIAL unique index that Prisma's schema language cannot express
   /// (it has no `WHERE` clause on `@@unique`). It is created in the migration
-  /// `20260720000200_integration_invariants` as:
+  /// `20260927000100_invariants` as:
   ///
   ///   CREATE UNIQUE INDEX "address_one_default_per_type"
   ///     ON "address" ("customerId", "type")
@@ -450,7 +437,7 @@ model Product {
   id       String        @id @default(uuid()) @db.Uuid
   /// NOTE: unique among LIVE products only. Prisma's schema language has no
   /// `WHERE` clause for `@unique`, so the constraint is a PARTIAL index created
-  /// in `20260911190000_release_unique_keys_on_soft_delete` as:
+  /// in `20260927000100_invariants` as:
   ///
   ///   CREATE UNIQUE INDEX "product_slug_key"
   ///     ON "product" ("slug") WHERE "deletedAt" IS NULL;
@@ -463,7 +450,7 @@ model Product {
   taxClass TaxClass      @default(STANDARD)
 
   /// Countries this product may NOT ship to. Enforced in cart validation AND at
-  /// checkout — some peptides/supplements are not legal everywhere.
+  /// checkout — for licensing, export or carrier restrictions on a given item.
   restrictedCountries String[] @default([])
 
   /// Art. 16(e): sealed goods unsuitable for return once opened are exempt from
@@ -531,25 +518,6 @@ model Product {
   /// for packs at all. See `ProductPackComponent`'s own doc comment.
   kind ProductKind @default(SIMPLE)
 
-  /// The physical form the product ships in — the FORMA cell of the storefront
-  /// spec table. A closed enum rather than free text, so the label is always a
-  /// translated one and never an operator's untranslated string. Defaults to
-  /// LYOPHILIZED, which is what almost the whole catalogue is.
-  form ProductForm @default(LYOPHILIZED)
-
-  /// The product's ONE certificate of analysis: an object key in the PRIVATE
-  /// COA bucket (`coa/products/{productId}/...`), never a URL. Null when none
-  /// is uploaded. Shoppers reach it only through the stable
-  /// `GET /v1/products/:slug/coa` redirect, which signs at click time, and
-  /// only while `showCoa` is on. Lot records (`Batch`) keep their own
-  /// certificates as admin data; they no longer drive the storefront.
-  coaObjectKey String? @db.VarChar(512)
-
-  /// The admin's "Mostrar certificado de análisis" switch. Off by default:
-  /// some certificates are uploaded before they are ready to publish, so an
-  /// upload alone never puts a document in front of a shopper.
-  showCoa Boolean @default(false)
-
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -612,14 +580,14 @@ model ProductVariant {
   productId String @db.Uuid
 
   /// NOTE: unique among LIVE variants only — a PARTIAL index created in
-  /// `20260911190000_release_unique_keys_on_soft_delete`, for the same reason
+  /// `20260927000100_invariants`, for the same reason
   /// `product.slug` is. See the note on that field.
   sku String @db.VarChar(64)
 
-  /// Per-locale display name, e.g. {"es":"10 mg","en":"10 mg"}. Null on
+  /// Per-locale display name, e.g. {"es":"M / Negro","en":"M / Black"}. Null on
   /// single-variant products.
   name    Json?
-  /// Option values, e.g. {"size":"10mg"}. The combination is unique per product
+  /// Option values, e.g. {"size":"M","color":"black"}. The combination is unique per product
   /// (enforced by a partial index in the migration).
   options Json  @default("{}")
 
@@ -659,7 +627,6 @@ model ProductVariant {
   /// At most one, guaranteed by `@@unique([variantId])` on MediaAsset. Singular
   /// because the model is singular: a variant has an image or it has none.
   image        MediaAsset?
-  batches      Batch[]
   priceHistory PriceHistory[]
   cartItems    CartItem[]
   ledger       InventoryLedgerEntry[]
@@ -766,30 +733,6 @@ model StockReservation {
   @@map("stock_reservation")
 }
 
-/// Lot traceability. The live Spanish FAQ contractually promises a lot id and
-/// COA access with every order, so this is a commitment, not a nice-to-have.
-model Batch {
-  id        String @id @default(uuid()) @db.Uuid
-  variantId String @db.Uuid
-
-  lotCode       String   @db.VarChar(64)
-  purityPercent Decimal  @db.Decimal(5, 2)
-  testedAt      DateTime
-  testMethod    String   @db.VarChar(64)
-
-  /// S3 key. Served via an expiring signed URL, never a public bucket path.
-  coaObjectKey String?   @db.VarChar(512)
-  expiresAt    DateTime?
-
-  createdAt DateTime @default(now())
-
-  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
-
-  @@unique([variantId, lotCode])
-  @@index([variantId])
-  @@map("batch")
-}
-
 model MediaAsset {
   id        String  @id @default(uuid()) @db.Uuid
   productId String  @db.Uuid
@@ -838,20 +781,20 @@ model Category {
 
   /// NOTE: unique among LIVE categories only. Prisma's schema language has no
   /// `WHERE` clause for `@unique`, so the constraint is a PARTIAL index created
-  /// in `20260915100000_category_admin_crud` as:
+  /// in `20260927000100_invariants` as:
   ///
   ///   CREATE UNIQUE INDEX "category_slug_key"
   ///     ON "category" ("slug") WHERE "deletedAt" IS NULL;
   ///
-  /// Same reasoning, same fix, as `Product.slug` and `ProductVariant.sku` in
-  /// `20260911190000_release_unique_keys_on_soft_delete`: a soft-deleted
+  /// Same reasoning, same fix, as `Product.slug` and `ProductVariant.sku`
+  /// (same migration): a soft-deleted
   /// category keeps its row (a deleted product may still reference it) but
   /// RELEASES its slug, so an admin can delete "bundles" and later create a
   /// new "bundles" category without inventing a different name. Declaring
   /// `@unique` here would recreate the unconditional index and break that.
   slug String @db.VarChar(160)
 
-  /// Per-locale names, e.g. {"es":"Recuperación","en":"Recovery"}.
+  /// Per-locale names, e.g. {"es":"Sudaderas","en":"Hoodies"}.
   name      Json
   sortOrder Int    @default(0)
 
@@ -937,7 +880,7 @@ model ProductPackComponent {
   componentVariantId String @db.Uuid
   /// Display order of the components on the pack's own PDP.
   sortOrder Int @default(0)
-  /// How many of THIS component one pack contains — "5x Reta 20mg" as one
+  /// How many of THIS component one pack contains — "3x Tee Black M" as one
   /// slot, not five identical slots. `CHECK (quantity > 0)` lives in the
   /// migration's raw SQL (Prisma has no check-constraint syntax here, same
   /// note as everywhere else this schema needs one). Weights the pro-rata
@@ -1025,8 +968,8 @@ model CartItem {
   variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Restrict)
 
   /// NOTE: "one line per variant" no longer holds unconditionally. It is now
-  /// TWO partial unique indexes, created in `<migration>_product_packs` and
-  /// widened in `<migration>_pack_component_quantity` as:
+  /// TWO partial unique indexes, created in
+  /// `20260927000100_invariants` as:
   ///
   ///   CREATE UNIQUE INDEX "cart_item_standalone_key"
   ///     ON "cart_item" ("cartId", "variantId") WHERE "packInstanceId" IS NULL;
@@ -1231,8 +1174,8 @@ model DiscountRedemption {
 }
 
 /// Destination-based VAT. Keyed (country, class, validFrom) rather than a single
-/// constant: supplements are reduced-rate in some member states, standard in
-/// others, and rates change on announced dates.
+/// constant: rates differ between member states, some goods fall under a
+/// reduced class in some of them, and rates change on announced dates.
 model TaxRate {
   id          String    @id @default(uuid()) @db.Uuid
   countryCode String    @db.Char(2)
@@ -1375,7 +1318,7 @@ model Order {
   billCountryCode String  @db.Char(2)
   billPhone       String? @db.VarChar(32)
 
-  /// Gap-free, allocated from `invoice_number_seq` at PAID ONLY. Abandoned
+  /// Gap-free, allocated by `allocate_invoice_number()` at PAID ONLY. Abandoned
   /// carts must never consume an invoice number.
   invoiceNumber String? @unique @db.VarChar(32)
   /// VIES-validated VAT number for B2B reverse charge.
@@ -1471,9 +1414,6 @@ model OrderItem {
   taxAmount      Int
   lineTotalNet   Int
   lineTotalGross Int
-
-  /// The lot actually shipped, for traceability.
-  batchLotCode String? @db.VarChar(64)
 
   /// Carried over from `CartItem` at order-creation time, unchanged — see that
   /// field's own comment. Purely for display/reporting grouping here; no
@@ -1883,8 +1823,8 @@ model RateLimitCounter {
 /// sequence structurally cannot be: `nextval` is deliberately non-transactional,
 /// so a settlement that rolls back — or a losing concurrent UPDATE whose
 /// target-list `nextval` was evaluated before the tuple lock — burns a number
-/// permanently. Measured on postgres:16-alpine; see
-/// `20260910000000_invoice_counter` for the transcript.
+/// permanently. Measured on postgres:16-alpine; see the invoice-counter
+/// section of `20260927000100_invariants`.
 ///
 /// A row updated under its own lock is MVCC state: it rolls back with its
 /// transaction, and a competing allocation waits instead of drawing a second

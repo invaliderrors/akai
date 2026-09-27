@@ -132,7 +132,7 @@ export type FieldError = z.infer<typeof fieldErrorSchema>;
  * WHICH variant a stock refusal ran short on, and how many units of it are
  * still available to THIS request (stock less the rest of the caller's cart).
  *
- * Exists so a pack refusal can name its short component — "RETA (GLP-3): only
+ * Exists so a pack refusal can name its short component — "Oversized Tee M: only
  * 3 left" — instead of a generic sold-out sentence about a pack the shopper
  * can see is on sale. Carries an id and a count, never a name or prose: the
  * client resolves the name from data it already holds, in its own locale, and

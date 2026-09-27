@@ -176,8 +176,6 @@ export const orderItemSchema = z
     taxAmount: nonNegativeMinorSchema,
     lineTotalNet: nonNegativeMinorSchema,
     lineTotalGross: nonNegativeMinorSchema,
-    /** The lot actually shipped, for traceability. */
-    batchLotCode: z.string().nullable(),
     /**
      * Set together, or both null. Carried over verbatim from `CartItem` at
      * order-creation time — every component line of one pack purchase shares

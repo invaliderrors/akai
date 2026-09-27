@@ -18,7 +18,7 @@ import { allocate, allocateEvenly, toMinor, type Minor } from "@akai/money";
  * changes with how many packs are bought, only how many units land at it.
  *
  * TWO-LEVEL ALLOCATION, because a component can now claim more than one
- * physical unit per pack ("5x Reta 20mg" as one slot). A single `unitPriceGross`
+ * physical unit per pack ("3x Tee Black M" as one slot). A single `unitPriceGross`
  * scalar has to hold for a whole line's `quantity` (`cart-totals.ts`'s
  * `calculateTotals` re-derives every line's gross as `unitPriceGross *
  * quantity` — it never accepts a pre-computed total), but a component's

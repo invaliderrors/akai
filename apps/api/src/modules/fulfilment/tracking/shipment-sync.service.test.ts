@@ -103,7 +103,7 @@ function createWorld(orderOverrides: Partial<OrderRow> = {}) {
     servicePointName: "PAPELERIA PILI",
     servicePointAddress: "Calle Delicias 12, 50002 Zaragoza",
     items: [
-      { id: ITEM_ID, productName: "Creatine Monohydrate", variantName: "500 g", quantity: 2, unitPriceGross: 4999 },
+      { id: ITEM_ID, productName: "Oversized Tee", variantName: "L", quantity: 2, unitPriceGross: 4999 },
     ],
     ...orderOverrides,
   };
@@ -285,7 +285,7 @@ describe("ShipmentSyncService", () => {
       expect(payload.trackingNumber).toBe("IP123456789");
       expect(payload.orderUrl).toBe("https://app.akai.test/orders/AK-2026-000123");
       expect(payload.lines).toEqual([
-        expect.objectContaining({ name: "Creatine Monohydrate", quantity: 2 }),
+        expect.objectContaining({ name: "Oversized Tee", quantity: 2 }),
       ]);
     });
 

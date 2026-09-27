@@ -95,7 +95,7 @@ describe("s3-presigner — SigV4 primitives", () => {
 
   it("signs GET instead of PUT when asked — the only other verb this module signs", () => {
     const request = canonicalRequest(
-      "/akai-coa/coa/a/report.pdf",
+      "/akai-private/labels/a/1.pdf",
       "X-Amz-Algorithm=AWS4-HMAC-SHA256",
       "localhost:9002",
       "GET",
@@ -172,16 +172,16 @@ describe("presignPutUrl", () => {
 });
 
 describe("presignGetUrl", () => {
-  const COA_BASE = {
+  const PRIVATE_BASE = {
     ...PRESIGN_BASE,
-    bucket: "akai-coa",
-    objectKey: "coa/some-batch-id/report.pdf",
+    bucket: "akai-private",
+    objectKey: "labels/some-order-id/1.pdf",
   };
 
   it("carries the same signed parameters as a PUT, for the other verb this module signs", () => {
-    const url = new URL(presignGetUrl(COA_BASE));
+    const url = new URL(presignGetUrl(PRIVATE_BASE));
 
-    expect(url.pathname).toBe("/akai-coa/coa/some-batch-id/report.pdf");
+    expect(url.pathname).toBe("/akai-private/labels/some-order-id/1.pdf");
     expect(url.searchParams.get("X-Amz-Signature")).toMatch(/^[0-9a-f]{64}$/);
   });
 
@@ -189,14 +189,14 @@ describe("presignGetUrl", () => {
     // The method is part of the canonical request, so the same object, bucket
     // and expiry still produce two distinct signatures — a GET signature must
     // never authorise a PUT of the same object, or the reverse.
-    const getSignature = new URL(presignGetUrl(COA_BASE)).searchParams.get("X-Amz-Signature");
-    const putSignature = new URL(presignPutUrl(COA_BASE)).searchParams.get("X-Amz-Signature");
+    const getSignature = new URL(presignGetUrl(PRIVATE_BASE)).searchParams.get("X-Amz-Signature");
+    const putSignature = new URL(presignPutUrl(PRIVATE_BASE)).searchParams.get("X-Amz-Signature");
 
     expect(getSignature).not.toBe(putSignature);
   });
 
   it("never leaks the secret access key into the URL", () => {
-    expect(presignGetUrl(COA_BASE)).not.toContain("akaidev-secret");
+    expect(presignGetUrl(PRIVATE_BASE)).not.toContain("akaidev-secret");
   });
 });
 

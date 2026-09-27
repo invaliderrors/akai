@@ -183,13 +183,13 @@ function searchTermCte(term: string): Prisma.Sql {
  *   5 short-description word start · 6 description word start ·
  *   7 SKU contains (the only remaining way in)
  *
- * Tier 1 splits the prefix tier so that "reta" puts "RETA (GLP-3)" ahead of
- * "Retatrutide": both are prefixes, but only one is the word typed.
+ * Tier 1 splits the prefix tier so that "kumo" puts "KUMO Hoodie" ahead of
+ * "Kumogata Tee": both are prefixes, but only one is the word typed.
  *
  * Name tiers read the SAME translation row the filter does (`t`, active locale
  * → es → first). Descriptions match on WORD STARTS (`\m`), never substrings,
- * which is the whole point: "reta" must find "RETA" and "Retatrutide", not
- * every page that says "secretagogo", "discreta" or "interpreta".
+ * which is the whole point: "tee" must find "Tee" and "Teeshirt", not every
+ * page that says "Yankee", "settee" or "coteen".
  */
 const SEARCH_RANK = Prisma.sql`CASE
         WHEN lower(unaccent(t.name)) = st.folded

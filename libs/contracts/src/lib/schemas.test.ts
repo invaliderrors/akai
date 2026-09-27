@@ -24,8 +24,8 @@ describe("common primitives", () => {
   });
 
   it("enforces lowercase kebab slugs", () => {
-    expect(slugSchema.safeParse("bpc-157-10mg").success).toBe(true);
-    expect(slugSchema.safeParse("BPC_157").success).toBe(false);
+    expect(slugSchema.safeParse("oversized-tee-black").success).toBe(true);
+    expect(slugSchema.safeParse("HOODIE_KUMO").success).toBe(false);
     expect(slugSchema.safeParse("trailing-").success).toBe(false);
   });
 

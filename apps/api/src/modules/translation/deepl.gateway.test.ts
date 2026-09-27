@@ -20,9 +20,9 @@ const REQUEST: TranslateRequest = translateRequestSchema.parse({
   source: "es",
   target: "en",
   texts: [
-    { key: "name", text: "Creatina monohidratada" },
-    { key: "summary", text: "Pureza 99,9 %" },
-    { key: "description", text: "Cada lote se analiza por HPLC." },
+    { key: "name", text: "Camiseta oversize de algodón" },
+    { key: "summary", text: "Algodón 100 %" },
+    { key: "description", text: "Cada prenda se confecciona en algodón orgánico." },
   ],
 });
 
@@ -112,7 +112,7 @@ describe("DeeplTranslationGateway", () => {
 
   it("sends one request for the whole batch and pairs the answers back by key", async () => {
     fetchMock.mockResolvedValue(
-      new Response(deeplBody(["Creatine monohydrate", "99.9 % purity", "Every lot is HPLC tested."])),
+      new Response(deeplBody(["Oversized tee", "100 % cotton", "Every garment is made from organic cotton."])),
     );
 
     const outcome = await gateway().translate(REQUEST);
@@ -122,9 +122,9 @@ describe("DeeplTranslationGateway", () => {
     expect(outcome).toEqual({
       ok: true,
       translations: [
-        { key: "name", text: "Creatine monohydrate" },
-        { key: "summary", text: "99.9 % purity" },
-        { key: "description", text: "Every lot is HPLC tested." },
+        { key: "name", text: "Oversized tee" },
+        { key: "summary", text: "100 % cotton" },
+        { key: "description", text: "Every garment is made from organic cotton." },
       ],
     });
   });
@@ -141,9 +141,9 @@ describe("DeeplTranslationGateway", () => {
 
     const body = sentBody(call?.[1]);
     expect(body.text).toEqual([
-      "Creatina monohidratada",
-      "Pureza 99,9 %",
-      "Cada lote se analiza por HPLC.",
+      "Camiseta oversize de algodón",
+      "Algodón 100 %",
+      "Cada prenda se confecciona en algodón orgánico.",
     ]);
     expect(body.source_lang).toBe("ES");
     // A regional variant, because bare "EN" is deprecated as a TARGET.

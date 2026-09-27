@@ -12,9 +12,9 @@ const VALID = {
   source: "es",
   target: "en",
   texts: [
-    { key: "name", text: "Creatina monohidratada" },
-    { key: "summary", text: "Pureza 99,9 %" },
-    { key: "description", text: "Cada lote se analiza por HPLC." },
+    { key: "name", text: "Camiseta oversize de algodón" },
+    { key: "summary", text: "Algodón 100 %" },
+    { key: "description", text: "Cada prenda se confecciona en algodón orgánico." },
   ],
 };
 
@@ -104,9 +104,9 @@ describe("translateRequestSchema", () => {
     const parsed = translateRequestSchema.parse({
       source: "es",
       target: "en",
-      texts: [{ key: "name", text: "  Creatina  " }],
+      texts: [{ key: "name", text: "  Camiseta  " }],
     });
-    expect(parsed.texts[0]?.text).toBe("Creatina");
+    expect(parsed.texts[0]?.text).toBe("Camiseta");
 
     expect(
       translateRequestSchema.safeParse({
@@ -140,7 +140,7 @@ describe("translateResponseSchema", () => {
   it("rejects an unknown key", () => {
     expect(
       translateResponseSchema.safeParse({
-        translations: [{ key: "name", text: "Creatine", detected_source_language: "ES" }],
+        translations: [{ key: "name", text: "Tee", detected_source_language: "ES" }],
       }).success,
     ).toBe(false);
   });

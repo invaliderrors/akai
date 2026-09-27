@@ -1,8 +1,6 @@
-import { Inject, Injectable } from "@nestjs/common";
-import { randomBytes } from "node:crypto";
+import { Injectable } from "@nestjs/common";
 import { z } from "zod";
 import { Prisma } from "@akai/db";
-import type { ServerEnv } from "@akai/config";
 import {
   computeStackDiscountTiers,
   REVALIDATE_TAG_CATEGORIES,
@@ -28,14 +26,6 @@ import {
 import { splitGross, toMinor } from "@akai/money";
 import { sanitizeRichText } from "@akai/rich-text";
 import { PrismaService } from "../prisma/prisma.service";
-import { SERVER_CONFIG } from "../config/config.module";
-import { CLOCK, type Clock } from "../auth/ports/clock.port";
-import { presignGetUrl, presignPutUrl } from "../media/s3-presigner";
-import type {
-  AttachCoa,
-  CoaUploadUrlResponse,
-  CreateCoaUploadUrl,
-} from "../batches/batches.dto";
 import { CatalogError } from "./catalog.errors";
 import { CATALOG_TOPICS, type CatalogTopic } from "./catalog.events";
 import {
@@ -111,71 +101,12 @@ interface SanitizedTranslations {
  * needs to know about writes an outbox row inside the SAME transaction as the
  * change (spec §9). See catalog.events.ts for why that is not merely tidier.
  */
-/**
- * How long a signed COA read URL on an ADMIN read is good for — the product's
- * own `coaUrl` and a batch's. An hour suits an admin form left open.
- *
- * The PUBLIC product shape never carries a signed URL — only `hasCoa` —
- * because a URL baked into ISR-cached HTML went dead when it expired. Shoppers
- * reach the PDF through `GET /v1/products/:slug/coa`, signed at click time
- * with `COA_REDIRECT_TTL_SECONDS`.
- */
-const COA_URL_TTL_SECONDS = 3600;
-
-/**
- * The TTL of the URL `GET /v1/products/:slug/coa` redirects to. Short: it is
- * signed at click time and followed immediately, so it never sits in a cached
- * page — which is the whole point of that route.
- */
-const COA_REDIRECT_TTL_SECONDS = 300;
-
-/**
- * The TTL of a product certificate UPLOAD url. Mirrors `BatchesService` and
- * `MediaService`: long enough for a slow connection, short enough that a
- * captured URL is worthless soon after.
- */
-const COA_UPLOAD_URL_TTL_SECONDS = 600;
-
-/**
- * What may follow `coa/products/{productId}/` in a key `attachCoa` accepts:
- * exactly the shape `buildProductCoaKey` issues — one path segment, no
- * separators, no dots but the extension's. A bare prefix check would accept
- * `coa/products/{mine}/../{theirs}/x.pdf`.
- */
-const PRODUCT_COA_KEY_TAIL = /^[0-9A-Za-z-]+\.pdf$/;
-
-const S3_REGION = "us-east-1";
-
 @Injectable()
 export class ProductsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly taxRates: TaxRateResolver,
-    @Inject(SERVER_CONFIG) private readonly config: ServerEnv,
-    @Inject(CLOCK) private readonly clock: Clock,
   ) {}
-
-  /**
-   * A signed, time-boxed URL to read one COA PDF from the PRIVATE bucket.
-   *
-   * The only place `product.mapper.ts`'s `coaUrl` ever gets a real value —
-   * every mapper call in this service passes this in, so a public read and an
-   * admin read see the identical signing logic, not two that could drift.
-   */
-  private signCoaUrl = (
-    objectKey: string,
-    expiresInSeconds: number = COA_URL_TTL_SECONDS,
-  ): string =>
-    presignGetUrl({
-      endpoint: this.config.S3_ENDPOINT,
-      bucket: this.config.S3_BUCKET_COA,
-      objectKey,
-      region: S3_REGION,
-      accessKeyId: this.config.S3_ACCESS_KEY_ID,
-      secretAccessKey: this.config.S3_SECRET_ACCESS_KEY,
-      expiresInSeconds,
-      now: this.clock.now(),
-    });
 
   // -------------------------------------------------------------------------
   // Reads
@@ -285,7 +216,7 @@ export class ProductsService {
    */
   private toPublic(row: HydratedProduct): PublicProduct {
     return toPublicProduct(
-      mapProduct(row, { activeVariantsOnly: true }, this.signCoaUrl),
+      mapProduct(row, { activeVariantsOnly: true }),
       derivePackAvailability(row),
     );
   }
@@ -316,7 +247,7 @@ export class ProductsService {
     );
     return {
       items: page.items.map((row) =>
-        mapProduct(row, { activeVariantsOnly: false }, this.signCoaUrl),
+        mapProduct(row, { activeVariantsOnly: false }),
       ),
       nextCursor: page.nextCursor,
       hasMore: page.hasMore,
@@ -526,161 +457,6 @@ export class ProductsService {
     return this.toPublic(product);
   }
 
-  /**
-   * A FRESH signed URL for the product's certificate of analysis — the target
-   * of the stable `GET /v1/products/:slug/coa` redirect.
-   *
-   * WHY A REDIRECT AND NOT A URL IN THE PAGE. The product page is ISR-cached,
-   * and a signed URL embedded in it becomes a dead link for anyone who
-   * arrives after the signature expires. Signing at click time makes the link
-   * in the page permanent and the signature always fresh.
-   *
-   * THE SAME AUDIENCE RULES AS THE PRODUCT PAGE: ACTIVE, non-deleted
-   * products, current or historic slug. And the SAME RULE AS `hasCoa`: a file
-   * must be uploaded AND the admin's `showCoa` switch on. An uploaded but
-   * hidden certificate 404s exactly like a missing one — "hidden" must not be
-   * defeated by someone who guesses the URL, and the answer must not reveal
-   * that a hidden file exists.
-   */
-  async coaUrlFor(slug: string): Promise<string> {
-    return this.signCoaUrl(await this.coaObjectKeyFor(slug), COA_REDIRECT_TTL_SECONDS);
-  }
-
-  /**
-   * The private-bucket key of the product's certificate, under EXACTLY the
-   * rules `coaUrlFor` states above — it is the one place those rules live.
-   * `coaUrlFor` signs the key for the redirect; `GET /v1/products/:slug/coa/file`
-   * reads the bytes server-side for the in-page viewer. Two routes, one
-   * visibility decision, so "hidden" cannot be hidden on one and served on the
-   * other.
-   */
-  async coaObjectKeyFor(slug: string): Promise<string> {
-    const select = { id: true, coaObjectKey: true, showCoa: true } as const;
-    const product =
-      (await this.prisma.product.findFirst({
-        where: { slug, deletedAt: null, status: "ACTIVE" },
-        select,
-      })) ?? (await this.resolveHistoricCoaRow(slug));
-
-    if (product === null || !product.showCoa || product.coaObjectKey === null) {
-      throw CatalogError.notFound("Certificate of analysis");
-    }
-
-    return product.coaObjectKey;
-  }
-
-  private async resolveHistoricCoaRow(
-    slug: string,
-  ): Promise<{ id: string; coaObjectKey: string | null; showCoa: boolean } | null> {
-    const historic = await this.prisma.productSlugHistory.findUnique({
-      where: { slug },
-      select: { productId: true },
-    });
-    if (historic === null) {
-      return null;
-    }
-    return this.prisma.product.findFirst({
-      where: { id: historic.productId, deletedAt: null, status: "ACTIVE" },
-      select: { id: true, coaObjectKey: true, showCoa: true },
-    });
-  }
-
-  // -------------------------------------------------------------------------
-  // The product's certificate of analysis (admin)
-  // -------------------------------------------------------------------------
-  //
-  // ONE CERTIFICATE PER PRODUCT, uploaded with the same two-step presign →
-  // PUT → confirm pattern `BatchesService` uses for a lot's certificate, into
-  // the same PRIVATE bucket (`S3_BUCKET_COA`): PDF only, ≤ 10 MB (the shared
-  // `createCoaUploadUrlSchema`), and the bytes never transit the API. Keyed
-  // `coa/products/{productId}/…`, a prefix no batch key can share (a batch key
-  // is `coa/{batchId}/…`). Whether the shop OFFERS it is the separate
-  // `showCoa` switch, saved with the product through `update()`.
-  //
-  // A replaced or removed file's object is left in the bucket, as media and
-  // batch certificates are: private, unreferenced and harmless, and deleting
-  // it inline would couple a catalog write to object storage being up.
-
-  async createCoaUploadUrl(
-    productId: string,
-    input: CreateCoaUploadUrl,
-  ): Promise<CoaUploadUrlResponse> {
-    await this.assertProductExists(productId);
-
-    // Already bounded at 10 MB by `createCoaUploadUrlSchema`; the signed PUT
-    // does not carry a length, so there is nothing more to do with it here.
-    void input.sizeBytes;
-
-    const now = this.clock.now();
-    const objectKey = buildProductCoaKey(productId, now);
-    const uploadUrl = presignPutUrl({
-      endpoint: this.config.S3_ENDPOINT,
-      bucket: this.config.S3_BUCKET_COA,
-      objectKey,
-      region: S3_REGION,
-      accessKeyId: this.config.S3_ACCESS_KEY_ID,
-      secretAccessKey: this.config.S3_SECRET_ACCESS_KEY,
-      expiresInSeconds: COA_UPLOAD_URL_TTL_SECONDS,
-      now,
-    });
-
-    return { uploadUrl, objectKey, expiresInSeconds: COA_UPLOAD_URL_TTL_SECONDS };
-  }
-
-  /**
-   * Record the key an upload succeeded to — first upload and replacement
-   * alike. REFUSES a key this product was not issued: otherwise an admin
-   * session could point one product's certificate at another's (or at a
-   * batch's) object.
-   */
-  async attachCoa(productId: string, input: AttachCoa): Promise<Product> {
-    const prefix = `coa/products/${productId}/`;
-    if (
-      !input.objectKey.startsWith(prefix) ||
-      !PRODUCT_COA_KEY_TAIL.test(input.objectKey.slice(prefix.length))
-    ) {
-      throw CatalogError.validation(
-        "This object key was not issued for this product — request a fresh upload URL",
-      );
-    }
-    await this.assertProductExists(productId);
-
-    await this.runWrite(async (tx) => {
-      await tx.product.update({
-        where: { id: productId },
-        data: { coaObjectKey: input.objectKey },
-      });
-      await this.enqueueRevalidation(tx, CATALOG_TOPICS.productCoaAttached);
-    }, "Product");
-
-    return this.getByIdAdmin(productId);
-  }
-
-  /** Forget the product's certificate. The page's button goes with it. */
-  async removeCoa(productId: string): Promise<Product> {
-    await this.assertProductExists(productId);
-
-    await this.runWrite(async (tx) => {
-      await tx.product.update({
-        where: { id: productId },
-        data: { coaObjectKey: null },
-      });
-      await this.enqueueRevalidation(tx, CATALOG_TOPICS.productCoaRemoved);
-    }, "Product");
-
-    return this.getByIdAdmin(productId);
-  }
-
-  private async assertProductExists(productId: string): Promise<void> {
-    const product = await this.prisma.product.findFirst({
-      where: { id: productId, deletedAt: null },
-      select: { id: true },
-    });
-    if (product === null) {
-      throw CatalogError.notFound("Product");
-    }
-  }
-
   private async resolveHistoricSlug(slug: string): Promise<HydratedProduct | null> {
     const historic = await this.prisma.productSlugHistory.findUnique({
       where: { slug },
@@ -708,7 +484,7 @@ export class ProductsService {
       throw CatalogError.notFound("Product");
     }
 
-    return mapProduct(product, { activeVariantsOnly: false }, this.signCoaUrl);
+    return mapProduct(product, { activeVariantsOnly: false });
   }
 
   // -------------------------------------------------------------------------
@@ -763,11 +539,6 @@ export class ProductsService {
           // a product must not silently keep the column's own SIMPLE default
           // until a later update.
           kind: input.kind ?? "SIMPLE",
-          // Same "explicit, never omitted" reasoning as `kind` above.
-          form: input.form ?? "LYOPHILIZED",
-          // Hidden unless the admin says otherwise: an upload alone must never
-          // put a certificate in front of a shopper.
-          showCoa: input.showCoa ?? false,
           translations: { create: [...stored] },
           categories: {
             create: input.categoryIds.map((categoryId, index) => ({
@@ -926,10 +697,6 @@ export class ProductsService {
             ? {}
             : { stackDiscountEnabled: input.stackDiscountEnabled }),
           ...(input.kind === undefined ? {} : { kind: input.kind }),
-          ...(input.form === undefined ? {} : { form: input.form }),
-          // Flipping it changes whether the page offers the certificate; the
-          // `productUpdated` purge below covers it like any other field.
-          ...(input.showCoa === undefined ? {} : { showCoa: input.showCoa }),
         },
       });
 
@@ -1342,7 +1109,7 @@ export class ProductsService {
       throw CatalogError.notFound("Variant");
     }
 
-    return mapVariant(variant, this.signCoaUrl);
+    return mapVariant(variant);
   }
 
   // -------------------------------------------------------------------------
@@ -1948,7 +1715,7 @@ export class ProductsService {
    * nothing the second time, and hosts already at `ADD_ON_MAX` are counted
    * rather than pushed past a cap the dedicated route would have refused.
    *
-   * ONLY LISTED HOSTS. Offering bacteriostatic water on the bacteriostatic water
+   * ONLY LISTED HOSTS. Offering the tote bag on the tote bag's own
    * page is noise, and an add-on's own page is not a shop window for other
    * add-ons.
    */
@@ -2360,14 +2127,3 @@ function jsonOrDbNull(
 /** Re-exported for the tax resolver's consumers; keeps TaxClass off every import site. */
 export type { TaxClass };
 
-/**
- * The object key a product certificate upload writes to: the product id, a
- * timestamp and 8 random bytes. Unguessable — but unguessable is not
- * authorised; the bucket has no anonymous read, and the signature is what it
- * checks. The client never chooses it (`attachCoa` refuses any other shape).
- */
-function buildProductCoaKey(productId: string, now: Date): string {
-  const stamp = now.toISOString().replace(/[:.]/g, "-");
-  const suffix = randomBytes(8).toString("hex");
-  return `coa/products/${productId}/${stamp}-${suffix}.pdf`;
-}

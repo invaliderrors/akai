@@ -37,14 +37,6 @@ export const productKindSchema = z.enum(["SIMPLE", "PACK"]);
 export type ProductKind = z.infer<typeof productKindSchema>;
 
 /**
- * The physical form a product ships in — the FORMA cell of the storefront's
- * spec table. Closed, so every label a shopper sees is a translated one.
- * Mirrors the Prisma `ProductForm` enum.
- */
-export const productFormSchema = z.enum(["LYOPHILIZED", "SOLUTION", "CAPSULE", "OTHER"]);
-export type ProductForm = z.infer<typeof productFormSchema>;
-
-/**
  * Order lifecycle. The OrdersModule state machine THROWS on an illegal
  * transition rather than coercing (spec §13) — The provider delivers events out of
  * order, and coercion is how a refunded order silently becomes PAID again.
@@ -346,8 +338,9 @@ export const translationFailureReasonSchema = z.enum([
 export type TranslationFailureReason = z.infer<typeof translationFailureReasonSchema>;
 
 /**
- * Tax class. Supplements are reduced-rate in some member states and standard in
- * others, so the class is a per-product property, not a global constant.
+ * Tax class. Clothing is standard-rated almost everywhere, but a few goods fall
+ * under a reduced class in some member states, so the class is a per-product
+ * property, not a global constant.
  * ZERO_RATED covers B2B reverse charge.
  */
 export const taxClassSchema = z.enum(["STANDARD", "REDUCED", "ZERO_RATED"]);

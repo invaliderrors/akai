@@ -41,8 +41,8 @@ describe("AdminAuditService — diff construction", () => {
     const { service } = buildService();
 
     const diff = service.buildDiff(
-      { slug: "bpc-157", status: "DRAFT", priceGross: 4999 },
-      { slug: "bpc-157", status: "ACTIVE", priceGross: 4999 },
+      { slug: "hoodie-kumo", status: "DRAFT", priceGross: 4999 },
+      { slug: "hoodie-kumo", status: "ACTIVE", priceGross: 4999 },
     );
 
     // A full before/after pair per row would make the audit log a second copy of
@@ -53,10 +53,10 @@ describe("AdminAuditService — diff construction", () => {
 
   it("treats a create (before: null) as every key changing", () => {
     const { service } = buildService();
-    const diff = service.buildDiff(null, { slug: "tb-500", priceGross: 8999 });
+    const diff = service.buildDiff(null, { slug: "cargo-pants", priceGross: 8999 });
 
     expect(Object.keys(diff).sort()).toEqual(["priceGross", "slug"]);
-    expect(diff["slug"]).toEqual({ before: null, after: "tb-500" });
+    expect(diff["slug"]).toEqual({ before: null, after: "cargo-pants" });
   });
 
   it("compares structurally, so an unchanged nested object is not logged", () => {
@@ -150,7 +150,7 @@ describe("AdminAuditService — writing", () => {
       entityType: "y".repeat(200),
       entityId: "z".repeat(200),
       before: null,
-      after: { slug: "bpc-157" },
+      after: { slug: "hoodie-kumo" },
     });
 
     expect(create).toHaveBeenCalledTimes(1);

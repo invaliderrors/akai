@@ -392,7 +392,6 @@ export class OrdersService {
             unitPriceGross,
             taxRateBps: await resolveTaxBps(variant.product.taxClass),
             lineDiscount: ZERO,
-            batchLotCode: null,
             packProductId,
             packInstanceId,
           },

@@ -211,7 +211,7 @@ function orderConfirmation(): EmailPayloadFor<"order-confirmation"> {
     placedAt: "2026-07-20T10:00:00.000Z",
     lines: [
       {
-        name: "Creatine Monohydrate",
+        name: "Oversized Tee",
         variantName: "300 g",
         quantity: 2,
         unitPrice: { amount: toMinor(2499), currency: "EUR" },

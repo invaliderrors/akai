@@ -72,7 +72,7 @@ const TEST_ENV: NodeJS.ProcessEnv = {
   EMAIL_FROM: "no-reply@example.com",
   S3_ENDPOINT: "http://localhost:9000",
   S3_BUCKET: "akai-media",
-  S3_BUCKET_COA: "akai-coa",
+  S3_BUCKET_PRIVATE: "akai-private",
   S3_ACCESS_KEY_ID: "key",
   S3_SECRET_ACCESS_KEY: "secret",
   CORS_ALLOWED_ORIGINS: "http://localhost:3000",
@@ -159,14 +159,14 @@ describe.skipIf(!isDockerAvailable())("Invoice numbering — gap-free under roll
 
   async function seedCatalog(): Promise<void> {
     await db.prisma.product.create({
-      data: { id: PRODUCT_ID, slug: "creatine-monohydrate", status: "ACTIVE" },
+      data: { id: PRODUCT_ID, slug: "oversized-tee", status: "ACTIVE" },
     });
 
     await db.prisma.productVariant.create({
       data: {
         id: VARIANT_ID,
         productId: PRODUCT_ID,
-        sku: "AK-CRE-500",
+        sku: "AK-TEE-BLK-L",
         currency: "EUR",
         priceNet: 4131,
         priceTax: 868,

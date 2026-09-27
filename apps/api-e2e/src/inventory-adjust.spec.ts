@@ -48,13 +48,13 @@ describe.skipIf(!isDockerAvailable())("Inventory adjust — expectedOnHand and u
       data: { id: ACTOR_ID, email: "admin@example.com", role: "ADMIN" },
     });
     await db.prisma.product.create({
-      data: { id: PRODUCT_ID, slug: "creatine-monohydrate", status: "ACTIVE" },
+      data: { id: PRODUCT_ID, slug: "oversized-tee", status: "ACTIVE" },
     });
     await db.prisma.productVariant.create({
       data: {
         id: VARIANT_ID,
         productId: PRODUCT_ID,
-        sku: "AK-CRE-500",
+        sku: "AK-TEE-BLK-L",
         currency: "EUR",
         priceNet: 4131,
         priceTax: 868,

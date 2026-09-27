@@ -1,6 +1,5 @@
 import { z } from "zod";
 import {
-  productFormSchema,
   productKindSchema,
   productStatusSchema,
   taxClassSchema,
@@ -15,7 +14,7 @@ import {
 import { currencyCodeSchema, nonNegativeMinorSchema, toMinor, type Minor } from "./money";
 
 /**
- * Catalog: products, variants, prices, media, categories, batches, inventory.
+ * Catalog: products, variants, prices, media, categories, inventory.
  *
  * The central modelling decision: the VARIANT is the sellable unit. It carries
  * the SKU, the price, the weight and the stock. A single-variant product still
@@ -127,28 +126,6 @@ export const priceSchema = z
   .strict();
 
 export type Price = z.infer<typeof priceSchema>;
-
-/**
- * Batch / lot traceability.
- *
- * Not optional garnish: the live Spanish FAQ already promises "cada pedido
- * incluye el ID de lote y acceso al certificado de análisis". That is a
- * contractual commitment, so the shipped batch is recorded on the order line.
- */
-export const batchSchema = z
-  .object({
-    id: idSchema,
-    lotCode: z.string().min(1).max(64),
-    purityPercent: z.number().min(0).max(100),
-    testedAt: isoDateTimeSchema,
-    testMethod: z.string().max(64),
-    /** Signed, expiring URL. Null when the COA is not yet published. */
-    coaUrl: z.string().url().nullable(),
-    expiresAt: isoDateTimeSchema.nullable(),
-  })
-  .strict();
-
-export type Batch = z.infer<typeof batchSchema>;
 
 /**
  * Stock for one variant.
@@ -268,15 +245,14 @@ export const productVariantSchema = z
     id: idSchema,
     productId: idSchema,
     sku: z.string().min(1).max(64),
-    /** e.g. { es: "10 mg", en: "10 mg" }. Null for single-variant products. */
+    /** e.g. { es: "M / Negro", en: "M / Black" }. Null for single-variant products. */
     name: z.record(localeSchema, z.string().max(120)).nullable(),
-    /** Option values keyed by option name, e.g. { size: "10mg" }. */
+    /** Option values keyed by option name, e.g. { size: "M", color: "black" }. */
     options: z.record(z.string().max(40), z.string().max(80)),
     price: priceSchema,
     /** Grams. Non-null on physical goods — weight-based shipping depends on it. */
     weightGrams: z.number().int().positive().nullable(),
     inventory: inventoryItemSchema,
-    batch: batchSchema.nullable(),
     /**
      * The image for THIS variant. Null when the variant has none, which is the
      * normal case for a single-variant product that relies on the gallery.
@@ -357,8 +333,8 @@ export const productAddOnRefSchema = z
     /**
      * The add-on VARIANT this page arrives with already selected, or null.
      *
-     * ON THE EDGE, NOT ON THE ADD-ON. "Free bacteriostatic water with this
-     * peptide" is a fact about the PAIR: the same water may be free beside one
+     * ON THE EDGE, NOT ON THE ADD-ON. "A free tote with this
+     * hoodie" is a fact about the PAIR: the same tote may be free beside one
      * product, an upsell beside another, and absent from a third. This table is
      * an explicit join precisely because the edge carries data — `sortOrder`
      * lives here for the same reason.
@@ -399,8 +375,8 @@ export const productPackComponentRefSchema = z
     sortOrder: z.number().int().min(0),
     variantId: idSchema,
     /**
-     * How many of THIS component one pack contains — "5x Reta 20mg" as one
-     * slot, not five identical slots.
+     * How many of THIS component one pack contains — "3x Tee Black M" as one
+     * slot, not three identical slots.
      *
      * DEFAULTED for the same rollout reason `listed`/`offerOnNewProducts`
      * give on `productSchema` below: a response schema field, and the
@@ -519,32 +495,6 @@ export const productSchema = z
      * DEFAULTED for the same rollout reason as `addOns` above.
      */
     packComponents: z.array(productPackComponentRefSchema).default([]),
-    /**
-     * The form the product ships in — the FORMA cell of the storefront spec
-     * table. DEFAULTED for the same rollout reason as `listed` above; the
-     * column default is the same value.
-     */
-    form: productFormSchema.default("LYOPHILIZED"),
-    /**
-     * The admin's "show the certificate of analysis" switch. A product has ONE
-     * certificate (uploaded per product, not per lot), and the admin decides
-     * whether the shop offers it — some certificates are uploaded before they
-     * are ready to publish. DEFAULTED for the same rollout reason as `listed`
-     * above; the column default is the same value.
-     *
-     * ADMIN ONLY: `publicProductSchema` omits it and exposes the derived
-     * `hasCoa` instead.
-     */
-    showCoa: z.boolean().default(false),
-    /**
-     * The product's certificate of analysis, as a signed URL minted fresh on
-     * every ADMIN read so the dashboard can link to the current file. Null
-     * when none is uploaded. It is a signed URL into a PRIVATE bucket, so the
-     * public projection omits it: shoppers go through the stable
-     * `GET /v1/products/:slug/coa` redirect, which signs at click time.
-     * DEFAULTED for the same rollout reason as `listed` above.
-     */
-    coaUrl: z.string().url().nullable().default(null),
     createdAt: isoDateTimeSchema,
     updatedAt: isoDateTimeSchema,
     /** Soft delete. A non-null value hides the product everywhere but preserves order history. */
@@ -586,28 +536,10 @@ export const publicInventorySchema = z
 
 export type PublicInventory = z.infer<typeof publicInventorySchema>;
 
-/**
- * A batch as a shopper may see it: the lot record WITHOUT a signed COA URL.
- *
- * `coaUrl` is a one-hour signed URL, and the product page is ISR-cached — so
- * embedding it in a page served a dead link to anyone who arrived after the
- * signature expired. It is omitted outright.
- *
- * NO `hasCoa` HERE EITHER. The certificate the shop offers is the PRODUCT's
- * (`publicProductSchema.hasCoa`), uploaded per product with a visibility
- * switch; a batch's own certificate is admin data and no longer drives the
- * storefront. `.strict()`, so a stray per-lot flag fails loudly rather than
- * being read by a component that should not.
- */
-export const publicBatchSchema = batchSchema.omit({ coaUrl: true }).strict();
-
-export type PublicBatch = z.infer<typeof publicBatchSchema>;
-
-/** A variant with its stock and batch narrowed to the customer-safe projection. */
+/** A variant with its stock narrowed to the customer-safe projection. */
 export const publicProductVariantSchema = productVariantSchema
   .extend({
     inventory: publicInventorySchema,
-    batch: publicBatchSchema.nullable(),
   })
   .strict();
 
@@ -616,26 +548,13 @@ export type PublicProductVariant = z.infer<typeof publicProductVariantSchema>;
 /**
  * THE shape served by `GET /v1/products` and `GET /v1/products/:slug`.
  *
- * Identical to `productSchema` except for the narrowed inventory and batch,
- * and the certificate: the admin's `showCoa` switch and signed `coaUrl` are
- * replaced by the derived `hasCoa`. It is a separate declaration rather than a `.omit()` chain at the call site so that
+ * Identical to `productSchema` except for the narrowed inventory. It is a
+ * separate declaration rather than a `.omit()` chain at the call site so that
  * "what does the public see?" is answerable by reading one schema.
  */
 export const publicProductSchema = productSchema
-  .omit({ showCoa: true, coaUrl: true })
   .extend({
     variants: z.array(publicProductVariantSchema).min(1),
-    /**
-     * Does the shop offer this product's certificate of analysis? TRUE exactly
-     * when the admin has uploaded one AND switched "show" on. Never the object
-     * key and never a signed URL: the page is ISR-cached and a signed URL
-     * expires, so the storefront links to the stable
-     * `GET /v1/products/:slug/coa` redirect, which signs at click time.
-     *
-     * DEFAULTED so a new storefront still parses an older API that does not
-     * send it — the button simply stays hidden until the API catches up.
-     */
-    hasCoa: z.boolean().default(false),
   })
   .strict();
 
@@ -837,20 +756,6 @@ export const createProductSchema = z
      * `offerOnNewProducts` above gives.
      */
     kind: productKindSchema.optional(),
-    /**
-     * The FORMA cell. `.optional()`, not `.default("LYOPHILIZED")`, for the
-     * exact reason `offerOnNewProducts` above gives — the column default
-     * applies when it is omitted on create.
-     */
-    form: productFormSchema.optional(),
-    /**
-     * Whether the shop offers the product's certificate of analysis. Saved
-     * with the product; the FILE itself is uploaded separately
-     * (`POST /v1/admin/products/:id/coa/...`), because a product has no id to
-     * key it under until it is created. `.optional()`, not `.default(false)`,
-     * for the exact reason `offerOnNewProducts` above gives.
-     */
-    showCoa: z.boolean().optional(),
     /**
      * The 2-6 products this pack is made of, each with its pinned variant.
      * Required (and 2-6 long) only when `kind === "PACK"` — that cross-field

@@ -24,7 +24,7 @@ function validRow(slug: string) {
   return {
     slug,
     translations: [
-      { locale: "es", name: "BPC-157", shortDescription: "", description: "" },
+      { locale: "es", name: "Hoodie Kumo", shortDescription: "", description: "" },
     ],
     variants: [{ sku: `${slug}-10`, priceGross: 4999, currency: "EUR" }],
   };
@@ -85,7 +85,7 @@ describe("AdminProductsService — import", () => {
     const { service } = buildService(upsert);
 
     const request = bulkImportRequestSchema.parse({
-      products: [validRow("bpc-157"), validRow("tb-500")],
+      products: [validRow("hoodie-kumo"), validRow("cargo-pants")],
     });
     await service.importProducts(ACTOR, request);
 
@@ -96,7 +96,7 @@ describe("AdminProductsService — import", () => {
 
   it("continues past a failing row and reports it individually", async () => {
     const upsert = vi.fn(async (input: UpsertProductInput) => {
-      if (input.slug === "tb-500") {
+      if (input.slug === "cargo-pants") {
         throw new Error("SKU already exists");
       }
       return created(input.slug);
@@ -104,7 +104,7 @@ describe("AdminProductsService — import", () => {
     const { service } = buildService(upsert);
 
     const request = bulkImportRequestSchema.parse({
-      products: [validRow("bpc-157"), validRow("tb-500"), validRow("ghk-cu")],
+      products: [validRow("hoodie-kumo"), validRow("cargo-pants"), validRow("coach-jacket")],
     });
     const report = await service.importProducts(ACTOR, request);
 
@@ -112,8 +112,8 @@ describe("AdminProductsService — import", () => {
     // the admin must be told exactly which row failed.
     expect(report.created).toBe(2);
     expect(report.failed).toBe(1);
-    expect(report.rows.find((row) => row.slug === "tb-500")).toEqual({
-      slug: "tb-500",
+    expect(report.rows.find((row) => row.slug === "cargo-pants")).toEqual({
+      slug: "cargo-pants",
       outcome: "failed",
       error: "SKU already exists",
     });
@@ -125,7 +125,7 @@ describe("AdminProductsService — import", () => {
     });
     const { service } = buildService(upsert);
 
-    const request = bulkImportRequestSchema.parse({ products: [validRow("bpc-157")] });
+    const request = bulkImportRequestSchema.parse({ products: [validRow("hoodie-kumo")] });
     const report = await service.importProducts(ACTOR, request);
 
     // Stringifying an arbitrary throw is how a driver's internals reach an HTTP
@@ -140,7 +140,7 @@ describe("AdminProductsService — import", () => {
 
     const request = bulkImportRequestSchema.parse({
       dryRun: true,
-      products: [validRow("bpc-157")],
+      products: [validRow("hoodie-kumo")],
     });
     const report = await service.importProducts(ACTOR, request);
 
@@ -153,7 +153,7 @@ describe("AdminProductsService — import", () => {
     const upsert = vi.fn(async (input: UpsertProductInput) => created(input.slug));
     const { service, auditCreate } = buildService(upsert);
 
-    const request = bulkImportRequestSchema.parse({ products: [validRow("bpc-157")] });
+    const request = bulkImportRequestSchema.parse({ products: [validRow("hoodie-kumo")] });
     await service.importProducts(ACTOR, request);
 
     const actions = auditCreate.mock.calls.map((call): unknown => call[0].data["action"]);
@@ -164,7 +164,7 @@ describe("AdminProductsService — import", () => {
       (call) => call[0].data["action"] === "product.create",
     );
     expect(rowAudit?.[0].data["actorId"]).toBe(ACTOR.customerId);
-    expect(rowAudit?.[0].data["entityId"]).toBe("id-bpc-157");
+    expect(rowAudit?.[0].data["entityId"]).toBe("id-hoodie-kumo");
   });
 
   it("audits an update with a before snapshot so the change is reconstructable", async () => {
@@ -181,7 +181,7 @@ describe("AdminProductsService — import", () => {
         ],
         variants: [
           {
-            sku: "bpc-157-10",
+            sku: "hoodie-kumo-m",
             priceGross: 3999,
             compareAtGross: null,
             currency: "EUR",
@@ -195,7 +195,7 @@ describe("AdminProductsService — import", () => {
     }));
     const { service, auditCreate } = buildService(upsert);
 
-    const request = bulkImportRequestSchema.parse({ products: [validRow("bpc-157")] });
+    const request = bulkImportRequestSchema.parse({ products: [validRow("hoodie-kumo")] });
     await service.importProducts(ACTOR, request);
 
     const update = auditCreate.mock.calls.find(
@@ -224,7 +224,7 @@ describe("bulkImportRequestSchema", () => {
     // Two rows with the same slug would race through the upsert, with whichever
     // landed last silently winning.
     expect(() =>
-      bulkImportRequestSchema.parse({ products: [validRow("bpc-157"), validRow("bpc-157")] }),
+      bulkImportRequestSchema.parse({ products: [validRow("hoodie-kumo"), validRow("hoodie-kumo")] }),
     ).toThrow();
   });
 
@@ -233,7 +233,7 @@ describe("bulkImportRequestSchema", () => {
       bulkImportRequestSchema.parse({
         products: [
           {
-            ...validRow("bpc-157"),
+            ...validRow("hoodie-kumo"),
             variants: [
               { sku: "dup", priceGross: 100, currency: "EUR" },
               { sku: "dup", priceGross: 200, currency: "EUR" },
@@ -251,7 +251,7 @@ describe("bulkImportRequestSchema", () => {
       bulkImportRequestSchema.parse({
         products: [
           {
-            ...validRow("bpc-157"),
+            ...validRow("hoodie-kumo"),
             variants: [
               { sku: "a", priceGross: 5000, compareAtGross: 4000, currency: "EUR" },
             ],
@@ -268,7 +268,7 @@ describe("bulkImportRequestSchema", () => {
       bulkImportRequestSchema.parse({
         products: [
           {
-            ...validRow("bpc-157"),
+            ...validRow("hoodie-kumo"),
             variants: [{ sku: "a", priceGross: 49.99, currency: "EUR" }],
           },
         ],
@@ -279,7 +279,7 @@ describe("bulkImportRequestSchema", () => {
   it("rejects unknown keys instead of silently dropping them", () => {
     expect(() =>
       bulkImportRequestSchema.parse({
-        products: [{ ...validRow("bpc-157"), isAdmin: true }],
+        products: [{ ...validRow("hoodie-kumo"), isAdmin: true }],
       }),
     ).toThrow();
   });
@@ -297,12 +297,12 @@ describe("bulkImportRequestSchema", () => {
   it("requires at least one variant and one translation", () => {
     expect(() =>
       bulkImportRequestSchema.parse({
-        products: [{ ...validRow("bpc-157"), variants: [] }],
+        products: [{ ...validRow("hoodie-kumo"), variants: [] }],
       }),
     ).toThrow();
     expect(() =>
       bulkImportRequestSchema.parse({
-        products: [{ ...validRow("bpc-157"), translations: [] }],
+        products: [{ ...validRow("hoodie-kumo"), translations: [] }],
       }),
     ).toThrow();
   });

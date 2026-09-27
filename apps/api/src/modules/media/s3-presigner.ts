@@ -95,8 +95,8 @@ export function credentialScope(dateStamp: string, region: string): string {
  * documentation, and so the test asserts the STRUCTURE rather than merely that
  * some 64-character hex string came out.
  *
- * `method` defaults to `"PUT"` — the only verb this module signed until COA
- * downloads needed a signed `"GET"` too — so the existing test (and every
+ * `method` defaults to `"PUT"` — the only verb this module signed until private
+ * downloads (shipping labels) needed a signed `"GET"` too — so the existing test (and every
  * existing call site) sees no change.
  */
 export function canonicalRequest(
@@ -201,7 +201,7 @@ export function presignPutUrl(input: PresignInput): string {
 /**
  * A presigned URL that reads exactly one object.
  *
- * The only way an object in a PRIVATE bucket (`S3_BUCKET_COA`, unlike
+ * The only way an object in a PRIVATE bucket (`S3_BUCKET_PRIVATE`, unlike
  * `S3_BUCKET`, carries no anonymous-download policy) becomes readable to a
  * browser: the signature IS the authorisation, scoped to one object and one
  * expiry, so a leaked link is worthless once `expiresInSeconds` passes.

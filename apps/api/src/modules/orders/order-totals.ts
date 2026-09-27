@@ -48,10 +48,9 @@ export interface PricedLine {
   readonly taxRateBps: number;
   /** Gross discount applied to this whole line (not per unit). */
   readonly lineDiscount: Minor;
-  readonly batchLotCode: string | null;
   /**
    * Set together, or both null. Pure passthrough — never read by any
-   * computation in this file, exactly like `batchLotCode` beside it. Carried
+   * computation in this file. Carried
    * from `CartItem` through to `OrderItem` purely so a pack purchase's lines
    * stay grouped for display after checkout.
    */
@@ -74,7 +73,6 @@ export interface OrderLineSnapshot {
   readonly taxAmount: Minor;
   readonly lineTotalNet: Minor;
   readonly lineTotalGross: Minor;
-  readonly batchLotCode: string | null;
   readonly packProductId: string | null;
   readonly packInstanceId: string | null;
 }
@@ -165,7 +163,6 @@ function computeLine(line: PricedLine): LineComputation {
       taxAmount: after.tax,
       lineTotalNet: after.net,
       lineTotalGross: grossAfterDiscount,
-      batchLotCode: line.batchLotCode,
       packProductId: line.packProductId,
       packInstanceId: line.packInstanceId,
     },

@@ -341,16 +341,16 @@ export const serverEnvShape = z
     S3_ACCESS_KEY_ID: z.string().min(1),
     S3_SECRET_ACCESS_KEY: z.string().min(1),
     /**
-     * A SEPARATE, PRIVATE bucket for certificates of analysis — never
-     * `S3_BUCKET`. That bucket has an anonymous-download policy (product
-     * photos are meant to be public), so a COA PDF placed there would be
+     * A SEPARATE, PRIVATE bucket for documents that must never be public —
+     * never `S3_BUCKET`. That bucket has an anonymous-download policy (product
+     * photos are meant to be public), so a private PDF placed there would be
      * exactly as public as a product photo no matter how its object key was
      * signed: MinIO's bucket-wide policy never checks for a signature once
-     * anonymous downloads are allowed at all. `BatchesModule` writes here with
-     * a signed PUT; `product.mapper.ts` reads from here with a signed GET —
-     * the only two operations this bucket ever needs to authorise.
+     * anonymous downloads are allowed at all. Today it holds the Sendcloud
+     * shipping labels (`labels/{orderId}/{parcelId}.pdf`), written server-side
+     * by the label service and read back through short-lived signed GETs.
      */
-    S3_BUCKET_COA: z.string().min(1),
+    S3_BUCKET_PRIVATE: z.string().min(1),
 
     // --- Translation -------------------------------------------------------
     /**

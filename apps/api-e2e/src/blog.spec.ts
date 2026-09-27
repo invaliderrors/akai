@@ -54,7 +54,7 @@ const TEST_ENV: NodeJS.ProcessEnv = {
   EMAIL_FROM: "no-reply@example.com",
   S3_ENDPOINT: "http://localhost:9000",
   S3_BUCKET: "akai-media",
-  S3_BUCKET_COA: "akai-coa",
+  S3_BUCKET_PRIVATE: "akai-private",
   S3_ACCESS_KEY_ID: "key",
   S3_SECRET_ACCESS_KEY: "secret",
   CORS_ALLOWED_ORIGINS: "http://localhost:3000",
@@ -65,15 +65,15 @@ const TEST_ENV: NodeJS.ProcessEnv = {
 
 const BODY_ES = {
   locale: "es",
-  title: "Qué es BPC-157",
-  excerpt: "Una introducción al péptido.",
+  title: "Cómo combinar un oversize",
+  excerpt: "Una guía rápida de estilo.",
   bodyHtml: "<h2>Origen</h2><p>Texto<script>alert(1)</script></p>",
 };
 
 const BODY_EN = {
   locale: "en",
-  title: "What is BPC-157",
-  excerpt: "An introduction to the peptide.",
+  title: "How to style an oversized tee",
+  excerpt: "A quick styling guide.",
   bodyHtml: "<p>Text</p>",
 };
 
@@ -139,7 +139,7 @@ describe.skipIf(!isDockerAvailable())("Blog — public visibility, D8c and admin
     const response = await http()
       .post(`/${API_GLOBAL_PREFIX}/admin/blog/posts`)
       .set("authorization", `Bearer ${staffToken}`)
-      .send({ slug, category: "PEPTIDES", translations });
+      .send({ slug, category: "STYLE_GUIDES", translations });
     expect(response.status).toBe(201);
     return adminBlogPostSchema.parse(response.body);
   }
@@ -175,14 +175,14 @@ describe.skipIf(!isDockerAvailable())("Blog — public visibility, D8c and admin
   }
 
   it("keeps a draft off every public read, and shows it once published", async () => {
-    const draft = await createPost("que-es-bpc-157", [BODY_ES]);
+    const draft = await createPost("como-combinar-un-oversize", [BODY_ES]);
     expect(draft.status).toBe("DRAFT");
     expect(draft.publishedAt).toBeNull();
     // Sanitised on write.
     expect(draft.translations[0]?.bodyHtml).toBe("<h2>Origen</h2><p>Texto</p>");
 
     expect((await publicList()).items).toHaveLength(0);
-    const hidden = await http().get(`/${API_GLOBAL_PREFIX}/blog/posts/que-es-bpc-157`);
+    const hidden = await http().get(`/${API_GLOBAL_PREFIX}/blog/posts/como-combinar-un-oversize`);
     expect(hidden.status).toBe(404);
 
     const published = await publish(draft.id);
@@ -190,8 +190,8 @@ describe.skipIf(!isDockerAvailable())("Blog — public visibility, D8c and admin
     expect(published.publishedAt).not.toBeNull();
 
     const list = await publicList();
-    expect(list.items.map((item) => item.slug)).toEqual(["que-es-bpc-157"]);
-    const detail = await http().get(`/${API_GLOBAL_PREFIX}/blog/posts/que-es-bpc-157`);
+    expect(list.items.map((item) => item.slug)).toEqual(["como-combinar-un-oversize"]);
+    const detail = await http().get(`/${API_GLOBAL_PREFIX}/blog/posts/como-combinar-un-oversize`);
     expect(detail.status).toBe(200);
     expect(publicBlogPostSchema.parse(detail.body).translations[0]?.title).toBe(BODY_ES.title);
   });

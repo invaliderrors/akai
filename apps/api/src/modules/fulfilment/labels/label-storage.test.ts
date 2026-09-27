@@ -5,7 +5,7 @@ import { LabelStorageError, S3LabelStorage, labelObjectKey } from "./label-stora
 const NOW = new Date("2026-09-24T10:00:00.000Z");
 const OPTIONS = {
   endpoint: "http://localhost:9000",
-  bucket: "akai-coa",
+  bucket: "akai-private",
   region: "us-east-1",
   accessKeyId: "key",
   secretAccessKey: "secret",
@@ -32,7 +32,7 @@ describe("S3LabelStorage", () => {
     const [url, init] = fetchImpl.mock.calls[0] ?? [];
     const parsed = new URL(String(url));
     expect(parsed.origin).toBe("http://localhost:9000");
-    expect(parsed.pathname).toBe("/akai-coa/labels/o/1.pdf");
+    expect(parsed.pathname).toBe("/akai-private/labels/o/1.pdf");
     expect(parsed.searchParams.get("X-Amz-Expires")).toBe("60");
     expect(parsed.searchParams.get("X-Amz-Signature")).toMatch(/^[0-9a-f]{64}$/);
     expect(init?.method).toBe("PUT");
@@ -70,7 +70,7 @@ describe("S3LabelStorage", () => {
     const fetchImpl = vi.fn<typeof fetch>();
     const url = new URL(storageWith(fetchImpl).signedUrl("labels/o/1.pdf"));
 
-    expect(url.pathname).toBe("/akai-coa/labels/o/1.pdf");
+    expect(url.pathname).toBe("/akai-private/labels/o/1.pdf");
     expect(url.searchParams.get("X-Amz-Expires")).toBe("300");
     expect(fetchImpl).not.toHaveBeenCalled();
   });

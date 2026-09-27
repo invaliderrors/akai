@@ -16,15 +16,14 @@ const VAT_21 = 2100;
 function line(overrides: Partial<PricedLine> = {}): PricedLine {
   return {
     variantId: "11111111-1111-4111-8111-111111111111",
-    productName: "Creatine Monohydrate",
-    variantName: "500 g",
-    sku: "AK-CRE-500",
+    productName: "Oversized Tee",
+    variantName: "L",
+    sku: "AK-TEE-BLK-L",
     imageUrl: null,
     quantity: 1,
     unitPriceGross: toMinor(4999),
     taxRateBps: VAT_21,
     lineDiscount: toMinor(0),
-    batchLotCode: null,
     packProductId: null,
     packInstanceId: null,
     ...overrides,

@@ -59,7 +59,7 @@ const TEST_ENV: NodeJS.ProcessEnv = {
   SMTP_URL: "smtp://localhost:1025",
   EMAIL_FROM: "no-reply@example.com",
   S3_BUCKET: "akai-media",
-  S3_BUCKET_COA: "akai-coa",
+  S3_BUCKET_PRIVATE: "akai-private",
   S3_ACCESS_KEY_ID: "key",
   S3_SECRET_ACCESS_KEY: "secret",
   CORS_ALLOWED_ORIGINS: "http://localhost:3000",
@@ -249,9 +249,9 @@ describe.skipIf(!isDockerAvailable())("Sendcloud labels — bulk generate → ou
         items: {
           create: [
             {
-              productName: "Creatine Monohydrate",
-              variantName: "500 g",
-              sku: "AK-CRE-500",
+              productName: "Oversized Tee",
+              variantName: "L",
+              sku: "AK-TEE-BLK-L",
               quantity: 2,
               unitPriceNet: 4131,
               unitPriceGross: 4999,
@@ -326,7 +326,7 @@ describe.skipIf(!isDockerAvailable())("Sendcloud labels — bulk generate → ou
     for (const shipment of shipments) {
       expect(shipment).toMatchObject({ provider: "SENDCLOUD", status: "LABEL_CREATED" });
       expect(shipment.items).toEqual([expect.objectContaining({ quantity: 2 })]);
-      const key = `akai-coa/${shipment.labelObjectKey ?? "missing"}`;
+      const key = `akai-private/${shipment.labelObjectKey ?? "missing"}`;
       expect(store.objects.has(key)).toBe(true);
       expect(store.contentTypes.get(key)).toBe("application/pdf");
     }
@@ -370,7 +370,7 @@ describe.skipIf(!isDockerAvailable())("Sendcloud labels — bulk generate → ou
     expect(download.status).toBe(302);
     const location = new URL(String(download.headers["location"]));
     expect(location.origin).toBe(store.endpoint);
-    expect(location.pathname).toBe(`/akai-coa/labels/${INLINE}/${String(PARCEL[INLINE])}.pdf`);
+    expect(location.pathname).toBe(`/akai-private/labels/${INLINE}/${String(PARCEL[INLINE])}.pdf`);
     expect(location.searchParams.get("X-Amz-Signature")).toMatch(/^[0-9a-f]{64}$/);
 
     // 5. Cancel (Sendcloud 202 queued): CANCELLED, order back to PAID, and the
