@@ -434,7 +434,7 @@ export class AuthService {
     await this.repository.upsertEmailOtp({
       customerId: customer.id,
       // Only the digest is stored, and it is bound to the customer. See the
-      // 20260910000300_email_otp migration for why `auth_token` was refused.
+      // `EmailOtp` doc comment in schema.prisma for why `auth_token` was refused.
       codeHash: hashLoginCode(customer.id, code),
       expiresAt,
     });

@@ -22,7 +22,7 @@ import { isDockerAvailable, startTestDatabase, type TestDatabase } from "./harne
 /**
  * THE GAP-FREE INVOICE NUMBER, PROVEN AGAINST REAL POSTGRES.
  *
- * `20260720000100_invariants_sequences_grants` states the requirement in its own
+ * The platform's invariants migration states the requirement in its own
  * words: "INVOICE numbers may NOT have gaps — that is a legal requirement in most
  * EU member states". The implementation it shipped could not keep that promise,
  * because `next_invoice_number()` is `nextval` underneath and NEXTVAL IS NOT

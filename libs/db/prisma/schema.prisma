@@ -686,7 +686,7 @@ model InventoryItem {
   @@map("inventory_item")
 }
 
-/// APPEND-ONLY. The runtime role has INSERT + SELECT only (see migration).
+/// APPEND-ONLY. The runtime role has INSERT + SELECT only (see `20260927000100_invariants`).
 /// Current stock is always reconstructable by replaying these.
 model InventoryLedgerEntry {
   id        String            @id @default(uuid()) @db.Uuid
@@ -1737,7 +1737,7 @@ model ProviderEvent {
   @@map("provider_event")
 }
 
-/// APPEND-ONLY. Runtime role holds INSERT + SELECT only (see migration).
+/// APPEND-ONLY. Runtime role holds INSERT + SELECT only (see `20260927000100_invariants`).
 /// Written in the SAME transaction as the change it describes.
 model AuditLogEntry {
   id String @id @default(uuid()) @db.Uuid

@@ -26,7 +26,7 @@ export class PrismaSiteSettingsRepository implements SiteSettingsRepository {
 
   /**
    * `upsert`, not `findUniqueOrThrow`. The row is seeded by its own migration
-   * (`20260915110000_site_settings`), but ANYTHING that can empty the table —
+   * (`20260927000100_invariants`), but ANYTHING that can empty the table —
    * a restore from a dump taken before that migration, a reset between
    * integration-test runs — must not turn every storefront page load into a
    * 500. Reading is therefore self-seeding the same way `allocate_invoice_number()`
