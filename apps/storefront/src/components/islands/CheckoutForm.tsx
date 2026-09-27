@@ -7,7 +7,7 @@ import {
 import { formatMoney } from "@akai/money";
 import { useEffect, useMemo, useState, type SyntheticEvent } from "react";
 
-import type { Messages } from "@/i18n/messages";
+import { errorMessage, type Messages } from "@/i18n/messages";
 import { CartClient } from "@/lib/cart-client";
 import { pickLocaleText } from "@/lib/view";
 
@@ -17,6 +17,7 @@ interface Props {
   readonly cartHref: string;
   readonly termsVersion: string;
   readonly t: Messages["checkout"];
+  readonly errors: Messages["errors"];
 }
 
 const FIELDS = ["firstName", "lastName", "line1", "houseNumber", "line2", "city", "postalCode", "region", "phone"] as const;
@@ -30,7 +31,7 @@ const OPTIONAL: ReadonlySet<Field> = new Set(["line2", "region"]);
  * point search the API does not expose yet, and checkout would reject them
  * without a `servicePointId`.
  */
-export default function CheckoutForm({ apiUrl, locale, cartHref, termsVersion, t }: Props) {
+export default function CheckoutForm({ apiUrl, locale, cartHref, termsVersion, t, errors }: Props) {
   const client = useMemo(() => new CartClient(apiUrl, locale), [apiUrl, locale]);
   const countries = useMemo(() => {
     const names = new Intl.DisplayNames([locale], { type: "region" });
@@ -65,7 +66,7 @@ export default function CheckoutForm({ apiUrl, locale, cartHref, termsVersion, t
       setOptions(home);
       setRateId(home[0]?.rateId ?? null);
     } catch (cause: unknown) {
-      setError(cause instanceof Error ? cause.message : t.failed);
+      setError(errorMessage(errors, cause));
     }
   }
 
@@ -102,7 +103,7 @@ export default function CheckoutForm({ apiUrl, locale, cartHref, termsVersion, t
       window.location.assign(session.checkoutUrl);
     } catch (cause: unknown) {
       setSubmitting(false);
-      setError(cause instanceof Error ? cause.message : t.failed);
+      setError(errorMessage(errors, cause));
     }
   }
 

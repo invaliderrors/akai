@@ -12,11 +12,12 @@ interface Props {
   readonly checkoutHref: string;
   readonly productHrefBase: string;
   readonly t: Messages["cart"];
+  readonly problems: Messages["cartProblems"];
 }
 
 type State = { kind: "loading" } | { kind: "error" } | { kind: "ready"; cart: Cart | null };
 
-export default function CartView({ apiUrl, locale, shopHref, checkoutHref, productHrefBase, t }: Props) {
+export default function CartView({ apiUrl, locale, shopHref, checkoutHref, productHrefBase, t, problems }: Props) {
   const client = useMemo(() => new CartClient(apiUrl, locale), [apiUrl, locale]);
   const [state, setState] = useState<State>({ kind: "loading" });
   const [busy, setBusy] = useState(false);
@@ -58,7 +59,7 @@ export default function CartView({ apiUrl, locale, shopHref, checkoutHref, produ
   }
 
   const money = (amount: Minor) => formatMoney(amount, cart.totals.currency, locale);
-  const problemFor = (itemId: string) => cart.problems.find((problem) => problem.itemId === itemId);
+  const problemFor = (itemId: string) => cart.problems.find((problem) => problem.itemId === itemId)?.code;
 
   return (
     <div className="grid gap-10 lg:grid-cols-[1fr_22rem]">
@@ -73,7 +74,9 @@ export default function CartView({ apiUrl, locale, shopHref, checkoutHref, produ
                 {item.name}
               </a>
               {item.variantName && <p className="text-sm text-stone">{item.variantName}</p>}
-              {problemFor(item.id) && <p className="text-sm text-akai">{problemFor(item.id)?.message}</p>}
+              {problemFor(item.id) !== undefined && (
+                <p className="text-sm text-akai">{problems[problemFor(item.id) ?? "PRODUCT_UNAVAILABLE"]}</p>
+              )}
               <div className="mt-auto flex items-center gap-4">
                 {item.packInstanceId === null ? (
                   <select

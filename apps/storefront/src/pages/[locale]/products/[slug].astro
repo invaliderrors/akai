@@ -51,6 +51,7 @@ const gallery = [...product.media].sort((a, b) => a.sortOrder - b.sortOrder);
           variants={product.variants}
           cartHref={href(locale, "/cart")}
           t={t.product}
+          errors={t.errors}
         />
       </div>
 

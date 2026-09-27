@@ -2,7 +2,7 @@ import type { Locale, PublicProductVariant } from "@akai/contracts";
 import { formatMoney } from "@akai/money";
 import { useMemo, useState } from "react";
 
-import type { Messages } from "@/i18n/messages";
+import { errorMessage, type Messages } from "@/i18n/messages";
 import { CartClient } from "@/lib/cart-client";
 import { isSellable, pickLocaleText } from "@/lib/view";
 
@@ -12,6 +12,7 @@ interface Props {
   readonly variants: readonly PublicProductVariant[];
   readonly cartHref: string;
   readonly t: Messages["product"];
+  readonly errors: Messages["errors"];
 }
 
 type Status = "idle" | "adding" | "added" | "error";
@@ -21,7 +22,7 @@ function variantLabel(variant: PublicProductVariant, locale: Locale): string {
   return pickLocaleText(variant.name, locale) ?? (Object.values(variant.options).join(" · ") || variant.sku);
 }
 
-export default function AddToCart({ apiUrl, locale, variants, cartHref, t }: Props) {
+export default function AddToCart({ apiUrl, locale, variants, cartHref, t, errors }: Props) {
   const active = useMemo(() => variants.filter((variant) => variant.isActive), [variants]);
   const [selectedId, setSelectedId] = useState<string | null>(
     active.length === 1 ? (active[0]?.id ?? null) : (active.find(isSellable)?.id ?? null),
@@ -41,7 +42,7 @@ export default function AddToCart({ apiUrl, locale, variants, cartHref, t }: Pro
       setStatus("added");
     } catch (cause: unknown) {
       setStatus("error");
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(errorMessage(errors, cause));
     }
   }
 

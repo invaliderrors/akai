@@ -1,4 +1,4 @@
-import { errorEnvelopeSchema, type ErrorEnvelope } from "@akai/contracts";
+import { errorEnvelopeSchema, type ErrorCode, type ErrorEnvelope } from "@akai/contracts";
 import type { z } from "zod";
 
 /**
@@ -16,6 +16,11 @@ export class ApiError extends Error {
   ) {
     super(envelope?.error.message ?? `API request failed with status ${String(status)}`);
     this.name = "ApiError";
+  }
+
+  /** The platform's closed error code — what UI branches on, never `message`. */
+  get code(): ErrorCode {
+    return this.envelope?.error.code ?? "INTERNAL_ERROR";
   }
 
   get isNotFound(): boolean {
