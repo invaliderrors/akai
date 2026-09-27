@@ -1887,25 +1887,13 @@ function sha256Hex(value: string): string {
  * digest is exactly SHA-256 over `${customerId}:${code}` and that the code is
  * drawn from the full six-digit space.
  */
-function recoverLoginCode(customerId: string, codeHash: string): string {
-  for (let candidate = 0; candidate < 1_000_000; candidate += 1) {
-    const code = String(candidate).padStart(6, "0");
-    if (sha256Hex(`${customerId}:${code}`) === codeHash) {
-      return code;
-    }
-  }
-  throw new Error("no six-digit code hashes to the stored digest");
-}
-
 /**
  * The code the service just mailed, read from the event that carries it to the
  * mailer — and checked against the stored digest, so a helper that returned the
  * wrong code would fail loudly rather than pass a test for the wrong reason.
  *
- * NOT `recoverLoginCode`: walking 10^6 SHA-256 candidates costs ~100-600ms per
- * call, this helper runs in dozens of tests, and under a parallel
- * `nx run-many -t test` that pushed individual tests past the 5s timeout. The
- * walk is still the assertion in the one test that is about the digest.
+ * Never brute-force the digest instead: walking 10^6 SHA-256 candidates took
+ * seconds per call and pushed tests past the 5s timeout on CI runners.
  */
 function issuedCode(harness: Harness, customerId: string): string {
   const row = harness.repository.emailOtps.get(customerId);
@@ -1945,7 +1933,9 @@ describe("email sign-in codes — issuing", () => {
     const row = harness.repository.emailOtps.get(customer.id);
     expect(row?.codeHash).toHaveLength(64);
 
-    const code = recoverLoginCode(customer.id, row?.codeHash ?? "");
+    // `issuedCode` asserts the stored digest is sha256(`${customerId}:${code}`)
+    // of the code actually mailed.
+    const code = issuedCode(harness, customer.id);
     expect(code).toMatch(/^\d{6}$/);
     expect(row?.codeHash).toBe(sha256Hex(`${customer.id}:${code}`));
     // THE property `auth_token` could not provide. A digest over the bare code
