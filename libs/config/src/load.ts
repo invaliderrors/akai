@@ -90,16 +90,15 @@ const LOGGABLE_KEYS = [
   "EMAIL_TRANSPORT",
   "EMAIL_FROM",
   "CONTACT_INBOX_EMAIL",
-  // Whop: identifiers and endpoints only. WHOP_API_KEY and WHOP_WEBHOOK_SECRET
-  // are deliberately ABSENT and therefore redacted — `load.test.ts` asserts it,
-  // so re-adding one is a failing test.
-  "WHOP_ACCOUNT_ID",
-  "WHOP_PRODUCT_ID",
+  // Wompi: the public key only. WOMPI_PRIVATE_KEY, WOMPI_INTEGRITY_SECRET and
+  // WOMPI_EVENTS_SECRET are deliberately ABSENT and therefore redacted —
+  // `load.test.ts` asserts it, so re-adding one is a failing test.
+  "WOMPI_PUBLIC_KEY",
   // Which environment the process actually resolved to. The single most useful
   // line in a startup log when a payment behaves unexpectedly, and it carries no
   // secret — the credentials it selects are redacted by omission like the rest.
-  "WHOP_ENVIRONMENT",
-  "WHOP_API_VERSION_DATE",
+  "WOMPI_ENVIRONMENT",
+  "PAYMENTS_ENABLED",
   "S3_ENDPOINT",
   "S3_BUCKET",
   "CORS_ALLOWED_ORIGINS",

@@ -67,6 +67,25 @@ describe("logger redaction", () => {
     expect(output).not.toContain("s=abc");
   });
 
+  it("redacts the Wompi secrets, top-level or nested in the resolved config", () => {
+    const { lines, logger } = captureLogs();
+    logger.info(
+      {
+        wompi: {
+          privateKey: "prv_prod_leak1",
+          integritySecret: "prod_integrity_leak2",
+          eventsSecret: "prod_events_leak3",
+        },
+        WOMPI_EVENTS_SECRET: "prod_events_leak4",
+      },
+      "config",
+    );
+    const output = lines.join("");
+    for (const leak of ["leak1", "leak2", "leak3", "leak4"]) {
+      expect(output).not.toContain(leak);
+    }
+  });
+
   it("still logs the non-sensitive fields it was called with", () => {
     const { lines, logger } = captureLogs();
     logger.info({ orderNumber: "AK-2026-000123", email: "a@b.com" }, "paid");

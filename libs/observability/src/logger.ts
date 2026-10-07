@@ -62,13 +62,19 @@ export const REDACT_PATHS: readonly string[] = [
   // Provider-neutral: `client_secret` is a conventional name for a
   // browser-visible payment handle across gateways, not a Stripe-only field.
   "*.client_secret",
-  // Whop. The webhook secret in particular is the ONLY thing that makes a
-  // signature mean anything — it is the entire security boundary on the webhook
-  // route — so a single leaked log line is a forgeable "order paid" event.
-  "whopApiKey",
-  "*.whopApiKey",
-  "whopWebhookSecret",
-  "*.whopWebhookSecret",
+  // Wompi. The events secret in particular is the ONLY thing that makes a
+  // checksum mean anything — it is the entire security boundary on the webhook
+  // route — so a single leaked log line is a forgeable "order paid" event. The
+  // integrity secret signs checkout amounts; the private key reads transactions.
+  "privateKey",
+  "*.privateKey",
+  "integritySecret",
+  "*.integritySecret",
+  "eventsSecret",
+  "*.eventsSecret",
+  "WOMPI_PRIVATE_KEY",
+  "WOMPI_INTEGRITY_SECRET",
+  "WOMPI_EVENTS_SECRET",
 ];
 
 export interface LoggerConfig {

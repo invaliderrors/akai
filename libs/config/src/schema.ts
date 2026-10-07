@@ -41,37 +41,76 @@ export const nodeEnvSchema = z.enum(["development", "test", "production"]);
 export type NodeEnv = z.infer<typeof nodeEnvSchema>;
 
 /**
- * The two Whop environments, and the only two base URLs that exist.
+ * The two Wompi environments and everything that is DERIVED from the choice.
  *
- * DERIVED, NOT CONFIGURED. This was a free-form `WHOP_BASE_URL` and is now a
- * consequence of `WHOP_ENVIRONMENT`, because the pair must never disagree: a
- * live key against the sandbox host returns 401, and a sandbox key against the
- * live host does too. Two variables that must agree is a way to point real
- * credentials at a fake processor by editing one of them.
+ * DERIVED, NOT CONFIGURED. There is no `WOMPI_BASE_URL`: a free-form URL beside
+ * an environment flag is two values that must agree, and the way they disagree
+ * is real credentials pointed at a fake processor (or the reverse). The key
+ * PREFIXES are part of the same table, so a sandbox key pasted into a live
+ * deployment is a boot failure naming the variable — Wompi issues `pub_test_…`
+ * / `prv_test_…` / `test_integrity_…` / `test_events_…` in sandbox and the
+ * `prod` equivalents in production (docs.wompi.co, "Ambientes y llaves").
  */
-const WHOP_BASE_URLS = {
-  live: "https://api.whop.com/api/v1",
-  sandbox: "https://sandbox-api.whop.com/api/v1",
+export const WOMPI_ENVIRONMENTS = {
+  sandbox: {
+    apiBaseUrl: "https://sandbox.wompi.co/v1",
+    checkoutUrl: "https://checkout.wompi.co/p/",
+    /** `environment` as Wompi stamps it on an event body. */
+    eventEnvironment: "test",
+    prefixes: {
+      WOMPI_PUBLIC_KEY: "pub_test_",
+      WOMPI_PRIVATE_KEY: "prv_test_",
+      WOMPI_INTEGRITY_SECRET: "test_integrity_",
+      WOMPI_EVENTS_SECRET: "test_events_",
+    },
+  },
+  live: {
+    apiBaseUrl: "https://production.wompi.co/v1",
+    checkoutUrl: "https://checkout.wompi.co/p/",
+    eventEnvironment: "prod",
+    prefixes: {
+      WOMPI_PUBLIC_KEY: "pub_prod_",
+      WOMPI_PRIVATE_KEY: "prv_prod_",
+      WOMPI_INTEGRITY_SECRET: "prod_integrity_",
+      WOMPI_EVENTS_SECRET: "prod_events_",
+    },
+  },
 } as const;
 
-export type WhopEnvironment = keyof typeof WHOP_BASE_URLS;
+export type WompiEnvironment = keyof typeof WOMPI_ENVIRONMENTS;
+
+type WompiKeyName = keyof (typeof WOMPI_ENVIRONMENTS)["live"]["prefixes"];
+
+const WOMPI_KEY_NAMES: readonly WompiKeyName[] = [
+  "WOMPI_PUBLIC_KEY",
+  "WOMPI_PRIVATE_KEY",
+  "WOMPI_INTEGRITY_SECRET",
+  "WOMPI_EVENTS_SECRET",
+];
 
 /**
- * Which environment applies, from the explicit override or `NODE_ENV`.
+ * Which environment applies.
  *
- * ONE FUNCTION, used by both the refinement and the transform below. They have
- * to agree — a refinement that validates the sandbox set while the transform
- * hands out the live one is a config that passes boot and charges real cards.
+ * NEVER A SILENT LIVE DEFAULT. Unset resolves to sandbox, and production
+ * refuses unset outright (see the refinement). The deployed API may run
+ * `NODE_ENV=development`, so a `NODE_ENV`-derived default would resolve the LIVE
+ * deployment to sandbox — real customers on a sandbox checkout — and a
+ * production-derived "live" default would charge cards from a build nobody
+ * deliberately pointed at money. The deployment pins `WOMPI_ENVIRONMENT`.
+ *
+ * ONE FUNCTION, used by both the refinement and the transform, so the
+ * environment that was validated is the one that is handed out.
  */
-function resolveWhopEnvironment(
-  explicit: WhopEnvironment | undefined,
-  nodeEnv: string,
-): WhopEnvironment {
-  if (explicit !== undefined) {
-    return explicit;
-  }
-  return nodeEnv === "production" ? "live" : "sandbox";
+function resolveWompiEnvironment(explicit: WompiEnvironment | undefined): WompiEnvironment {
+  return explicit ?? "sandbox";
 }
+
+/** Blank is absent: `.env.example` ships `WOMPI_PUBLIC_KEY=` style lines. */
+const optionalKey = z
+  .string()
+  .trim()
+  .optional()
+  .transform((value) => (value === undefined || value.length === 0 ? undefined : value));
 
 /**
  * The declared variables, before refinement or resolution.
@@ -106,141 +145,52 @@ export const serverEnvShape = z
     ARGON2_MEMORY_KIB: z.coerce.number().int().min(19_456).default(19_456),
     ARGON2_TIME_COST: z.coerce.number().int().min(2).default(2),
 
-    // --- Whop ---------------------------------------------------------------
+    // --- Wompi -------------------------------------------------------------
     //
-    // The former `TAGADA_*` block is DELETED, not commented out, and it is deleted
-    // in the same change that removed `apps/api/src/modules/payments/tagada/**`.
-    // Keeping required variables for an adapter that no longer exists means
-    // every deployment must keep supplying a TagadaPay secret to boot a system
-    // that cannot reach TagadaPay — an operator would reasonably conclude the
-    // key is live and rotate it on a schedule, forever.
+    // The former `WHOP_*` block is DELETED, not commented out, in the same
+    // change that removed the Whop adapter. Required variables for an adapter
+    // that no longer exists are a secret every deployment keeps rotating for
+    // nothing.
     /**
-     * Whop LIVE API key — the unprefixed `WHOP_*` set is the production one.
+     * Which Wompi environment the keys below belong to: "sandbox" or "live".
      *
-     * NO PREFIX CHECK: Whop issues several credential types and the docs do not
-     * commit to a single stable prefix for server keys, so asserting one would
-     * reject a key the API honours. Length is the only shape assertion that is
-     * safe to make here — which is also why a sandbox key pasted here would be
-     * accepted, and why `WHOP_ENVIRONMENT` decides which set is used rather than
-     * anything inferred from the value.
+     * PINNED EXPLICITLY ON EVERY DEPLOYMENT. Unset means sandbox, and production
+     * refuses unset — see `resolveWompiEnvironment` for why neither direction
+     * may be inferred from `NODE_ENV`.
      */
-    WHOP_API_KEY: z.string().min(20),
-    /** `biz_…`. The account every checkout configuration is created under. */
-    WHOP_ACCOUNT_ID: z.string().startsWith("biz_"),
+    WOMPI_ENVIRONMENT: z.enum(["sandbox", "live"]).optional(),
+    /** `pub_test_…` / `pub_prod_…`. Public: it is a query parameter on the checkout URL. */
+    WOMPI_PUBLIC_KEY: optionalKey,
+    /** `prv_test_…` / `prv_prod_…`. Bearer for `GET /v1/transactions/{id}`. */
+    WOMPI_PRIVATE_KEY: optionalKey,
     /**
-     * `prod_…`. The SINGLE Whop product every per-order plan hangs off.
-     *
-     * There is no catalog mirror. Whop takes our computed amount directly on
-     * the checkout call, so a product exists here only because a plan must
-     * belong to one — it is a container, not a representation of anything we
-     * sell.
+     * `test_integrity_…` / `prod_integrity_…`. Signs the checkout URL:
+     * `sha256(reference + amountInCents + currency + expirationTime + secret)`.
+     * Without it a buyer could edit `amount-in-cents` in the URL.
      */
-    WHOP_PRODUCT_ID: z.string().startsWith("prod_"),
+    WOMPI_INTEGRITY_SECRET: optionalKey,
     /**
-     * The webhook endpoint signing secret, copied from the Whop dashboard
-     * (Developer -> Webhooks).
-     *
-     * `ws_` PREFIX IS REQUIRED, AND THE PREFIX IS PART OF THE KEY. Whop HMACs
-     * with the literal bytes of the secret it issued, prefix included, so a
-     * secret stored with `ws_` stripped derives a DIFFERENT key and every
-     * delivery fails verification. Asserting the prefix here turns that into a
-     * boot failure naming the variable, instead of a silent 100% webhook
-     * rejection rate discovered when orders stop settling.
-     *
-     * This secret is the entire security boundary on the webhook route: without
-     * it, anyone on the internet could POST `payment.succeeded` and mark any
-     * order paid. Hence the 32-char floor `secret()` applies.
+     * `test_events_…` / `prod_events_…`. The ENTIRE security boundary on
+     * `POST /v1/webhooks/wompi`: without it anyone could post an APPROVED
+     * transaction and mark an order paid.
      */
-    WHOP_WEBHOOK_SECRET: secret("WHOP_WEBHOOK_SECRET").startsWith("ws_"),
-    /**
-     * Which Whop environment the credentials above are used against.
-     *
-     * DEFAULTS FROM `NODE_ENV` — development means sandbox, production means
-     * live — so a developer gets test cards without configuring anything, and a
-     * production build cannot quietly point at a fake processor.
-     *
-     * IT IS OVERRIDABLE, AND ON THIS PLATFORM THAT IS LOAD-BEARING RATHER THAN A
-     * CONVENIENCE. The deployed API deliberately runs `NODE_ENV=development`,
-     * because the guard below refuses `PAYMENTS_ENABLED=false` in production and
-     * this deployment ran credential-free for a while. A pure `NODE_ENV` rule
-     * would therefore resolve the LIVE deployment to sandbox, and the moment
-     * payments were enabled real customers would be handed a sandbox checkout
-     * and their orders marked PAID having taken no money — the same fraud the
-     * `PAYMENTS_ENABLED` guard exists to prevent, arriving through another door.
-     * So the deployment pins `WHOP_ENVIRONMENT=live` explicitly and the default
-     * only governs a developer's laptop.
-     *
-     * The refinement below still refuses sandbox under `NODE_ENV=production`
-     * outright: an override may correct the default, never invert the one case
-     * where the answer is not a judgement call.
-     */
-    WHOP_ENVIRONMENT: z.enum(["sandbox", "live"]).optional(),
-
-    // --- Sandbox credentials ------------------------------------------------
-    //
-    // A WHOLLY SEPARATE ACCOUNT, not a mode flag. Whop's sandbox lives at
-    // sandbox.whop.com with its own dashboard, its own `biz_`/`prod_` ids and
-    // its own keys; a live key returns 401 against `sandbox-api.whop.com` and
-    // vice versa. That is why these are four more variables rather than one
-    // boolean — there is no shared credential to reuse.
-    //
-    // ALL OPTIONAL, and required only when sandbox is the resolved environment
-    // (see the refinement). A live-only deployment sets none of them.
-    WHOP_SANDBOX_API_KEY: z.string().min(20).optional(),
-    WHOP_SANDBOX_ACCOUNT_ID: z.string().startsWith("biz_").optional(),
-    WHOP_SANDBOX_PRODUCT_ID: z.string().startsWith("prod_").optional(),
-    WHOP_SANDBOX_WEBHOOK_SECRET: secret("WHOP_SANDBOX_WEBHOOK_SECRET")
-      .startsWith("ws_")
-      .optional(),
-    /**
-     * The dated API version every request is pinned to.
-     *
-     * REQUIRED, NOT DEFAULTED. Whop versions its payload shapes by date, and
-     * the webhook body our settlement check reads (`PaymentLegacy`) is one of
-     * them. A default here would mean the pin silently moves whenever this file
-     * is edited; an explicit value per environment means upgrading is a
-     * deliberate act with a diff.
-     */
-    WHOP_API_VERSION_DATE: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, {
-      message: "WHOP_API_VERSION_DATE must be a YYYY-MM-DD Whop API version date",
-    }),
+    WOMPI_EVENTS_SECRET: optionalKey,
     /**
      * Whether a real payment provider is engaged at checkout.
      *
-     * "false" is DEMO MODE: checkout skips Whop entirely, settles the order
+     * "false" is DEMO MODE: checkout skips Wompi entirely, settles the order
      * locally as PAID and returns the customer to the ordinary processing screen.
-     * It exists so the whole shop — catalogue, cart, orders, confirmation emails,
-     * invoices, returns, metrics — can be shown working before any payment
-     * credentials exist.
+     * It exists so the whole shop can be shown working before any payment
+     * credentials exist. With it "true" all four `WOMPI_*` keys are required.
      *
-     * PRODUCTION REFUSES IT (see the guard below). A deployment that took real
-     * card details and marked orders paid without charging anyone would be
-     * fraud, so the flag cannot reach one — the same containment
-     * `WHOP_BOOT_CHECK` uses.
+     * PRODUCTION REFUSES IT (see the guard below). A deployment that marked
+     * orders paid without charging anyone would be fraud.
      *
      * `z.coerce.boolean()` is deliberately NOT used: it is JavaScript
      * truthiness, so the string "false" coerces to `true` and the flag would do
      * the exact opposite of what the operator wrote.
      */
     PAYMENTS_ENABLED: z
-      .enum(["true", "false"])
-      .default("true")
-      .transform((value) => value === "true"),
-
-    /**
-     * Whether `LiveWhopGateway.onModuleInit` proves the credentials are real
-     * before the API serves traffic.
-     *
-     * DEFAULTS ON, and the production guard below REFUSES to let it be turned
-     * off. It exists solely so the stack can be booted locally without a Whop
-     * account — without it, `pnpm start:api` is impossible for anyone who has
-     * not been issued credentials, which is every new contributor and every CI
-     * job.
-     *
-     * `z.coerce.boolean()` is deliberately NOT used, for the same reason as
-     * PAYMENTS_ENABLED above.
-     */
-    WHOP_BOOT_CHECK: z
       .enum(["true", "false"])
       .default("true")
       .transform((value) => value === "true"),
@@ -399,7 +349,7 @@ export const serverEnvSchema = serverEnvShape
      * THE SIGNAL IS THE CREDENTIAL, NOT `NODE_ENV`. The production block below
      * already refuses a non-resend transport and it NEVER FIRES on this
      * platform, because the deployed API deliberately runs
-     * `NODE_ENV=development` — the identical trap `WHOP_ENVIRONMENT` exists to
+     * `NODE_ENV=development` — the identical trap `WOMPI_ENVIRONMENT` exists to
      * escape. Under that default every order confirmation is handed to
      * `LoggingTransport`, which returns a fabricated `local-000001` message id
      * and delivers nothing: green logs, an email log full of SENT rows, and no
@@ -415,7 +365,7 @@ export const serverEnvSchema = serverEnvShape
      * transport is a misconfiguration in every environment, with no case worth
      * carving out.
      *
-     * It is deliberately NOT keyed on `PAYMENTS_ENABLED` or the resolved Whop
+     * It is deliberately NOT keyed on `PAYMENTS_ENABLED` or the resolved Wompi
      * environment either: both are already `true`/`live` on the deployment, so
      * either would refuse the very boot this rule must never refuse.
      */
@@ -447,7 +397,7 @@ export const serverEnvSchema = serverEnvShape
      * time in this file that distinction is the whole point. The production
      * block below already demands this key and NEVER FIRES on this platform,
      * because the deployed API deliberately runs `NODE_ENV=development` — the
-     * identical trap `WHOP_ENVIRONMENT` exists to escape and the
+     * identical trap `WOMPI_ENVIRONMENT` exists to escape and the
      * `EMAIL_TRANSPORT` rule above was just fixed for.
      *
      * `RESEND_API_KEY` is the right signal because it is the precise condition
@@ -464,12 +414,12 @@ export const serverEnvSchema = serverEnvShape
      * Keyed this way it cannot take the running deployment down, which is the
      * other half of the requirement: that API holds no Resend key, so the rule
      * is inert until one is issued. It is deliberately NOT keyed on an https
-     * `CORS_ALLOWED_ORIGINS`, on live Whop, or on `PAYMENTS_ENABLED` — the
+     * `CORS_ALLOWED_ORIGINS`, on live Wompi, or on `PAYMENTS_ENABLED` — the
      * deployment already has all three, so any of them would refuse the very
      * boot this rule must never refuse.
      *
-     * THERE IS NO ESCAPE HATCH, unlike `WHOP_BOOT_CHECK`. That flag exists so a
-     * contributor with no Whop account can boot; nobody needs to hold a live
+     * THERE IS NO ESCAPE HATCH, unlike `PAYMENTS_ENABLED=false`. That flag exists so a
+     * contributor with no Wompi account can boot; nobody needs to hold a live
      * sending credential AND leave the account-creating endpoints unguarded, so
      * there is no case worth carving out. A dev machine has neither key and is
      * unaffected.
@@ -546,19 +496,6 @@ export const serverEnvSchema = serverEnvShape
         });
       }
 
-      // The boot check is the only thing that proves the Whop credentials are
-      // real before a customer reaches checkout. Disabling it in production
-      // moves that discovery to the first payment, which is precisely the
-      // failure the check exists to prevent.
-      if (!env.WHOP_BOOT_CHECK) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["WHOP_BOOT_CHECK"],
-          message:
-            'WHOP_BOOT_CHECK cannot be "false" in production: it is the only check that proves the Whop credentials are real before the first customer checkout',
-        });
-      }
-
       if (env.EMAIL_TRANSPORT !== "resend") {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -588,81 +525,111 @@ export const serverEnvSchema = serverEnvShape
       }
     }
 
-    // --- Whop environment selection -------------------------------------
-    const whopEnvironment = resolveWhopEnvironment(env.WHOP_ENVIRONMENT, env.NODE_ENV);
-
-    if (env.NODE_ENV === "production" && whopEnvironment === "sandbox") {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["WHOP_ENVIRONMENT"],
-        message:
-          'WHOP_ENVIRONMENT cannot be "sandbox" in production: checkout would hand real customers a sandbox payment page and mark their orders PAID without taking any money',
-      });
+    // --- Wompi environment and keys ------------------------------------
+    if (env.NODE_ENV === "production") {
+      if (env.WOMPI_ENVIRONMENT === undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["WOMPI_ENVIRONMENT"],
+          message:
+            'WOMPI_ENVIRONMENT must be set explicitly in production ("live"); it is never inferred',
+        });
+      } else if (env.WOMPI_ENVIRONMENT === "sandbox") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["WOMPI_ENVIRONMENT"],
+          message:
+            'WOMPI_ENVIRONMENT cannot be "sandbox" in production: checkout would hand real customers a sandbox payment page and mark their orders PAID without taking any money',
+        });
+      }
     }
 
-    // ONLY WHEN PAYMENTS ARE ACTUALLY ENGAGED. With `PAYMENTS_ENABLED=false`
-    // checkout settles in-process and never reaches Whop, so demanding a full
-    // sandbox credential set would stop a fresh clone booting to look at the
-    // shop — the same reason `WHOP_BOOT_CHECK` can be turned off. The moment
-    // payments are switched on in a sandbox environment, the keys become
-    // mandatory and their absence is a boot failure rather than a 500 at the
-    // first checkout.
-    if (whopEnvironment === "sandbox" && env.PAYMENTS_ENABLED) {
-      // Named individually rather than as one "sandbox is incomplete": a boot
-      // failure should say which variable to go and fetch.
-      const sandbox = {
-        WHOP_SANDBOX_API_KEY: env.WHOP_SANDBOX_API_KEY,
-        WHOP_SANDBOX_ACCOUNT_ID: env.WHOP_SANDBOX_ACCOUNT_ID,
-        WHOP_SANDBOX_PRODUCT_ID: env.WHOP_SANDBOX_PRODUCT_ID,
-        WHOP_SANDBOX_WEBHOOK_SECRET: env.WHOP_SANDBOX_WEBHOOK_SECRET,
-      };
+    const wompiEnvironment = resolveWompiEnvironment(env.WOMPI_ENVIRONMENT);
+    const prefixes = WOMPI_ENVIRONMENTS[wompiEnvironment].prefixes;
 
-      for (const [name, value] of Object.entries(sandbox)) {
-        if (value === undefined) {
+    for (const name of WOMPI_KEY_NAMES) {
+      const value = env[name];
+
+      // ONLY WHEN PAYMENTS ARE ENGAGED. With `PAYMENTS_ENABLED=false` checkout
+      // settles in-process and never reaches Wompi, so a fresh clone must boot
+      // without an account. Named individually: a boot failure should say which
+      // variable to go and fetch.
+      if (value === undefined) {
+        if (env.PAYMENTS_ENABLED) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: [name],
-            message: `${name} is required when the Whop environment resolves to "sandbox". Sandbox is a separate Whop account with its own credentials — create one at sandbox.whop.com, or set WHOP_ENVIRONMENT=live to use the production keys.`,
+            message: `${name} is required when PAYMENTS_ENABLED is "true" (Wompi dashboard -> Desarrolladores; ${wompiEnvironment} keys start with "${prefixes[name]}")`,
           });
         }
+        continue;
+      }
+
+      // A key from the OTHER environment is the misconfiguration that matters:
+      // it fails at Wompi with a 401 (or, for the events secret, rejects every
+      // genuine webhook) long after a green deploy. The value is never echoed.
+      if (!value.startsWith(prefixes[name])) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [name],
+          message: `${name} does not belong to the "${wompiEnvironment}" Wompi environment: it must start with "${prefixes[name]}". Check WOMPI_ENVIRONMENT and that the key came from the matching Wompi account.`,
+        });
       }
     }
   })
   /**
-   * Resolve the ACTIVE Whop credentials once, at boot.
+   * Resolve the ACTIVE Wompi configuration once, at boot.
    *
-   * Consumers read `config.whop` and never choose. Leaving the choice to each
-   * call site would mean the gateway, the webhook controller and the checkout
-   * service each deciding which account they are talking to, and the failure
-   * when one of them disagrees is a payment taken in one environment and
-   * verified against another.
+   * `null` WHEN ANY KEY IS ABSENT — which the refinement allows only with
+   * `PAYMENTS_ENABLED=false`. Null rather than empty strings on purpose: an
+   * empty events secret makes `sha256(manifest + "")` a checksum ANYONE can
+   * compute, so the webhook route must be able to see "not configured" and
+   * refuse, not verify against nothing.
    */
   .transform((env) => {
-    const environment = resolveWhopEnvironment(env.WHOP_ENVIRONMENT, env.NODE_ENV);
+    const environment = resolveWompiEnvironment(env.WOMPI_ENVIRONMENT);
+    const derived = WOMPI_ENVIRONMENTS[environment];
 
-    // The refinement above guarantees these are present whenever sandbox is the
-    // resolved environment, so the fallbacks are unreachable — they exist so the
-    // types stay honest without a non-null assertion.
-    const whop =
-      environment === "sandbox"
-        ? {
-            environment,
-            apiKey: env.WHOP_SANDBOX_API_KEY ?? "",
-            accountId: env.WHOP_SANDBOX_ACCOUNT_ID ?? "",
-            productId: env.WHOP_SANDBOX_PRODUCT_ID ?? "",
-            webhookSecret: env.WHOP_SANDBOX_WEBHOOK_SECRET ?? "",
-            baseUrl: WHOP_BASE_URLS.sandbox,
-          }
+    const {
+      WOMPI_PUBLIC_KEY: publicKey,
+      WOMPI_PRIVATE_KEY: privateKey,
+      WOMPI_INTEGRITY_SECRET: integritySecret,
+      WOMPI_EVENTS_SECRET: eventsSecret,
+    } = env;
+
+    const wompi: WompiConfig | null =
+      publicKey === undefined ||
+      privateKey === undefined ||
+      integritySecret === undefined ||
+      eventsSecret === undefined
+        ? null
         : {
             environment,
-            apiKey: env.WHOP_API_KEY,
-            accountId: env.WHOP_ACCOUNT_ID,
-            productId: env.WHOP_PRODUCT_ID,
-            webhookSecret: env.WHOP_WEBHOOK_SECRET,
-            baseUrl: WHOP_BASE_URLS.live,
+            publicKey,
+            privateKey,
+            integritySecret,
+            eventsSecret,
+            apiBaseUrl: derived.apiBaseUrl,
+            checkoutUrl: derived.checkoutUrl,
+            eventEnvironment: derived.eventEnvironment,
           };
 
-    return { ...env, whop };
+    return { ...env, WOMPI_ENVIRONMENT: environment, wompi };
   });
+
+/** The resolved Wompi configuration every consumer reads (`config.wompi`). */
+export interface WompiConfig {
+  readonly environment: WompiEnvironment;
+  readonly publicKey: string;
+  readonly privateKey: string;
+  readonly integritySecret: string;
+  readonly eventsSecret: string;
+  /** `https://sandbox.wompi.co/v1` or `https://production.wompi.co/v1`. */
+  readonly apiBaseUrl: string;
+  /** Web Checkout: `https://checkout.wompi.co/p/` in both environments. */
+  readonly checkoutUrl: string;
+  /** `"test"` or `"prod"` — what Wompi writes in an event's `environment`. */
+  readonly eventEnvironment: string;
+}
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;

@@ -127,8 +127,8 @@ services:
   #
   # NODE_ENV IS OVERRIDDEN TO development ON PURPOSE. Every image sets
   # NODE_ENV=production, and libs/config's production guards then (correctly)
-  # refuse a TagadaPay test key, EMAIL_TRANSPORT=smtp, a plaintext CORS origin
-  # and WHOP_BOOT_CHECK=false — i.e. exactly the local placeholder setup. The
+  # refuse WOMPI_ENVIRONMENT=sandbox, EMAIL_TRANSPORT=smtp and a plaintext CORS
+  # origin — i.e. exactly the local placeholder setup. The
   # override is what lets the production image run against a development
   # configuration; it does not weaken the deployed one.
   # ===========================================================================

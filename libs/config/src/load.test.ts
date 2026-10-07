@@ -7,6 +7,24 @@ import {
   resetServerConfigCache,
 } from "./load";
 
+/** A complete live Wompi key set. Placeholders — never real keys. */
+const LIVE_WOMPI = {
+  WOMPI_ENVIRONMENT: "live",
+  WOMPI_PUBLIC_KEY: "pub_prod_placeholder",
+  WOMPI_PRIVATE_KEY: "prv_prod_placeholder",
+  WOMPI_INTEGRITY_SECRET: "prod_integrity_placeholder",
+  WOMPI_EVENTS_SECRET: "prod_events_placeholder",
+} as const;
+
+/** A complete sandbox Wompi key set. */
+const SANDBOX_WOMPI = {
+  WOMPI_ENVIRONMENT: "sandbox",
+  WOMPI_PUBLIC_KEY: "pub_test_placeholder",
+  WOMPI_PRIVATE_KEY: "prv_test_placeholder",
+  WOMPI_INTEGRITY_SECRET: "test_integrity_placeholder",
+  WOMPI_EVENTS_SECRET: "test_events_placeholder",
+} as const;
+
 /** A minimal environment that passes validation. Tests override single keys off this. */
 function validEnv(overrides: Record<string, string> = {}): NodeJS.ProcessEnv {
   return {
@@ -14,14 +32,9 @@ function validEnv(overrides: Record<string, string> = {}): NodeJS.ProcessEnv {
     DATABASE_URL: "postgresql://akai:akai@localhost:5432/akai",
     DIRECT_DATABASE_URL: "postgresql://akai:akai@localhost:5432/akai",
     JWT_ACCESS_SECRET: "a".repeat(32),
-    WHOP_API_KEY: "whop_test_abc123def456ghi789",
-    WHOP_ACCOUNT_ID: "biz_test_1",
-    WHOP_PRODUCT_ID: "prod_test_1",
-    WHOP_WEBHOOK_SECRET: `ws_${"c".repeat(32)}`,
-    WHOP_API_VERSION_DATE: "2026-08-14",
-    // PINNED, exactly as the deployment does. Unset, NODE_ENV=development would
-    // resolve to sandbox and demand a sandbox credential set.
-    WHOP_ENVIRONMENT: "live",
+    // PINNED, exactly as the deployment does, with keys from the matching
+    // (live) Wompi environment.
+    ...LIVE_WOMPI,
     EMAIL_TRANSPORT: "smtp",
     SMTP_URL: "smtp://localhost:1025",
     EMAIL_FROM: "no-reply@example.com",
@@ -40,14 +53,6 @@ function validEnv(overrides: Record<string, string> = {}): NodeJS.ProcessEnv {
 beforeEach(() => {
   resetServerConfigCache();
 });
-
-/** A complete sandbox credential set, for the environment-selection tests. */
-const SANDBOX_ENV = {
-  WHOP_SANDBOX_API_KEY: "whop_sandbox_abc123def456ghi789",
-  WHOP_SANDBOX_ACCOUNT_ID: "biz_sandbox_1",
-  WHOP_SANDBOX_PRODUCT_ID: "prod_sandbox_1",
-  WHOP_SANDBOX_WEBHOOK_SECRET: `ws_${"s".repeat(32)}`,
-} as const;
 
 describe("parseServerEnv", () => {
   it("accepts a valid environment and applies defaults", () => {
@@ -80,7 +85,7 @@ describe("parseServerEnv", () => {
   it("reports EVERY problem at once, not just the first", () => {
     const env = validEnv();
     delete env["DATABASE_URL"];
-    delete env["WHOP_ACCOUNT_ID"];
+    delete env["JWT_ACCESS_SECRET"];
     delete env["S3_BUCKET"];
 
     try {
@@ -91,7 +96,7 @@ describe("parseServerEnv", () => {
       if (!(error instanceof ConfigValidationError)) throw error;
       const paths = error.issues.map((issue) => issue.path);
       expect(paths).toContain("DATABASE_URL");
-      expect(paths).toContain("WHOP_ACCOUNT_ID");
+      expect(paths).toContain("JWT_ACCESS_SECRET");
       expect(paths).toContain("S3_BUCKET");
     }
   });
@@ -154,7 +159,7 @@ describe("cross-field rules", () => {
     //
     // The signal is the CREDENTIAL, not NODE_ENV: RESEND_API_KEY is the only
     // way mail can leave this system, so holding one while binding the discard
-    // transport is never anything but a mistake. Same shape as WHOP_ENVIRONMENT
+    // transport is never anything but a mistake. Same shape as WOMPI_ENVIRONMENT
     // — an explicit signal the operator states, not one inferred from NODE_ENV.
     expect(() =>
       parseServerEnv(
@@ -175,7 +180,7 @@ describe("cross-field rules", () => {
     // something this environment does not yet have.
     const env = validEnv({
       NODE_ENV: "development",
-      WHOP_ENVIRONMENT: "live",
+      WOMPI_ENVIRONMENT: "live",
       PAYMENTS_ENABLED: "true",
       EMAIL_TRANSPORT: "smtp",
       SMTP_URL: "smtp://akai-mailpit-7urpbe:1025",
@@ -206,7 +211,7 @@ describe("cross-field rules", () => {
     // otherwise AuthModule binds AlwaysAllowCaptchaVerifier, which accepts any
     // string. The existing guard lives inside `if (NODE_ENV === "production")`
     // and this deployment deliberately runs NODE_ENV=development, so it never
-    // fires: the identical trap WHOP_ENVIRONMENT exists to escape and that the
+    // fires: the identical trap WOMPI_ENVIRONMENT exists to escape and that the
     // EMAIL_TRANSPORT rule above was just fixed for.
     //
     // The signal is the SAME CREDENTIAL, and that is the whole design: register
@@ -242,12 +247,12 @@ describe("cross-field rules", () => {
     // THE HARD CONSTRAINT, locked as a test — the same one the EMAIL_TRANSPORT
     // rule above is bound by. The deployed API holds no Resend key yet and no
     // Turnstile secret; a rule that demanded the captcha unconditionally, or on
-    // any signal this environment already has (an https origin, live Whop,
+    // any signal this environment already has (an https origin, live Wompi,
     // PAYMENTS_ENABLED), would take the live API down on its next deploy. Mail
     // is discarded by LoggingTransport today, so there is no relay to close yet.
     const env = validEnv({
       NODE_ENV: "development",
-      WHOP_ENVIRONMENT: "live",
+      WOMPI_ENVIRONMENT: "live",
       PAYMENTS_ENABLED: "true",
       EMAIL_TRANSPORT: "smtp",
       SMTP_URL: "smtp://akai-mailpit-7urpbe:1025",
@@ -283,38 +288,13 @@ describe("cross-field rules", () => {
     ).toBe("0x4AAA_secret");
   });
 
-  it("refuses production with the Whop boot check disabled", () => {
-    // WHOP_BOOT_CHECK=false exists so the stack can run locally without a Whop
-    // account. If it could reach production it would silently remove the only
-    // check that proves the credentials are real before a customer reaches
-    // checkout — so the escape hatch must fail closed.
-    expect(() =>
-      parseServerEnv(
-        validEnv({
-          NODE_ENV: "production",
-          WHOP_BOOT_CHECK: "false",
-          EMAIL_TRANSPORT: "resend",
-          RESEND_API_KEY: "re_live",
-          TURNSTILE_SECRET_KEY: "0x4AAAAAAA_test_secret",
-          CORS_ALLOWED_ORIGINS: "https://akai.shop",
-        }),
-      ),
-    ).toThrow(/WHOP_BOOT_CHECK/);
-  });
-
-  it('treats WHOP_BOOT_CHECK="false" as false, not as a truthy string', () => {
+  it('treats PAYMENTS_ENABLED="false" as false, not as a truthy string', () => {
     // The bug this locks out: `z.coerce.boolean()` is JavaScript truthiness, so
-    // the non-empty string "false" coerces to `true` and the flag does the exact
-    // opposite of what the operator wrote.
-    expect(parseServerEnv(validEnv({ WHOP_BOOT_CHECK: "false" })).WHOP_BOOT_CHECK).toBe(
+    // the non-empty string "false" coerces to `true`.
+    expect(parseServerEnv(validEnv({ PAYMENTS_ENABLED: "false" })).PAYMENTS_ENABLED).toBe(
       false,
     );
-    expect(parseServerEnv(validEnv({ WHOP_BOOT_CHECK: "true" })).WHOP_BOOT_CHECK).toBe(
-      true,
-    );
-    // Absent means enabled: the safe default must not depend on the operator
-    // remembering to set it.
-    expect(parseServerEnv(validEnv({})).WHOP_BOOT_CHECK).toBe(true);
+    expect(parseServerEnv(validEnv({})).PAYMENTS_ENABLED).toBe(true);
   });
 
   it("refuses production with the local Mailpit transport", () => {
@@ -343,85 +323,121 @@ describe("cross-field rules", () => {
     ).toThrow(/plaintext origin/);
   });
 
-  it("resolves to SANDBOX outside production, and derives the sandbox base URL", () => {
-    // A developer gets test cards without configuring anything. The base URL is
-    // derived, never configured: a live key against the sandbox host 401s, so
-    // two variables that must agree is a way to point real credentials at a fake
-    // processor by editing one of them.
-    const config = parseServerEnv(
-      validEnv({ ...SANDBOX_ENV, PAYMENTS_ENABLED: "true", WHOP_ENVIRONMENT: "sandbox" }),
-    );
+  it("derives the sandbox endpoints from WOMPI_ENVIRONMENT=sandbox", () => {
+    // The base URL is derived, never configured: two variables that must agree
+    // is a way to point real credentials at a fake processor by editing one.
+    const config = parseServerEnv(validEnv({ ...SANDBOX_WOMPI }));
 
-    expect(config.whop.environment).toBe("sandbox");
-    expect(config.whop.baseUrl).toBe("https://sandbox-api.whop.com/api/v1");
-    expect(config.whop.apiKey).toBe(SANDBOX_ENV.WHOP_SANDBOX_API_KEY);
-    expect(config.whop.accountId).toBe("biz_sandbox_1");
+    expect(config.wompi).toEqual({
+      environment: "sandbox",
+      publicKey: "pub_test_placeholder",
+      privateKey: "prv_test_placeholder",
+      integritySecret: "test_integrity_placeholder",
+      eventsSecret: "test_events_placeholder",
+      apiBaseUrl: "https://sandbox.wompi.co/v1",
+      checkoutUrl: "https://checkout.wompi.co/p/",
+      eventEnvironment: "test",
+    });
   });
 
-  it("resolves to LIVE when told to, whatever NODE_ENV says", () => {
-    // THE CASE THIS DEPLOYMENT DEPENDS ON. The deployed API deliberately runs
-    // NODE_ENV=development, so a pure NODE_ENV rule would hand real customers a
-    // sandbox checkout and mark their orders PAID without taking money.
-    const config = parseServerEnv(
-      validEnv({ ...SANDBOX_ENV, NODE_ENV: "development", WHOP_ENVIRONMENT: "live" }),
-    );
+  it("derives the production endpoints from WOMPI_ENVIRONMENT=live, whatever NODE_ENV says", () => {
+    // THE CASE THE DEPLOYMENT DEPENDS ON: it may run NODE_ENV=development, so
+    // the environment is read from the explicit pin and nothing else.
+    const config = parseServerEnv(validEnv({ NODE_ENV: "development" }));
 
-    expect(config.whop.environment).toBe("live");
-    expect(config.whop.baseUrl).toBe("https://api.whop.com/api/v1");
-    expect(config.whop.apiKey).toBe("whop_test_abc123def456ghi789");
+    expect(config.wompi?.environment).toBe("live");
+    expect(config.wompi?.apiBaseUrl).toBe("https://production.wompi.co/v1");
+    expect(config.wompi?.eventEnvironment).toBe("prod");
   });
 
-  it("REFUSES to boot with sandbox selected while the sandbox keys are absent", () => {
-    // Naming the variable, not "sandbox is incomplete" — a boot failure should
-    // say which credential to go and fetch.
-    // Only once payments are actually engaged: with them off, checkout never
-    // reaches Whop and a fresh clone must still boot.
+  it("resolves an UNSET environment to sandbox — never silently to live", () => {
+    const env = validEnv({ ...SANDBOX_WOMPI });
+    delete env["WOMPI_ENVIRONMENT"];
+
+    expect(parseServerEnv(env).WOMPI_ENVIRONMENT).toBe("sandbox");
+  });
+
+  it("REFUSES production without an explicit WOMPI_ENVIRONMENT", () => {
+    const env = validEnv({
+      NODE_ENV: "production",
+      EMAIL_TRANSPORT: "resend",
+      RESEND_API_KEY: "re_live",
+      TURNSTILE_SECRET_KEY: "0x4AAAAAAA_test_secret",
+      CORS_ALLOWED_ORIGINS: "https://akai.shop",
+    });
+    delete env["WOMPI_ENVIRONMENT"];
+
+    expect(() => parseServerEnv(env)).toThrow(/WOMPI_ENVIRONMENT must be set explicitly/);
+  });
+
+  it("REFUSES sandbox in production", () => {
     expect(() =>
-      parseServerEnv(validEnv({ PAYMENTS_ENABLED: "true", WHOP_ENVIRONMENT: "sandbox" })),
-    ).toThrow(/WHOP_SANDBOX_API_KEY/);
+      parseServerEnv(
+        validEnv({
+          ...SANDBOX_WOMPI,
+          NODE_ENV: "production",
+          EMAIL_TRANSPORT: "resend",
+          RESEND_API_KEY: "re_live",
+          TURNSTILE_SECRET_KEY: "0x4AAAAAAA_test_secret",
+          CORS_ALLOWED_ORIGINS: "https://akai.shop",
+        }),
+      ),
+    ).toThrow(/cannot be "sandbox" in production/);
+  });
+
+  it("REFUSES a key from the other environment, naming the variable", () => {
+    // A sandbox events secret on a live deployment rejects every genuine
+    // webhook; a sandbox private key 401s every confirmation. Both are boot
+    // failures here instead of a silent outage.
     expect(() =>
-      parseServerEnv(validEnv({ PAYMENTS_ENABLED: "false", WHOP_ENVIRONMENT: "sandbox" })),
-    ).not.toThrow();
+      parseServerEnv(validEnv({ WOMPI_EVENTS_SECRET: "test_events_placeholder" })),
+    ).toThrow(/WOMPI_EVENTS_SECRET does not belong to the "live" Wompi environment/);
+    expect(() =>
+      parseServerEnv(validEnv({ ...SANDBOX_WOMPI, WOMPI_PRIVATE_KEY: "prv_prod_placeholder" })),
+    ).toThrow(/WOMPI_PRIVATE_KEY does not belong to the "sandbox" Wompi environment/);
   });
 
-  it("applies the documented WHOP_BASE_URL default in the live case", () => {
-    const config = parseServerEnv(validEnv({ WHOP_ENVIRONMENT: "live" }));
-    expect(config.whop.baseUrl).toBe("https://api.whop.com/api/v1");
+  it("never echoes a mismatched key in the error", () => {
+    try {
+      parseServerEnv(validEnv({ WOMPI_INTEGRITY_SECRET: "test_integrity_s3cr3t_value" }));
+      expect.unreachable("should have thrown");
+    } catch (error) {
+      expect(String(error)).not.toContain("s3cr3t_value");
+    }
   });
 
-  it("rejects a weak WHOP_WEBHOOK_SECRET — it is the only forgery defence", () => {
-    // Signature verification is the entire security boundary on the webhook
-    // route: without it, anyone could POST `payment.succeeded`.
-    expect(() => parseServerEnv(validEnv({ WHOP_WEBHOOK_SECRET: "ws_short" }))).toThrow(
-      /at least 32 characters/,
+  it("requires every key once payments are engaged, and none while they are off", () => {
+    for (const name of [
+      "WOMPI_PUBLIC_KEY",
+      "WOMPI_PRIVATE_KEY",
+      "WOMPI_INTEGRITY_SECRET",
+      "WOMPI_EVENTS_SECRET",
+    ]) {
+      const env = validEnv({ PAYMENTS_ENABLED: "true" });
+      delete env[name];
+      expect(() => parseServerEnv(env)).toThrow(new RegExp(`${name} is required`));
+    }
+
+    const bare = validEnv({ PAYMENTS_ENABLED: "false" });
+    for (const name of [
+      "WOMPI_ENVIRONMENT",
+      "WOMPI_PUBLIC_KEY",
+      "WOMPI_PRIVATE_KEY",
+      "WOMPI_INTEGRITY_SECRET",
+      "WOMPI_EVENTS_SECRET",
+    ]) {
+      delete bare[name];
+    }
+    const config = parseServerEnv(bare);
+    // NULL, not empty strings: an empty events secret would make the webhook
+    // checksum computable by anyone.
+    expect(config.wompi).toBeNull();
+  });
+
+  it("treats a blank key as absent", () => {
+    expect(() => parseServerEnv(validEnv({ WOMPI_PUBLIC_KEY: "  " }))).toThrow(
+      /WOMPI_PUBLIC_KEY is required/,
     );
-  });
-
-  it("REJECTS a webhook secret with the ws_ prefix stripped", () => {
-    // THE PREFIX IS PART OF THE SIGNING KEY. Whop HMACs with the literal bytes
-    // of the secret it issued, prefix included, so a value stored without it
-    // derives a DIFFERENT key and every delivery fails verification — a silent
-    // 100% rejection rate discovered only when orders stop settling. Asserting
-    // the prefix turns that into a boot failure naming the variable.
-    expect(() => parseServerEnv(validEnv({ WHOP_WEBHOOK_SECRET: "d".repeat(40) }))).toThrow(
-      /ws_/,
-    );
-  });
-
-  it("requires a dated API version rather than defaulting one", () => {
-    // Whop versions payload shapes by date, including the webhook body the
-    // settlement check reads. A default would let the pin drift silently.
-    const env = validEnv();
-    delete env["WHOP_API_VERSION_DATE"];
-    expect(() => parseServerEnv(env)).toThrow(/WHOP_API_VERSION_DATE/);
-    expect(() => parseServerEnv(validEnv({ WHOP_API_VERSION_DATE: "August 2026" }))).toThrow(
-      /YYYY-MM-DD/,
-    );
-  });
-
-  it("requires the biz_ and prod_ id prefixes", () => {
-    expect(() => parseServerEnv(validEnv({ WHOP_ACCOUNT_ID: "acct_1" }))).toThrow(/biz_/);
-    expect(() => parseServerEnv(validEnv({ WHOP_PRODUCT_ID: "product_1" }))).toThrow(/prod_/);
   });
 
   it("accepts a fully-configured production environment", () => {
@@ -453,11 +469,11 @@ describe("redactedConfig", () => {
     const redacted = redactedConfig(parseServerEnv(validEnv()));
     expect(redacted["PORT"]).toBe(3333);
     expect(redacted["NODE_ENV"]).toBe("development");
-    // Identifiers and endpoints are operationally useful and carry no secret.
-    expect(redacted["WHOP_ACCOUNT_ID"]).toBe("biz_test_1");
+    // The public key is public by definition: it rides on every checkout URL.
+    expect(redacted["WOMPI_PUBLIC_KEY"]).toBe("pub_prod_placeholder");
     // WHICH ENVIRONMENT the process resolved to — the single most useful line in
     // a startup log when a payment behaves unexpectedly, and it names no secret.
-    expect(redacted["WHOP_ENVIRONMENT"]).toBe("live");
+    expect(redacted["WOMPI_ENVIRONMENT"]).toBe("live");
   });
 
   it("omits every secret — allowlist, so new secrets are excluded by default", () => {
@@ -469,8 +485,10 @@ describe("redactedConfig", () => {
       "S3_SECRET_ACCESS_KEY",
       "REVALIDATE_SIGNING_SECRET",
       "RESEND_API_KEY",
-      "WHOP_API_KEY",
-      "WHOP_WEBHOOK_SECRET",
+      "WOMPI_PRIVATE_KEY",
+      "WOMPI_INTEGRITY_SECRET",
+      "WOMPI_EVENTS_SECRET",
+      "wompi",
     ]) {
       expect(redacted).not.toHaveProperty(secretKey);
     }

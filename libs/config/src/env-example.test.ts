@@ -95,26 +95,23 @@ describe(".env.example", () => {
     expect(contents).not.toMatch(/whsec_[A-Za-z0-9]{32,}/);
   });
 
-  it("contains no real-looking Whop credentials", () => {
+  it("contains no real-looking Wompi credentials", () => {
     const contents = readFileSync(ENV_EXAMPLE, "utf8");
 
-    // A committed API key looks exactly like a placeholder unless you check the
-    // tail: anything with a long random-looking suffix is a real credential.
-    expect(contents).not.toMatch(/whop_live_/i);
-    const apiKey = /^WHOP_API_KEY=(.*)$/m.exec(contents)?.[1] ?? "";
-    expect(apiKey).toMatch(/placeholder/);
+    // Placeholders only, and SANDBOX placeholders: a fresh clone must never be
+    // one edit away from a live Wompi account.
+    expect(contents).not.toMatch(/^WOMPI_[A-Z_]+=\S*prod/m);
+    expect(/^WOMPI_ENVIRONMENT=(.*)$/m.exec(contents)?.[1]).toBe("sandbox");
 
-    // The account and product ids are not secrets, but a real one here would
-    // point every fresh clone at someone's live Whop account.
-    expect(/^WHOP_ACCOUNT_ID=(.*)$/m.exec(contents)?.[1] ?? "").toMatch(/placeholder/);
-    expect(/^WHOP_PRODUCT_ID=(.*)$/m.exec(contents)?.[1] ?? "").toMatch(/placeholder/);
-
-    // The webhook secret has a 32-char floor AND a required `ws_` prefix in the
-    // schema, so the placeholder must satisfy both — otherwise the documented
-    // example does not actually boot.
-    const webhookSecret = /^WHOP_WEBHOOK_SECRET=(.*)$/m.exec(contents)?.[1] ?? "";
-    expect(webhookSecret).toMatch(/^ws_/);
-    expect(webhookSecret.length).toBeGreaterThanOrEqual(32);
-    expect(webhookSecret).toMatch(/change_me/);
+    for (const name of [
+      "WOMPI_PUBLIC_KEY",
+      "WOMPI_PRIVATE_KEY",
+      "WOMPI_INTEGRITY_SECRET",
+      "WOMPI_EVENTS_SECRET",
+    ]) {
+      expect(new RegExp(`^${name}=(.*)$`, "m").exec(contents)?.[1] ?? "").toMatch(
+        /placeholder$/,
+      );
+    }
   });
 });
