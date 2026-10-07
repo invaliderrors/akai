@@ -1,6 +1,6 @@
 /**
- * Applies ONLY the shipping setup (zones, rates, their Sendcloud mapping and the
- * served countries' STANDARD VAT rates) — nothing else.
+ * Applies ONLY the shipping setup (the Colombia zone, its rate and Colombia's
+ * STANDARD IVA rate) — nothing else.
  *
  * Run with: `pnpm nx run api:seed-shipping`.
  *

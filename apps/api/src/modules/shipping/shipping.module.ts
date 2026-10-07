@@ -1,21 +1,7 @@
 import { Module } from "@nestjs/common";
-import type { ServerEnv } from "@akai/config";
-import type { Logger } from "@akai/observability";
-
 import { CartModule } from "../cart/cart.module";
 import { PrismaModule } from "../prisma/prisma.module";
-import { SERVER_CONFIG } from "../config/config.module";
-import { LOGGER } from "../observability/logger.module";
 import { ThrottlerModule } from "../throttler/throttler.module";
-import {
-  SENDCLOUD_INTERACTIVE_CLIENT,
-  createInteractiveSendcloudClient,
-} from "./service-points/interactive-sendcloud.client";
-import {
-  SERVICE_POINTS_CLOCK,
-  ServicePointsService,
-  type ServicePointsClock,
-} from "./service-points/service-points.service";
 import { ShippingController } from "./shipping.controller";
 import {
   SHIPPING_TAX_RESOLVER,
@@ -54,12 +40,6 @@ import { ShippingService } from "./shipping.service";
  * accepted from the request, so a shopper cannot state the numbers that decide
  * what they pay for delivery. CartModule does not import ShippingModule, so
  * there is no cycle; CheckoutModule imports both.
- *
- * PICKUP POINTS (Sendcloud spec §3.2/§3.3): `ServicePointsService` searches a
- * SERVICE_POINT rate's carrier's points (`POST /v1/shipping/service-points`) and
- * re-verifies the chosen one for checkout — exported for CheckoutModule. It
- * talks to Sendcloud through its OWN short-budget binding
- * (`SENDCLOUD_INTERACTIVE_CLIENT`, 5 s × 2 attempts), not the label worker's.
  */
 @Module({
   imports: [PrismaModule, CartModule, ThrottlerModule],
@@ -68,15 +48,7 @@ import { ShippingService } from "./shipping.service";
     ShippingService,
     { provide: SHIPPING_REPOSITORY, useClass: PrismaShippingRepository },
     { provide: SHIPPING_TAX_RESOLVER, useClass: PrismaShippingTaxResolver },
-    ServicePointsService,
-    {
-      provide: SENDCLOUD_INTERACTIVE_CLIENT,
-      inject: [SERVER_CONFIG, LOGGER],
-      useFactory: (config: ServerEnv, logger: Logger) =>
-        createInteractiveSendcloudClient(config.sendcloud, logger),
-    },
-    { provide: SERVICE_POINTS_CLOCK, useValue: ((): number => Date.now()) satisfies ServicePointsClock },
   ],
-  exports: [ShippingService, ServicePointsService],
+  exports: [ShippingService],
 })
 export class ShippingModule {}

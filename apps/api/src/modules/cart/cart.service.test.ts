@@ -315,7 +315,7 @@ function variant(overrides: Partial<VariantSnapshot> = {}): VariantSnapshot {
     variantName: "M",
     sku: "AK-HOOD-M",
     imageUrl: null,
-    currency: "EUR",
+    currency: "COP",
     priceGross: 4999,
     // No volume pricing by default — every variant that exists today. The tier
     // tests pass their own.
@@ -897,7 +897,7 @@ describe("CartService", () => {
       repository.packPrices.set(PACK_ID, {
         packProductId: PACK_ID,
         priceGross: toMinor(packPriceGross),
-        currency: "EUR",
+        currency: "COP",
         isPurchasable: true,
       });
       return componentIds;
@@ -1557,7 +1557,7 @@ describe("CartService", () => {
         repository.packPrices.set(PACK_ID, {
           packProductId: PACK_ID,
           priceGross: toMinor(5499),
-          currency: "EUR",
+          currency: "COP",
           isPurchasable: false,
         });
 
@@ -2116,7 +2116,6 @@ describe("CartService", () => {
         { createFromCart: unreachable },
         { startCheckout: unreachable },
         { loadVariantWeights: () => Promise.resolve(new Map<string, number>()) },
-        { verifyForCheckout: unreachable },
       );
       const { cart } = await cartService.getOrCreateCart(actor);
 
@@ -2125,22 +2124,21 @@ describe("CartService", () => {
           cartId: cart.id,
           email: "guest@example.com",
           shippingAddress: {
-            firstName: "Ana",
-            lastName: "García",
+            firstName: "Valentina",
+            lastName: "Restrepo",
             company: null,
-            line1: "Calle Mayor 1",
+            line1: "Calle 10 # 43-21",
             line2: null,
-            city: "Madrid",
-            region: null,
-            postalCode: "28013",
-            countryCode: "ES",
-            phone: "+34600000000",
-            houseNumber: "1",
+            city: "Medellín",
+            region: "Antioquia",
+            postalCode: null,
+            countryCode: "CO",
+            phone: "3001234567",
           },
           billingAddress: null,
           shippingMethodId: randomUUID(),
-          servicePointId: null,
-          vatNumber: null,
+          documentType: "CC",
+          documentNumber: "1020304050",
           locale: "es",
           acceptedTermsVersion: "2026-01",
         }),

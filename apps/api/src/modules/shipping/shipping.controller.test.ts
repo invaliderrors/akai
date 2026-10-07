@@ -4,17 +4,14 @@ import { toMinor } from "@akai/money";
 import {
   freeShippingThresholdResponseSchema,
   shippingQuoteResponseSchema,
-  type ServicePointSearchRequest,
-  type ServicePointSearchResponse,
 } from "@akai/contracts";
 
 import type { CartActor } from "../cart/cart-actor";
 import type { CartService, CartShippingBasis } from "../cart/cart.service";
 import { ShippingController } from "./shipping.controller";
 import { ShippingError } from "./shipping.errors";
-import { type ShippingOption, UNMAPPED_FULFILMENT } from "./shipping-rate.selector";
+import { type ShippingOption } from "./shipping-rate.selector";
 import type { ShippingQuoteInput, ShippingService } from "./shipping.service";
-import type { ServicePointsService } from "./service-points/service-points.service";
 import { THROTTLE_KEY, THROTTLE_RULES } from "../throttler/throttle.decorator";
 
 const ACTOR: CartActor = { customerId: null, cartToken: "token" };
@@ -34,7 +31,8 @@ const STANDARD: ShippingOption = {
   currency: "EUR",
   priceGross: toMinor(495),
   isFree: false,
-  fulfilment: UNMAPPED_FULFILMENT,
+  transitDaysMin: null,
+  transitDaysMax: null,
 };
 
 /**
@@ -45,22 +43,11 @@ const STANDARD: ShippingOption = {
  */
 type CartDouble = Pick<CartService, "getShippingBasis">;
 type ShippingDouble = Pick<ShippingService, "listOptions" | "freeShippingThreshold">;
-type ServicePointsDouble = Pick<ServicePointsService, "search">;
-
-const NO_POINTS: ServicePointsDouble = {
-  search: () => Promise.resolve({ status: "NONE_NEARBY", points: [] }),
-};
-
 function controllerWith(
   shipping: ShippingDouble,
   cart: CartDouble = { getShippingBasis: () => Promise.resolve(BASIS) },
-  servicePoints: ServicePointsDouble = NO_POINTS,
 ): ShippingController {
-  return new ShippingController(
-    shipping as ShippingService,
-    cart as CartService,
-    servicePoints as ServicePointsService,
-  );
+  return new ShippingController(shipping as ShippingService, cart as CartService);
 }
 
 describe("ShippingController.quote", () => {
@@ -116,8 +103,6 @@ describe("ShippingController.quote", () => {
         currency: "EUR",
         priceGross: 495,
         isFree: false,
-        deliveryType: "HOME",
-        carrierName: null,
         transitDaysMin: null,
         transitDaysMax: null,
       },
@@ -218,40 +203,5 @@ describe("ShippingError.isDestinationNotServed", () => {
   it("is NOT set on the other VALIDATION_FAILED cases that share its status", () => {
     expect(ShippingError.noMethodAvailable("ES").isDestinationNotServed).toBe(false);
     expect(ShippingError.taxUnconfigured("ES").isDestinationNotServed).toBe(false);
-  });
-});
-
-describe("ShippingController.servicePointSearch", () => {
-  const idleShipping: ShippingDouble = {
-    freeShippingThreshold: () => Promise.resolve(null),
-    listOptions: () => Promise.resolve([]),
-  };
-
-  it("hands the validated body to the service and returns its answer verbatim", async () => {
-    const seen: ServicePointSearchRequest[] = [];
-    const answer: ServicePointSearchResponse = { status: "ADDRESS_NOT_FOUND", points: [] };
-    const controller = controllerWith(idleShipping, undefined, {
-      search: (request) => {
-        seen.push(request);
-        return Promise.resolve(answer);
-      },
-    });
-    const body: ServicePointSearchRequest = {
-      rateId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
-      countryCode: "ES",
-      postalCode: "50002",
-      city: null,
-    };
-
-    await expect(controller.servicePointSearch(body)).resolves.toBe(answer);
-    expect(seen).toEqual([body]);
-  });
-
-  it("spends the QUOTE's throttle bucket, not a second one", () => {
-    const metadata: unknown = Reflect.getMetadata(
-      THROTTLE_KEY,
-      ShippingController.prototype.servicePointSearch,
-    );
-    expect(metadata).toEqual(THROTTLE_RULES.shippingQuote);
   });
 });

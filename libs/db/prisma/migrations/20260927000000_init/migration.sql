@@ -41,13 +41,10 @@ CREATE TYPE "RefundStatus" AS ENUM ('PENDING', 'SUCCEEDED', 'FAILED', 'CANCELLED
 CREATE TYPE "RefundReason" AS ENUM ('REQUESTED_BY_CUSTOMER', 'DUPLICATE', 'FRAUDULENT', 'WITHDRAWAL_RIGHT', 'DAMAGED', 'OTHER');
 
 -- CreateEnum
-CREATE TYPE "ShipmentStatus" AS ENUM ('PENDING', 'IN_TRANSIT', 'DELIVERED', 'RETURNED', 'LOST', 'LABEL_CREATED', 'AWAITING_PICKUP', 'CANCELLED', 'FAILED', 'EXCEPTION');
+CREATE TYPE "ShipmentStatus" AS ENUM ('PENDING', 'IN_TRANSIT', 'DELIVERED', 'RETURNED', 'LOST');
 
 -- CreateEnum
-CREATE TYPE "ShippingDeliveryType" AS ENUM ('HOME', 'SERVICE_POINT');
-
--- CreateEnum
-CREATE TYPE "ShipmentProvider" AS ENUM ('MANUAL', 'SENDCLOUD');
+CREATE TYPE "IdentityDocumentType" AS ENUM ('CC', 'CE', 'NIT', 'PP', 'TI', 'PPT');
 
 -- CreateEnum
 CREATE TYPE "InventoryMovement" AS ENUM ('SALE', 'RESTOCK', 'RETURN', 'ADJUSTMENT', 'RESERVATION', 'RESERVATION_RELEASE');
@@ -172,8 +169,8 @@ CREATE TABLE "address" (
     "line1" VARCHAR(200) NOT NULL,
     "line2" VARCHAR(200),
     "city" VARCHAR(120) NOT NULL,
-    "region" VARCHAR(120),
-    "postalCode" VARCHAR(20) NOT NULL,
+    "region" VARCHAR(120) NOT NULL,
+    "postalCode" VARCHAR(20),
     "countryCode" CHAR(2) NOT NULL,
     "phone" VARCHAR(32),
     "isDefault" BOOLEAN NOT NULL DEFAULT false,
@@ -518,9 +515,6 @@ CREATE TABLE "shipping_rate" (
     "maxValue" INTEGER,
     "freeOverSubtotal" INTEGER,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
-    "deliveryType" "ShippingDeliveryType" NOT NULL DEFAULT 'HOME',
-    "carrierCode" VARCHAR(64),
-    "sendcloudOptionCode" VARCHAR(128),
     "transitDaysMin" INTEGER,
     "transitDaysMax" INTEGER,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -551,8 +545,8 @@ CREATE TABLE "order" (
     "shipLine1" VARCHAR(200) NOT NULL,
     "shipLine2" VARCHAR(200),
     "shipCity" VARCHAR(120) NOT NULL,
-    "shipRegion" VARCHAR(120),
-    "shipPostalCode" VARCHAR(20) NOT NULL,
+    "shipRegion" VARCHAR(120) NOT NULL,
+    "shipPostalCode" VARCHAR(20),
     "shipCountryCode" CHAR(2) NOT NULL,
     "shipPhone" VARCHAR(32),
     "billFirstName" VARCHAR(80) NOT NULL,
@@ -561,24 +555,16 @@ CREATE TABLE "order" (
     "billLine1" VARCHAR(200) NOT NULL,
     "billLine2" VARCHAR(200),
     "billCity" VARCHAR(120) NOT NULL,
-    "billRegion" VARCHAR(120),
-    "billPostalCode" VARCHAR(20) NOT NULL,
+    "billRegion" VARCHAR(120) NOT NULL,
+    "billPostalCode" VARCHAR(20),
     "billCountryCode" CHAR(2) NOT NULL,
     "billPhone" VARCHAR(32),
     "invoiceNumber" VARCHAR(32),
-    "vatNumber" VARCHAR(20),
-    "reverseCharge" BOOLEAN NOT NULL DEFAULT false,
+    "documentType" "IdentityDocumentType" NOT NULL,
+    "documentNumber" VARCHAR(20) NOT NULL,
     "shippingMethodName" VARCHAR(120),
     "acceptedTermsVersion" VARCHAR(32),
     "shippingRateId" UUID,
-    "sendcloudOptionCode" VARCHAR(128),
-    "servicePointId" VARCHAR(32),
-    "servicePointCarrierId" VARCHAR(64),
-    "servicePointName" VARCHAR(120),
-    "servicePointAddress" VARCHAR(255),
-    "servicePointPostNumber" VARCHAR(32),
-    "shipHouseNumber" VARCHAR(16),
-    "parcelWeightGrams" INTEGER,
     "providerCheckoutId" TEXT,
     "placedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "paidAt" TIMESTAMP(3),
@@ -688,13 +674,6 @@ CREATE TABLE "shipment" (
     "carrier" VARCHAR(64) NOT NULL,
     "trackingNumber" VARCHAR(128),
     "trackingUrl" VARCHAR(1024),
-    "provider" "ShipmentProvider" NOT NULL DEFAULT 'MANUAL',
-    "sendcloudShipmentId" VARCHAR(64),
-    "sendcloudParcelId" BIGINT,
-    "labelObjectKey" VARCHAR(512),
-    "sendcloudStatusCode" VARCHAR(64),
-    "failureReason" TEXT,
-    "lastSyncedAt" TIMESTAMP(3),
     "shippedAt" TIMESTAMP(3),
     "deliveredAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -1107,19 +1086,10 @@ CREATE UNIQUE INDEX "dispute_providerDisputeId_key" ON "dispute"("providerDisput
 CREATE INDEX "dispute_orderId_idx" ON "dispute"("orderId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "shipment_sendcloudShipmentId_key" ON "shipment"("sendcloudShipmentId");
-
--- CreateIndex
-CREATE UNIQUE INDEX "shipment_sendcloudParcelId_key" ON "shipment"("sendcloudParcelId");
-
--- CreateIndex
 CREATE INDEX "shipment_orderId_idx" ON "shipment"("orderId");
 
 -- CreateIndex
 CREATE INDEX "shipment_trackingNumber_idx" ON "shipment"("trackingNumber");
-
--- CreateIndex
-CREATE INDEX "shipment_provider_status_lastSyncedAt_idx" ON "shipment"("provider", "status", "lastSyncedAt");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "shipment_item_shipmentId_orderItemId_key" ON "shipment_item"("shipmentId", "orderItemId");

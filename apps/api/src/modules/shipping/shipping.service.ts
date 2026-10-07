@@ -6,7 +6,6 @@ import { pickLocalizedText } from "../../common/localized-text";
 import { sharedFreeShippingThreshold } from "./free-shipping";
 import type { ShippingCharge } from "../orders/order-totals";
 import {
-  type RateFulfilment,
   type ShippingOption,
   type ShippingSelectionContext,
   selectShippingOptions,
@@ -76,11 +75,6 @@ export interface ResolvedShipping {
   readonly net: Minor;
   /** The exact shape `OrdersService.createFromCart` expects. */
   readonly charge: ShippingCharge;
-  /**
-   * The chosen rate's Sendcloud mapping, for checkout to verify a pickup point
-   * against and snapshot onto the order (spec §3.3). Never priced.
-   */
-  readonly fulfilment: RateFulfilment;
 }
 
 @Injectable()
@@ -167,7 +161,6 @@ export class ShippingService {
       taxRateBps,
       net,
       charge: { net, taxRateBps },
-      fulfilment: chosen.fulfilment,
     };
   }
 

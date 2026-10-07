@@ -36,15 +36,15 @@ const fixedClock: Clock = { now: () => FIXED_NOW };
 function addressInput(overrides: Partial<CreateAddressInput> = {}): CreateAddressInput {
   return {
     type: "SHIPPING",
-    firstName: "Ana",
-    lastName: "García",
+    firstName: "Valentina",
+    lastName: "Restrepo",
     company: null,
-    line1: "Calle Mayor 1",
+    line1: "Calle 10 # 43-21",
     line2: null,
-    city: "Madrid",
-    region: null,
-    postalCode: "28013",
-    countryCode: "ES",
+    city: "Medellín",
+    region: "Antioquia",
+    postalCode: null,
+    countryCode: "CO",
     phone: null,
     ...overrides,
   };
@@ -87,7 +87,7 @@ describe("cross-customer isolation", () => {
     // asserted the throw would pass even if the write had landed before the
     // ownership check rejected the read-back.
     const stillOwned = await addresses.get(victim.id, owned.id);
-    expect(stillOwned.city).toBe("Madrid");
+    expect(stillOwned.city).toBe("Medellín");
   });
 
   it("does not let a customer DELETE another customer's address", async () => {

@@ -64,15 +64,15 @@ describe.skipIf(!RUN)("aggregateOrderStats (real Postgres)", () => {
       `INSERT INTO "order" (
          id, "orderNumber", "customerId", email, status, locale, currency,
          subtotal, "discountTotal", "shippingTotal", "taxTotal", "grandTotal", "refundedTotal",
-         "shipFirstName","shipLastName","shipLine1","shipCity","shipPostalCode","shipCountryCode",
-         "billFirstName","billLastName","billLine1","billCity","billPostalCode","billCountryCode",
-         "reverseCharge","placedAt","updatedAt",version
+         "shipFirstName","shipLastName","shipLine1","shipCity","shipRegion","shipCountryCode",
+         "billFirstName","billLastName","billLine1","billCity","billRegion","billCountryCode",
+         "documentType","documentNumber","placedAt","updatedAt",version
        ) VALUES (
-         gen_random_uuid(), $1, $2::uuid, 'buyer@akai.test', $3::"OrderStatus", 'es', 'EUR',
+         gen_random_uuid(), $1, $2::uuid, 'buyer@akai.test', $3::"OrderStatus", 'es', 'COP',
          $4, 0, 0, 0, $4, $5,
-         'A','B','L1','City','00000','ES',
-         'A','B','L1','City','00000','ES',
-         false, $6, now(), 0
+         'A','B','Calle 10 # 43-21','Medellín','Antioquia','CO',
+         'A','B','Calle 10 # 43-21','Medellín','Antioquia','CO',
+         'CC', '1020304050', $6, now(), 0
        )`,
       input.number,
       input.customerId,

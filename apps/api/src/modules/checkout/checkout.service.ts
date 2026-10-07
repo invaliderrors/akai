@@ -14,14 +14,10 @@ import type { z } from "zod";
 import type { CartActor } from "../cart/cart-actor";
 import { CartService } from "../cart/cart.service";
 import { ProductInventoryService } from "../catalog/product-inventory.service";
-import { OrdersService, type OrderFulfilmentSnapshot } from "../orders/orders.service";
+import { OrdersService } from "../orders/orders.service";
 import { PaymentsService } from "../payments/payments.service";
 import { qualifyingSubtotal } from "../shipping/free-shipping";
 import { ShippingService } from "../shipping/shipping.service";
-import {
-  ServicePointsService,
-  type ServicePointSnapshot,
-} from "../shipping/service-points/service-points.service";
 import {
   CHECKOUT_CATALOG_PORT,
   type CheckoutCatalogPort,
@@ -46,7 +42,6 @@ export type CheckoutShippingPort = Pick<ShippingService, "resolveCharge">;
 export type CheckoutInventoryPort = Pick<ProductInventoryService, "reserve" | "release">;
 export type CheckoutOrdersPort = Pick<OrdersService, "createFromCart">;
 export type CheckoutPaymentsPort = Pick<PaymentsService, "startCheckout">;
-export type CheckoutServicePointPort = Pick<ServicePointsService, "verifyForCheckout">;
 
 /**
  * How long stock is withheld for an in-flight checkout.
@@ -75,9 +70,7 @@ const RESERVATION_TTL_SECONDS = 1800;
  *     it carries a blocking problem — the customer must not discover an
  *     out-of-stock line after their card is charged.
  *  2. Price shipping server-side from the destination. The API never accepts a
- *     shipping amount from the client (spec §13). For a pickup-point rate,
- *     RE-VERIFY the chosen point with Sendcloud (carrier, country, expiry,
- *     availability — Sendcloud spec §3.3); a HOME rate must carry no point.
+ *     shipping amount from the client (spec §13).
  *  3. RESERVE stock for every line first. `reserve` is the atomic oversell
  *     guard: two buyers of the last unit cannot both pass it. If any line fails,
  *     every reservation already taken is released — a half-reserved checkout
@@ -100,7 +93,6 @@ export class CheckoutService {
     @Inject(OrdersService) private readonly orders: CheckoutOrdersPort,
     @Inject(PaymentsService) private readonly payments: CheckoutPaymentsPort,
     @Inject(CHECKOUT_CATALOG_PORT) private readonly catalog: CheckoutCatalogPort,
-    @Inject(ServicePointsService) private readonly servicePoints: CheckoutServicePointPort,
   ) {}
 
   async startCheckout(
@@ -162,22 +154,6 @@ export class CheckoutService {
       locale: request.locale,
     });
 
-    // ALSO before any stock is held: a missing, foreign, expired or closed
-    // pickup point — or Sendcloud being unreachable — refuses the checkout with
-    // a coded reason and no side effects, so the customer can simply pick
-    // another point and resubmit.
-    const servicePoint = await this.servicePoints.verifyForCheckout({
-      fulfilment: shipping.fulfilment,
-      servicePointId: request.servicePointId,
-      countryCode: request.shippingAddress.countryCode,
-    });
-    const fulfilment = fulfilmentSnapshot(
-      shipping,
-      servicePoint,
-      totalWeightGrams,
-      request.shippingAddress.houseNumber,
-    );
-
     const reservationIds = await this.reserveAll(cart.id, cart.items);
     // `createFromCart` finds these reservations by the cart id they were opened
     // against and binds them to the order it creates (so the sale-completed path
@@ -185,7 +161,7 @@ export class CheckoutService {
     // derived from the cart itself. This method supplies identity, addresses and
     // the server-resolved shipping charge; it never supplies an amount. The
     // `reservationIds` are held only to release them if creation is refused.
-    const order = await this.createOrder(actor, request, shipping, fulfilment, reservationIds);
+    const order = await this.createOrder(actor, request, shipping, reservationIds);
 
     // The immutable order now exists and owns the held stock, so the cart is
     // consumed. Clearing here — not after the gateway call — is what stops a double-submit
@@ -209,7 +185,6 @@ export class CheckoutService {
     actor: CartActor,
     request: CreateCheckoutSession,
     shipping: Awaited<ReturnType<ShippingService["resolveCharge"]>>,
-    fulfilment: OrderFulfilmentSnapshot,
     reservationIds: readonly string[],
   ): Promise<Order> {
     try {
@@ -223,8 +198,9 @@ export class CheckoutService {
         shipping: shipping.charge,
         shippingMethodName: shipping.methodName,
         acceptedTermsVersion: request.acceptedTermsVersion,
-        vatNumber: request.vatNumber,
-        fulfilment,
+        // Already normalised for its type by `createCheckoutSessionSchema`.
+        customerDocument: { type: request.documentType, number: request.documentNumber },
+        shippingRateId: shipping.rateId,
       });
     } catch (error) {
       await this.releaseAll(reservationIds);
@@ -264,30 +240,4 @@ export class CheckoutService {
       await this.inventory.release(reservationId);
     }
   }
-}
-
-/**
- * Everything the label will need, frozen at checkout (Sendcloud spec §3.3):
- * the chosen rate and its option code AT THIS MOMENT, the parcel weight from
- * the same weights shipping was priced with, the separate house number, and
- * the re-verified pickup point (all null for a HOME rate).
- */
-function fulfilmentSnapshot(
-  shipping: Awaited<ReturnType<ShippingService["resolveCharge"]>>,
-  servicePoint: ServicePointSnapshot | null,
-  parcelWeightGrams: number,
-  houseNumber: string,
-): OrderFulfilmentSnapshot {
-  const trimmedHouseNumber = houseNumber.trim();
-  return {
-    shippingRateId: shipping.rateId,
-    sendcloudOptionCode: shipping.fulfilment.sendcloudOptionCode,
-    parcelWeightGrams,
-    shipHouseNumber: trimmedHouseNumber === "" ? null : trimmedHouseNumber,
-    servicePointId: servicePoint?.servicePointId ?? null,
-    servicePointCarrierId: servicePoint?.servicePointCarrierId ?? null,
-    servicePointName: servicePoint?.servicePointName ?? null,
-    servicePointAddress: servicePoint?.servicePointAddress ?? null,
-    servicePointPostNumber: servicePoint?.servicePointPostNumber ?? null,
-  };
 }

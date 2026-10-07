@@ -226,15 +226,15 @@ describe("UsersService", () => {
       const addresses = new AddressesService(repository);
       await addresses.create(customer.id, {
         type: "SHIPPING",
-        firstName: "Ana",
-        lastName: "García",
+        firstName: "Valentina",
+        lastName: "Restrepo",
         company: null,
-        line1: "Calle Mayor 1",
+        line1: "Calle 10 # 43-21",
         line2: null,
-        city: "Madrid",
-        region: null,
-        postalCode: "28013",
-        countryCode: "ES",
+        city: "Medellín",
+        region: "Antioquia",
+        postalCode: null,
+        countryCode: "CO",
         phone: null,
       });
 

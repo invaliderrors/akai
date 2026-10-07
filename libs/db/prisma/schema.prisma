@@ -119,37 +119,32 @@ enum RefundReason {
   OTHER
 }
 
-/// PENDING/IN_TRANSIT/DELIVERED/RETURNED/LOST are the manual-fulfilment
-/// states. The rest arrived with Sendcloud (spec 2026-09-24-sendcloud-shipping
-/// §3.7 / §11a G4): LABEL_CREATED = label bought, parcel not yet scanned;
-/// AWAITING_PICKUP = at the pickup point waiting for the customer; CANCELLED =
-/// label cancelled (credited); FAILED = announcement refused, no label exists;
-/// EXCEPTION = the carrier reports a problem that needs a human.
+/// The manual-fulfilment states: staff record a parcel (carrier and tracking
+/// number typed in by hand), then mark it delivered.
 enum ShipmentStatus {
   PENDING
   IN_TRANSIT
   DELIVERED
   RETURNED
   LOST
-  LABEL_CREATED
-  AWAITING_PICKUP
-  CANCELLED
-  FAILED
-  EXCEPTION
 }
 
-/// How a shipping rate hands the parcel over. SERVICE_POINT rates require the
-/// customer to pick a pickup point at checkout (spec §3.3).
-enum ShippingDeliveryType {
-  HOME
-  SERVICE_POINT
-}
-
-/// Who made a shipment: staff by hand (carrier + tracking typed in), or a
-/// label bought through Sendcloud.
-enum ShipmentProvider {
-  MANUAL
-  SENDCLOUD
+/// The buyer's Colombian identity document, snapshotted on every order (a
+/// payment provider's PSE `customer_data` needs it, and so does an invoice).
+/// Mirrors `identityDocumentTypeSchema` in libs/contracts.
+enum IdentityDocumentType {
+  /// Cédula de ciudadanía.
+  CC
+  /// Cédula de extranjería.
+  CE
+  /// Número de identificación tributaria (a company, or a person as taxpayer).
+  NIT
+  /// Pasaporte.
+  PP
+  /// Tarjeta de identidad.
+  TI
+  /// Permiso por protección temporal.
+  PPT
 }
 
 enum InventoryMovement {
@@ -399,10 +394,15 @@ model Address {
   company     String? @db.VarChar(120)
   line1       String  @db.VarChar(200)
   line2       String? @db.VarChar(200)
+  /// The municipio, free text.
   city        String  @db.VarChar(120)
-  region      String? @db.VarChar(120)
-  postalCode  String  @db.VarChar(20)
+  /// The departamento — one of `COLOMBIAN_DEPARTAMENTOS` (libs/contracts), by
+  /// its Spanish name. Required: Colombia is the only country served.
+  region      String  @db.VarChar(120)
+  /// Rarely used in Colombia, so optional.
+  postalCode  String? @db.VarChar(20)
   countryCode String  @db.Char(2)
+  /// A Colombian mobile, digits only, without +57.
   phone       String? @db.VarChar(32)
 
   isDefault Boolean   @default(false)
@@ -536,7 +536,7 @@ model Product {
   offeredAsAddOn ProductAddOn[] @relation("ProductAddOnOffered")
 
   /// The 3-6 products THIS pack is made of. Empty unless `kind == PACK`.
-  packComponents ProductPackComponent[] @relation("PackComponents")
+  packComponents  ProductPackComponent[] @relation("PackComponents")
   /// The packs that include THIS product as a component.
   packMemberships ProductPackComponent[] @relation("PackComponentOf")
 
@@ -622,27 +622,27 @@ model ProductVariant {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  product      Product                @relation(fields: [productId], references: [id], onDelete: Cascade)
-  inventory    InventoryItem?
+  product          Product                @relation(fields: [productId], references: [id], onDelete: Cascade)
+  inventory        InventoryItem?
   /// At most one, guaranteed by `@@unique([variantId])` on MediaAsset. Singular
   /// because the model is singular: a variant has an image or it has none.
-  image        MediaAsset?
-  priceHistory PriceHistory[]
-  cartItems    CartItem[]
-  ledger       InventoryLedgerEntry[]
-  reservations StockReservation[]
+  image            MediaAsset?
+  priceHistory     PriceHistory[]
+  cartItems        CartItem[]
+  ledger           InventoryLedgerEntry[]
+  reservations     StockReservation[]
   /// Edges that pre-select this variant. Back-reference only; nothing reads it.
-  defaultForAddOns ProductAddOn[] @relation("ProductAddOnDefaultVariant")
+  defaultForAddOns ProductAddOn[]         @relation("ProductAddOnDefaultVariant")
   /// Pack components pinned to exactly this variant. Back-reference only.
-  pinnedByPacks ProductPackComponent[] @relation("PackComponentVariant")
+  pinnedByPacks    ProductPackComponent[] @relation("PackComponentVariant")
 
-  @@index([productId])
-  @@index([isActive, deletedAt])
   /// REDUNDANT WITH THE PRIMARY KEY, AND THAT IS THE POINT. `id` alone proves a
   /// variant exists but not whose it is; this is what a COMPOSITE foreign key
   /// can reference, which is how "a default add-on variant belongs to that
   /// add-on" becomes a database guarantee.
   @@unique([productId, id])
+  @@index([productId])
+  @@index([isActive, deletedAt])
   @@map("product_variant")
 }
 
@@ -796,7 +796,7 @@ model Category {
 
   /// Per-locale names, e.g. {"es":"Sudaderas","en":"Hoodies"}.
   name      Json
-  sortOrder Int    @default(0)
+  sortOrder Int  @default(0)
 
   createdAt DateTime  @default(now())
   deletedAt DateTime?
@@ -833,22 +833,22 @@ model ProductVariantPriceTier {
 
 model ProductAddOn {
   /// The product whose page offers the add-on.
-  productId String @db.Uuid
+  productId        String  @db.Uuid
   /// The product being offered. A product like any other: it has a slug, a
   /// detail page, variants and a price.
-  addOnId   String @db.Uuid
+  addOnId          String  @db.Uuid
   /// The operator's merchandising order, on the edge — the same place
   /// `ProductCategory` keeps it, because the same product can sit differently
   /// on two different pages.
-  sortOrder Int    @default(0)
+  sortOrder        Int     @default(0)
   /// The add-on VARIANT this host page arrives with pre-selected, or null.
   /// A variant rather than a boolean: an add-on sold in two sizes has no single
   /// thing to pre-select. A suggestion the shopper may decline, never a
   /// compulsory line.
   defaultVariantId String? @db.Uuid
 
-  product Product @relation("ProductAddOnHost", fields: [productId], references: [id], onDelete: Cascade)
-  addOn   Product @relation("ProductAddOnOffered", fields: [addOnId], references: [id], onDelete: Cascade)
+  product        Product         @relation("ProductAddOnHost", fields: [productId], references: [id], onDelete: Cascade)
+  addOn          Product         @relation("ProductAddOnOffered", fields: [addOnId], references: [id], onDelete: Cascade)
   /// COMPOSITE, carrying `addOnId` into the reference so the database itself
   /// rejects a default naming some other product's variant. Needs
   /// `@@unique([productId, id])` on ProductVariant to point at.
@@ -879,7 +879,7 @@ model ProductPackComponent {
   componentProductId String @db.Uuid
   componentVariantId String @db.Uuid
   /// Display order of the components on the pack's own PDP.
-  sortOrder Int @default(0)
+  sortOrder          Int    @default(0)
   /// How many of THIS component one pack contains — "3x Tee Black M" as one
   /// slot, not five identical slots. `CHECK (quantity > 0)` lives in the
   /// migration's raw SQL (Prisma has no check-constraint syntax here, same
@@ -888,10 +888,10 @@ model ProductPackComponent {
   /// rather than just `liveUnitPrice`, and scales the cart/order line
   /// quantity written for this component — see that file's doc comment for
   /// why a component can legitimately need up to 2 lines once this is > 1.
-  quantity Int @default(1)
+  quantity           Int    @default(1)
 
-  pack      Product        @relation("PackComponents", fields: [packProductId], references: [id], onDelete: Cascade)
-  component Product        @relation("PackComponentOf", fields: [componentProductId], references: [id], onDelete: Restrict)
+  pack             Product        @relation("PackComponents", fields: [packProductId], references: [id], onDelete: Cascade)
+  component        Product        @relation("PackComponentOf", fields: [componentProductId], references: [id], onDelete: Restrict)
   /// COMPOSITE, carrying `componentProductId` into the reference so the
   /// database itself rejects a pinned variant that belongs to some OTHER
   /// product — the exact mechanism `ProductAddOn.defaultVariant` already
@@ -1173,9 +1173,9 @@ model DiscountRedemption {
   @@map("discount_redemption")
 }
 
-/// Destination-based VAT. Keyed (country, class, validFrom) rather than a single
-/// constant: rates differ between member states, some goods fall under a
-/// reduced class in some of them, and rates change on announced dates.
+/// Destination-based IVA. Keyed (country, class, validFrom) rather than a single
+/// constant: Colombia's 19% general rate sits beside reduced (5%) and exempt
+/// classes, and rates change on announced dates (a tax reform).
 model TaxRate {
   id          String    @id @default(uuid()) @db.Uuid
   countryCode String    @db.Char(2)
@@ -1240,26 +1240,16 @@ model ShippingRate {
 
   isActive Boolean @default(true)
 
-  /// --- Sendcloud mapping (spec §3.1). The customer is charged `priceGross`
-  /// above; these only decide HOW the parcel travels. A rate with no
-  /// `sendcloudOptionCode` is still sellable — its label is made by hand.
-  deliveryType        ShippingDeliveryType @default(HOME)
-  /// Sendcloud carrier code (`inpost_es`, `ups`) — filters the pickup points
-  /// offered for this method, so another carrier's points are never shown.
-  carrierCode         String?              @db.VarChar(64)
-  /// Sendcloud shipping option code, e.g. `inpost_es:service_point,national_c2c`.
-  /// INTERNAL: never on a public DTO.
-  sendcloudOptionCode String?              @db.VarChar(128)
-  /// The "1–2 días" sub-line under the method name. Null = not shown.
-  transitDaysMin      Int?
-  transitDaysMax      Int?
+  /// The "2–5 días" sub-line under the method name. Null = not shown.
+  transitDaysMin Int?
+  transitDaysMax Int?
 
   createdAt DateTime  @default(now())
   /// See `ShippingZone.updatedAt`.
   updatedAt DateTime  @default(now()) @updatedAt
   deletedAt DateTime?
 
-  zone ShippingZone @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  zone   ShippingZone @relation(fields: [zoneId], references: [id], onDelete: Cascade)
   orders Order[]
 
   @@index([zoneId, isActive])
@@ -1302,8 +1292,8 @@ model Order {
   shipLine1       String  @db.VarChar(200)
   shipLine2       String? @db.VarChar(200)
   shipCity        String  @db.VarChar(120)
-  shipRegion      String? @db.VarChar(120)
-  shipPostalCode  String  @db.VarChar(20)
+  shipRegion      String  @db.VarChar(120)
+  shipPostalCode  String? @db.VarChar(20)
   shipCountryCode String  @db.Char(2)
   shipPhone       String? @db.VarChar(32)
 
@@ -1313,46 +1303,28 @@ model Order {
   billLine1       String  @db.VarChar(200)
   billLine2       String? @db.VarChar(200)
   billCity        String  @db.VarChar(120)
-  billRegion      String? @db.VarChar(120)
-  billPostalCode  String  @db.VarChar(20)
+  billRegion      String  @db.VarChar(120)
+  billPostalCode  String? @db.VarChar(20)
   billCountryCode String  @db.Char(2)
   billPhone       String? @db.VarChar(32)
 
   /// Gap-free, allocated by `allocate_invoice_number()` at PAID ONLY. Abandoned
   /// carts must never consume an invoice number.
   invoiceNumber String? @unique @db.VarChar(32)
-  /// VIES-validated VAT number for B2B reverse charge.
-  vatNumber     String? @db.VarChar(20)
-  /// True when the order was zero-rated under reverse charge.
-  reverseCharge Boolean @default(false)
+
+  /// The buyer's identity document, SNAPSHOTTED like the addresses. Normalised
+  /// by `normaliseDocumentNumber` (libs/contracts): digits for CC/TI, digits
+  /// plus an optional `-D` check digit for NIT, uppercase alphanumerics for
+  /// CE/PP/PPT.
+  documentType   IdentityDocumentType
+  documentNumber String               @db.VarChar(20)
 
   shippingMethodName   String? @db.VarChar(120)
   acceptedTermsVersion String? @db.VarChar(32)
 
-  /// --- Fulfilment snapshot (spec §3.3/§3.4). All nullable: orders placed
-  /// before Sendcloud keep nulls and stay manually fulfillable.
-  ///
   /// The rate the customer chose. SET NULL, so deleting a rate never touches an
-  /// order — which is why everything the label needs is ALSO copied below.
-  shippingRateId         String? @db.Uuid
-  /// The rate's option code AT CHECKOUT, so remapping a rate later cannot
-  /// change how an already-paid order ships.
-  sendcloudOptionCode    String? @db.VarChar(128)
-  /// The chosen pickup point, re-verified at checkout and snapshotted here: it
-  /// must survive the point disappearing from Sendcloud. `servicePointId` is
-  /// Sendcloud's id as a STRING (the shipment API takes a string, the search
-  /// API returns an integer — spec §1 S7/S10).
-  servicePointId         String? @db.VarChar(32)
-  servicePointCarrierId  String? @db.VarChar(64)
-  servicePointName       String? @db.VarChar(120)
-  /// Single line: "street house, postal city, CC".
-  servicePointAddress    String? @db.VarChar(255)
-  servicePointPostNumber String? @db.VarChar(32)
-  /// Separate house number, required by InPost ES / Mondial Relay (spec §1 S17).
-  shipHouseNumber        String? @db.VarChar(16)
-  /// Computed from the lines at checkout, so a later product purge or weight
-  /// edit cannot change the label weight.
-  parcelWeightGrams      Int?
+  /// order — the charge and the method name are already snapshotted above.
+  shippingRateId String? @db.Uuid
 
   /// Correlation rank 2: the `ch_…` checkout configuration this order was sent
   /// to. Persisted BEFORE the customer reaches the payment page, so it cannot
@@ -1373,14 +1345,14 @@ model Order {
   /// Optimistic concurrency: out-of-order provider webhooks race each other.
   version Int @default(0)
 
-  customer  Customer?       @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customer     Customer?       @relation(fields: [customerId], references: [id], onDelete: SetNull)
   shippingRate ShippingRate?   @relation(fields: [shippingRateId], references: [id], onDelete: SetNull)
-  items     OrderItem[]
-  events    OrderEvent[]
-  payments  Payment[]
-  refunds   Refund[]
-  shipments Shipment[]
-  returns   ReturnRequest[]
+  items        OrderItem[]
+  events       OrderEvent[]
+  payments     Payment[]
+  refunds      Refund[]
+  shipments    Shipment[]
+  returns      ReturnRequest[]
 
   @@index([customerId, placedAt])
   @@index([status, placedAt])
@@ -1547,27 +1519,6 @@ model Shipment {
   trackingNumber String? @db.VarChar(128)
   trackingUrl    String? @db.VarChar(1024)
 
-  /// --- Sendcloud (spec §3.5). All null for MANUAL shipments.
-  provider            ShipmentProvider @default(MANUAL)
-  /// Sendcloud's shipment id (string in v3). UNIQUE: a label is bought at most
-  /// once per order, and a retried job resolving the same shipment (409 on the
-  /// same `external_reference_id`) must land on this row, not a second one.
-  sendcloudShipmentId String?          @unique @db.VarChar(64)
-  /// Sendcloud's parcel id — the key the tracking webhook and the label
-  /// download use. BigInt: Sendcloud parcel ids are 64-bit integers.
-  sendcloudParcelId   BigInt?          @unique
-  /// Key of the label PDF in the private bucket (`labels/{orderId}/{parcelId}.pdf`).
-  /// A key, never a URL — downloads are short-lived signed GETs.
-  labelObjectKey      String?          @db.VarChar(512)
-  /// Sendcloud's own last-seen status code (e.g. `AWAITING_CUSTOMER_PICKUP`),
-  /// kept verbatim beside the mapped `status` so an unmapped/new code is
-  /// visible to staff instead of silently collapsed.
-  sendcloudStatusCode String?          @db.VarChar(64)
-  /// Vendor detail for a FAILED announcement or a refused cancel, for staff.
-  failureReason       String?          @db.Text
-  /// Last time the state was re-read from Sendcloud (webhook or sweep).
-  lastSyncedAt        DateTime?
-
   shippedAt   DateTime?
   deliveredAt DateTime?
   createdAt   DateTime  @default(now())
@@ -1577,8 +1528,6 @@ model Shipment {
 
   @@index([orderId])
   @@index([trackingNumber])
-  /// The tracking sweep: non-terminal SENDCLOUD shipments, oldest sync first.
-  @@index([provider, status, lastSyncedAt])
   @@map("shipment")
 }
 

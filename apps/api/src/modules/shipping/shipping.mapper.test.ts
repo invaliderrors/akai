@@ -3,74 +3,65 @@ import { shippingQuoteResponseSchema } from "@akai/contracts";
 import { toMinor } from "@akai/money";
 
 import { toShippingQuote } from "./shipping.mapper";
-import { type ShippingOption, UNMAPPED_FULFILMENT } from "./shipping-rate.selector";
+import { type ShippingOption } from "./shipping-rate.selector";
 
 const BASIS = {
   cartId: "cart-1",
-  currency: "EUR",
-  subtotalGross: toMinor(3000),
-  weightGrams: 250,
+  currency: "COP",
+  subtotalGross: toMinor(8_900_000),
+  weightGrams: 280,
 };
 
-const INPOST: ShippingOption = {
+const NATIONAL: ShippingOption = {
   rateId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
-  name: { es: "InPost punto de recogida", en: "InPost pickup point" },
-  currency: "EUR",
-  priceGross: toMinor(899),
+  name: { es: "Envío nacional", en: "National shipping" },
+  currency: "COP",
+  priceGross: toMinor(1_500_000),
   isFree: false,
-  fulfilment: {
-    deliveryType: "SERVICE_POINT",
-    carrierCode: "inpost_es",
-    sendcloudOptionCode: "inpost_es:service_point,national_c2c",
-    transitDaysMin: 1,
-    transitDaysMax: 2,
-  },
+  transitDaysMin: 2,
+  transitDaysMax: 5,
 };
 
 describe("toShippingQuote", () => {
-  it("describes the method: delivery type, carrier display name, transit days", () => {
-    const quote = toShippingQuote("ES", BASIS, [INPOST], true);
+  it("describes the method: per-locale name, price and transit days", () => {
+    const quote = toShippingQuote("CO", BASIS, [NATIONAL], true);
 
     expect(shippingQuoteResponseSchema.parse(quote)).toEqual(quote);
-    expect(quote.options[0]).toMatchObject({
-      deliveryType: "SERVICE_POINT",
-      carrierName: "InPost",
-      transitDaysMin: 1,
-      transitDaysMax: 2,
+    expect(quote.options[0]).toEqual({
+      rateId: NATIONAL.rateId,
+      name: { es: "Envío nacional", en: "National shipping" },
+      currency: "COP",
+      priceGross: 1_500_000,
+      isFree: false,
+      transitDaysMin: 2,
+      transitDaysMax: 5,
     });
   });
 
-  it("NEVER publishes the Sendcloud option code or the carrier code", () => {
-    const quote = toShippingQuote("ES", BASIS, [INPOST], true);
-    const wire = JSON.stringify(quote);
-
-    expect(wire).not.toContain("sendcloudOptionCode");
-    expect(wire).not.toContain("national_c2c");
-    expect(wire).not.toContain("inpost_es");
-  });
-
-  it("renders an unmapped rate as HOME with no carrier line", () => {
-    const quote = toShippingQuote(
-      "ES",
-      BASIS,
-      [{ ...INPOST, fulfilment: UNMAPPED_FULFILMENT }],
-      true,
-    );
-    expect(quote.options[0]).toMatchObject({
-      deliveryType: "HOME",
-      carrierName: null,
-      transitDaysMin: null,
-      transitDaysMax: null,
+  it("echoes the inputs the server used", () => {
+    const quote = toShippingQuote("CO", BASIS, [NATIONAL], true);
+    expect(quote).toMatchObject({
+      countryCode: "CO",
+      currency: "COP",
+      subtotalGross: 8_900_000,
+      weightGrams: 280,
+      destinationServed: true,
     });
   });
 
-  it("shows no carrier line for a carrier code it does not know", () => {
+  it("renders a rate with no transit days as null, not as zero", () => {
     const quote = toShippingQuote(
-      "ES",
+      "CO",
       BASIS,
-      [{ ...INPOST, fulfilment: { ...INPOST.fulfilment, carrierCode: "acme_post" } }],
+      [{ ...NATIONAL, transitDaysMin: null, transitDaysMax: null }],
       true,
     );
-    expect(quote.options[0]?.carrierName).toBeNull();
+    expect(quote.options[0]).toMatchObject({ transitDaysMin: null, transitDaysMax: null });
+  });
+
+  it("carries no Sendcloud-era fields", () => {
+    const wire = JSON.stringify(toShippingQuote("CO", BASIS, [NATIONAL], true));
+    expect(wire).not.toContain("deliveryType");
+    expect(wire).not.toContain("carrierName");
   });
 });

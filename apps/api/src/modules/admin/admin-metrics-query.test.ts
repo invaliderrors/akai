@@ -70,6 +70,6 @@ describe("metricsWindowQuerySchema", () => {
   it("defaults to a trailing window ending now", () => {
     const parsed = metricsWindowQuerySchema.parse({});
     expect(parsed.from.getTime()).toBeLessThan(parsed.to.getTime());
-    expect(parsed.currency).toBe("EUR");
+    expect(parsed.currency).toBe("COP");
   });
 });

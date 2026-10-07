@@ -307,7 +307,7 @@ describe("metricsWindowQuerySchema", () => {
     // An unbounded default means the owner's first dashboard load full-scans the
     // largest table in the system, and gets slower every day the store succeeds.
     expect(Math.round(days)).toBe(30);
-    expect(parsed.currency).toBe("EUR");
+    expect(parsed.currency).toBe("COP");
   });
 
   it("rejects an inverted window", () => {

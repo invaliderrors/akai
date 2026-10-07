@@ -6,10 +6,12 @@ import {
   allocate,
   allocateEvenly,
   applyBasisPoints,
+  displayFractionDigits,
   formatAggregateMinor,
   formatMoney,
   fromDecimalString,
   grossFromNet,
+  intlLocale,
   minorUnitExponent,
   multiply,
   parseMinorUnitString,
@@ -66,6 +68,13 @@ describe("VAT-inclusive splitting", () => {
       const split = splitGross(toMinor(grossAmount), 2100);
       expect(split.net + split.tax).toBe(grossAmount);
     }
+  });
+
+  it("splits a $89.000 COP tee at 19% IVA so net + tax foots exactly", () => {
+    const parts = splitGross(toMinor(8_900_000), 1900);
+    expect(parts.net).toBe(7_478_992);
+    expect(parts.tax).toBe(1_421_008);
+    expect(parts.net + parts.tax).toBe(8_900_000);
   });
 
   it("splits €49.99 at 21% into 4131 net + 868 tax", () => {
@@ -160,24 +169,31 @@ describe("parseMinorUnitString — the external-string boundary", () => {
 
 describe("formatting", () => {
   // Intl output contains non-breaking spaces; normalise before asserting.
-  const normalise = (value: string): string => value.replace(/ | /g, " ");
+  const normalise = (value: string): string => value.replace(/[\u00A0\u202F]/g, " ");
 
-  it("formats Spanish as the EU store expects — NOT the old hardcoded en-US", () => {
-    // Comma decimal separator, trailing symbol. The old en-US formatter
-    // rendered this same amount as "€1,234.56", which reads as a different
-    // number entirely to a Spanish customer.
-    expect(normalise(formatMoney(toMinor(123_456), "EUR", "es"))).toBe("1234,56 €");
+  it("formats COP as a Colombian shopper reads it: whole pesos, dot grouping, no decimals", () => {
+    // 8_900_000 centavos is $89.000 — stored in centavos, never DISPLAYED in them.
+    expect(normalise(formatMoney(toMinor(8_900_000), "COP", "es"))).toBe("$ 89.000");
+    expect(normalise(formatMoney(toMinor(123_400), "COP", "es"))).toBe("$ 1.234");
+    expect(normalise(formatMoney(toMinor(0), "COP", "es"))).toBe("$ 0");
   });
 
-  it("follows the Spanish rule of NO group separator below five digits", () => {
-    // Pinned deliberately: es-ES omits the separator for 4-digit integers but
-    // uses "." from 10000 up. A future 'fix' that forces grouping everywhere
-    // would be wrong, and this test says so.
-    expect(normalise(formatMoney(toMinor(1_234_567), "EUR", "es"))).toBe("12.345,67 €");
+  it("formats COP in English with a bare leading symbol and comma grouping", () => {
+    expect(normalise(formatMoney(toMinor(8_900_000), "COP", "en"))).toBe("$89,000");
   });
 
-  it("formats English with a leading symbol", () => {
+  it("rounds stray centavos for DISPLAY only", () => {
+    expect(normalise(formatMoney(toMinor(8_900_060), "COP", "es"))).toBe("$ 89.001");
+  });
+
+  it("still formats a two-decimal currency with its decimals", () => {
     expect(normalise(formatMoney(toMinor(123_456), "EUR", "en"))).toBe("€1,234.56");
+    expect(normalise(formatMoney(toMinor(123_456), "EUR", "es"))).toBe("€ 1.234,56");
+  });
+
+  it("formats Spanish with es-CO and English with en-US", () => {
+    expect(intlLocale("es")).toBe("es-CO");
+    expect(intlLocale("en")).toBe("en-US");
   });
 
   it("respects currencies whose minor unit is not 1/100", () => {
@@ -186,6 +202,13 @@ describe("formatting", () => {
     expect(minorUnitExponent("KWD")).toBe(3);
     // 5000 JPY minor units is ¥5000, not ¥50.
     expect(normalise(formatMoney(toMinor(5000), "JPY", "en"))).toContain("5,000");
+  });
+
+  it("keeps COP's ISO exponent at 2 (centavos) while displaying it with 0 digits", () => {
+    expect(minorUnitExponent("COP")).toBe(2);
+    expect(displayFractionDigits("COP")).toBe(0);
+    expect(displayFractionDigits("EUR")).toBe(2);
+    expect(displayFractionDigits("JPY")).toBe(0);
   });
 });
 
@@ -196,28 +219,27 @@ describe("formatAggregateMinor — the display-only path around the Minor cap", 
 
   it("renders exactly what formatMoney renders for an in-range amount", () => {
     // Same Intl call, so an aggregate tile and a line total cannot drift into
-    // two spellings of the same euro figure.
-    expect(normalise(formatAggregateMinor(8980, "EUR", "es"))).toBe("89,80 €");
-    expect(normalise(formatAggregateMinor(8980, "EUR", "en"))).toBe("€89.80");
-    expect(normalise(formatAggregateMinor(8980, "EUR", "es"))).toBe(
-      normalise(formatMoney(toMinor(8980), "EUR", "es")),
+    // two spellings of the same peso figure.
+    expect(normalise(formatAggregateMinor(8_900_000, "COP", "es"))).toBe("$ 89.000");
+    expect(normalise(formatAggregateMinor(8_900_000, "COP", "en"))).toBe("$89,000");
+    expect(normalise(formatAggregateMinor(8_900_000, "COP", "es"))).toBe(
+      normalise(formatMoney(toMinor(8_900_000), "COP", "es")),
     );
   });
 
   it("formats an aggregate ABOVE MINOR_MAX where toMinor throws", () => {
-    // THE WHOLE REASON THE FUNCTION EXISTS. MINOR_MAX is €20,000,000 — correct
-    // as a ceiling on one order and wrong as a ceiling on lifetime revenue.
-    // A dashboard that brands its aggregates starts crashing on a SUCCESSFUL
-    // business, so the same figure that kills toMinor must still render here.
-    const lifetimeRevenue = MINOR_MAX + 1;
+    // THE WHOLE REASON THE FUNCTION EXISTS. MINOR_MAX is $20.000.000 COP —
+    // correct as a ceiling on one order and wrong as a ceiling on lifetime
+    // revenue. A dashboard that brands its aggregates starts crashing on a
+    // SUCCESSFUL business, so the same figure that kills toMinor must still
+    // render here.
+    const lifetimeRevenue = MINOR_MAX * 50;
 
     expect(() => toMinor(lifetimeRevenue)).toThrow();
-    expect(normalise(formatAggregateMinor(lifetimeRevenue, "EUR", "es"))).toBe(
-      "20.000.000,01 €",
+    expect(normalise(formatAggregateMinor(lifetimeRevenue, "COP", "es"))).toBe(
+      "$ 1.000.000.000",
     );
-    expect(normalise(formatAggregateMinor(lifetimeRevenue, "EUR", "en"))).toBe(
-      "€20,000,000.01",
-    );
+    expect(normalise(formatAggregateMinor(lifetimeRevenue, "COP", "en"))).toBe("$1,000,000,000");
   });
 
   it("respects a currency whose minor unit is not 1/100, like formatMoney does", () => {
@@ -225,7 +247,7 @@ describe("formatAggregateMinor — the display-only path around the Minor cap", 
   });
 
   it("carries a sign, so a refunded-total tile is not read as a credit", () => {
-    expect(normalise(formatAggregateMinor(-4200, "EUR", "es"))).toBe("-42,00 €");
+    expect(normalise(formatAggregateMinor(-4_200_000, "COP", "es"))).toBe("-$ 42.000");
   });
 });
 

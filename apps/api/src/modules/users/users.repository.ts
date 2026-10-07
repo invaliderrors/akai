@@ -57,8 +57,8 @@ export interface AddressRow {
   readonly line1: string;
   readonly line2: string | null;
   readonly city: string;
-  readonly region: string | null;
-  readonly postalCode: string;
+  readonly region: string;
+  readonly postalCode: string | null;
   readonly countryCode: string;
   readonly phone: string | null;
   readonly isDefault: boolean;
@@ -142,8 +142,8 @@ export interface AddressInsert {
   readonly line1: string;
   readonly line2: string | null;
   readonly city: string;
-  readonly region: string | null;
-  readonly postalCode: string;
+  readonly region: string;
+  readonly postalCode: string | null;
   readonly countryCode: string;
   readonly phone: string | null;
   readonly isDefault: boolean;
@@ -157,8 +157,8 @@ export interface AddressPatch {
   readonly line1?: string | undefined;
   readonly line2?: string | null | undefined;
   readonly city?: string | undefined;
-  readonly region?: string | null | undefined;
-  readonly postalCode?: string | undefined;
+  readonly region?: string | undefined;
+  readonly postalCode?: string | null | undefined;
   readonly countryCode?: string | undefined;
   readonly phone?: string | null | undefined;
 }

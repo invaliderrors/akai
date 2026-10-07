@@ -1,12 +1,10 @@
 import type {
   AddressFields,
   AdminOrder,
-  AdminOrderServicePoint,
   AdminOrderShipment,
   Order,
   OrderEvent,
   OrderItem,
-  OrderServicePoint,
   OrderShipment,
   OrderStatus,
   OrderSummary,
@@ -51,10 +49,7 @@ export type OrderStatusEnumsAgree = MutuallyAssignable<
   PrismaOrderStatus
 >;
 
-/**
- * Same proof for shipment statuses — the five Sendcloud states were added to
- * both in one change, and this is what keeps them added to both.
- */
+/** Same proof for shipment statuses. */
 export type ShipmentStatusEnumsAgree = MutuallyAssignable<
   PrismaShipmentStatus,
   ShipmentStatus,
@@ -141,7 +136,7 @@ export function toOrderEventDto(row: OrderWithDetail["events"][number]): OrderEv
   };
 }
 
-/** A parcel as its customer sees it — no vendor detail, no label key. */
+/** A parcel as its customer sees it. */
 export function toOrderShipmentDto(row: ShipmentRow): OrderShipment {
   return {
     id: row.id,
@@ -158,38 +153,7 @@ export function toOrderShipmentDto(row: ShipmentRow): OrderShipment {
 export function toAdminOrderShipmentDto(row: ShipmentRow): AdminOrderShipment {
   return {
     ...toOrderShipmentDto(row),
-    provider: row.provider,
-    // Presence only: the key is a storage detail, downloads go through the
-    // admin label endpoint's short-lived signed URL.
-    hasLabel: row.labelObjectKey !== null,
-    providerStatusCode: row.sendcloudStatusCode,
-    failureReason: row.failureReason,
     createdAt: row.createdAt.toISOString(),
-  };
-}
-
-/**
- * The pickup-point SNAPSHOT, or null. All three identifying columns must be
- * present: checkout writes them together, and a half-written snapshot is
- * rendered as no point rather than as a point with a blank name.
- */
-function toServicePoint(row: OrderWithDetail): OrderServicePoint | null {
-  if (row.servicePointId === null || row.servicePointName === null || row.servicePointAddress === null) {
-    return null;
-  }
-  return { name: row.servicePointName, address: row.servicePointAddress };
-}
-
-function toAdminServicePoint(row: OrderWithDetail): AdminOrderServicePoint | null {
-  const point = toServicePoint(row);
-  if (point === null || row.servicePointId === null) {
-    return null;
-  }
-  return {
-    ...point,
-    id: row.servicePointId,
-    carrierServicePointId: row.servicePointCarrierId,
-    postNumber: row.servicePointPostNumber,
   };
 }
 
@@ -226,10 +190,9 @@ export function toOrderDto(row: OrderWithDetail, view: OrderView): Order {
     shippingAddress: toShippingAddress(row),
     billingAddress: toBillingAddress(row),
     invoiceNumber: row.invoiceNumber,
-    vatNumber: row.vatNumber,
+    documentType: row.documentType,
+    documentNumber: row.documentNumber,
     shippingMethodName: row.shippingMethodName,
-    shippingHouseNumber: row.shipHouseNumber,
-    servicePoint: toServicePoint(row),
     shipments: row.shipments.map(toOrderShipmentDto),
     events,
     placedAt: row.placedAt.toISOString(),
@@ -242,18 +205,13 @@ export function toOrderDto(row: OrderWithDetail, view: OrderView): Order {
 
 /**
  * The admin order detail (`adminOrderSchema`): the admin view of `toOrderDto`
- * plus the fulfilment facts only staff act on.
+ * plus the facts only staff act on.
  */
 export function toAdminOrderDto(row: OrderWithDetail): AdminOrder {
   return {
     ...toOrderDto(row, "admin"),
-    servicePoint: toAdminServicePoint(row),
     shipments: row.shipments.map(toAdminOrderShipmentDto),
     shippingRateId: row.shippingRateId,
-    parcelWeightGrams: row.parcelWeightGrams,
-    // From the order's own SNAPSHOT, not the live rate: remapping or deleting
-    // a rate after checkout must not change how a paid order can ship.
-    labelEligible: row.sendcloudOptionCode !== null,
   };
 }
 

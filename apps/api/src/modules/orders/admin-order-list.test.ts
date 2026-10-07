@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { adminOrderSummarySchema } from "@akai/contracts";
 
 import {
-  ACTIVE_SHIPMENT_STATUSES,
   type OrderForAdminSummary,
   shippingFilterWhere,
   toAdminOrderSummaryDto,
@@ -13,8 +12,8 @@ function row(overrides: Partial<OrderForAdminSummary> = {}): OrderForAdminSummar
     id: "8d7a4a0e-5d0b-4b4e-9d4f-3a1c1f9b8e01",
     orderNumber: "AK-2026-000123",
     status: "PAID",
-    currency: "EUR",
-    grandTotal: 4990,
+    currency: "COP",
+    grandTotal: 10_400_000,
     placedAt: new Date("2026-09-24T10:00:00.000Z"),
     items: [{ quantity: 2 }, { quantity: 1 }],
     shipments: [],
@@ -23,18 +22,16 @@ function row(overrides: Partial<OrderForAdminSummary> = {}): OrderForAdminSummar
 }
 
 describe("toAdminOrderSummaryDto", () => {
-  it("maps the newest shipment compactly and never leaks the object key", () => {
+  it("maps the newest shipment compactly", () => {
     const dto = toAdminOrderSummaryDto(
       row({
-        status: "FULFILLING",
+        status: "SHIPPED",
         shipments: [
           {
             id: "0b9f6a52-6a8e-4d38-9c1e-5b1d7d9e2a10",
-            status: "LABEL_CREATED",
-            provider: "SENDCLOUD",
-            carrier: "inpost_es",
-            trackingNumber: "INP123",
-            labelObjectKey: "labels/o/1.pdf",
+            status: "IN_TRANSIT",
+            carrier: "Servientrega",
+            trackingNumber: "2087654321",
           },
         ],
       }),
@@ -43,13 +40,10 @@ describe("toAdminOrderSummaryDto", () => {
     expect(dto.itemCount).toBe(3);
     expect(dto.shipment).toEqual({
       id: "0b9f6a52-6a8e-4d38-9c1e-5b1d7d9e2a10",
-      status: "LABEL_CREATED",
-      provider: "SENDCLOUD",
-      carrier: "inpost_es",
-      trackingNumber: "INP123",
-      hasLabel: true,
+      status: "IN_TRANSIT",
+      carrier: "Servientrega",
+      trackingNumber: "2087654321",
     });
-    expect(JSON.stringify(dto)).not.toContain("labels/o/1.pdf");
     // The wire shape is the contract's, strictly.
     expect(adminOrderSummarySchema.parse(dto)).toEqual(dto);
   });
@@ -60,44 +54,23 @@ describe("toAdminOrderSummaryDto", () => {
 });
 
 describe("shippingFilterWhere", () => {
-  it("NO_LABEL = paid (or fulfilling) with no parcel that carries goods", () => {
-    expect(shippingFilterWhere("NO_LABEL")).toEqual({
+  it("NOT_SHIPPED = paid (or fulfilling) with no parcel recorded", () => {
+    expect(shippingFilterWhere("NOT_SHIPPED")).toEqual({
       status: { in: ["PAID", "FULFILLING"] },
-      shipments: { none: { status: { in: [...ACTIVE_SHIPMENT_STATUSES] } } },
+      shipments: { none: {} },
     });
   });
 
-  it("an active set that excludes exactly the two statuses that moved nothing", () => {
-    expect(ACTIVE_SHIPMENT_STATUSES).not.toContain("CANCELLED");
-    expect(ACTIVE_SHIPMENT_STATUSES).not.toContain("FAILED");
-    expect(ACTIVE_SHIPMENT_STATUSES).toContain("LABEL_CREATED");
-    expect(ACTIVE_SHIPMENT_STATUSES).toContain("PENDING");
-  });
-
-  it("LABEL_CREATED and IN_TRANSIT look at the parcels", () => {
-    expect(shippingFilterWhere("LABEL_CREATED")).toEqual({
-      shipments: { some: { status: "LABEL_CREATED" } },
-    });
+  it("IN_TRANSIT looks at the parcels", () => {
     expect(shippingFilterWhere("IN_TRANSIT")).toEqual({
-      shipments: { some: { status: { in: ["IN_TRANSIT", "AWAITING_PICKUP"] } } },
+      shipments: { some: { status: "IN_TRANSIT" } },
     });
   });
 
-  it("ISSUE = a carrier problem on a live order, or a paid order whose only labels failed", () => {
+  it("ISSUE = a returned or lost parcel on an order that is still live", () => {
     expect(shippingFilterWhere("ISSUE")).toEqual({
-      OR: [
-        {
-          status: { in: ["PAID", "FULFILLING", "SHIPPED"] },
-          shipments: { some: { status: { in: ["EXCEPTION", "RETURNED", "LOST"] } } },
-        },
-        {
-          status: { in: ["PAID", "FULFILLING"] },
-          AND: [
-            { shipments: { some: { status: "FAILED" } } },
-            { shipments: { none: { status: { in: [...ACTIVE_SHIPMENT_STATUSES] } } } },
-          ],
-        },
-      ],
+      status: { in: ["PAID", "FULFILLING", "SHIPPED"] },
+      shipments: { some: { status: { in: ["RETURNED", "LOST"] } } },
     });
   });
 });

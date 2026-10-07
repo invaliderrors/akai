@@ -21,12 +21,6 @@ import type {
   ResolvedShipping,
   ShippingChargeInput,
 } from "../shipping/shipping.service";
-import { UNMAPPED_FULFILMENT, type RateFulfilment } from "../shipping/shipping-rate.selector";
-import type {
-  ServicePointSnapshot,
-  VerifyServicePointInput,
-} from "../shipping/service-points/service-points.service";
-import { FulfilmentError } from "../fulfilment/fulfilment.errors";
 import type { CheckoutCatalogPort } from "./checkout-catalog.port";
 import {
   CheckoutService,
@@ -34,7 +28,6 @@ import {
   type CheckoutInventoryPort,
   type CheckoutOrdersPort,
   type CheckoutPaymentsPort,
-  type CheckoutServicePointPort,
   type CheckoutShippingPort,
 } from "./checkout.service";
 
@@ -59,8 +52,8 @@ function cartItem(variantId: string, quantity: number): Cart["items"][number] {
     sku: `SKU-${variantId.slice(0, 4)}`,
     imageUrl: null,
     quantity,
-    unitPriceGross: toMinor(4999),
-    lineTotalGross: toMinor(4999 * quantity),
+    unitPriceGross: toMinor(8_900_000),
+    lineTotalGross: toMinor(8_900_000 * quantity),
     priceChanged: false,
     packProductId: null,
     packInstanceId: null,
@@ -77,7 +70,7 @@ function buildCart(overrides: Partial<Cart> = {}): Cart {
     items,
     itemCount: items.reduce((count, item) => count + item.quantity, 0),
     totals: {
-      currency: "EUR",
+      currency: "COP",
       subtotal: grandTotal,
       discountTotal: 0,
       shippingTotal: 0,
@@ -97,22 +90,21 @@ function request(overrides: Partial<CreateCheckoutSession> = {}): CreateCheckout
     cartId: CART_ID,
     email: "guest@example.com",
     shippingAddress: {
-      firstName: "Ana",
-      lastName: "García",
+      firstName: "Valentina",
+      lastName: "Restrepo",
       company: null,
-      line1: "Calle Mayor 1",
+      line1: "Calle 10 # 43-21",
       line2: null,
-      city: "Madrid",
-      region: null,
-      postalCode: "28013",
-      countryCode: "ES",
-      phone: "+34600000000",
-      houseNumber: "1",
+      city: "Medellín",
+      region: "Antioquia",
+      postalCode: null,
+      countryCode: "CO",
+      phone: "3001234567",
     },
     billingAddress: null,
     shippingMethodId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
-    servicePointId: null,
-    vatNumber: null,
+    documentType: "CC",
+    documentNumber: "1020304050",
     locale: "es",
     acceptedTermsVersion: "2026-01",
     ...overrides,
@@ -121,13 +113,12 @@ function request(overrides: Partial<CreateCheckoutSession> = {}): CreateCheckout
 
 const SHIPPING: ResolvedShipping = {
   rateId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
-  methodName: "Correos Estándar",
-  currency: "EUR",
-  priceGross: toMinor(500),
-  taxRateBps: 2100,
-  net: toMinor(413),
-  charge: { net: toMinor(413), taxRateBps: 2100 },
-  fulfilment: UNMAPPED_FULFILMENT,
+  methodName: "Envío nacional",
+  currency: "COP",
+  priceGross: toMinor(1_500_000),
+  taxRateBps: 1900,
+  net: toMinor(1_260_504),
+  charge: { net: toMinor(1_260_504), taxRateBps: 1900 },
 };
 
 // ---------------------------------------------------------------------------
@@ -159,37 +150,6 @@ class FakeShipping implements CheckoutShippingPort {
       throw this.error;
     }
     return this.resolved;
-  }
-}
-
-/**
- * The pickup-point gate, reduced to its contract: HOME needs no point and
- * refuses one; SERVICE_POINT needs one, and `error` scripts a refusal of it.
- * The real rules (carrier/country/expiry/availability) are proven in
- * service-points.service.test.ts; this proves checkout ORDERS them right and
- * stamps the snapshot.
- */
-class FakeServicePoints implements CheckoutServicePointPort {
-  readonly calls: VerifyServicePointInput[] = [];
-  error: Error | null = null;
-  snapshot: ServicePointSnapshot = {
-    servicePointId: "12188365",
-    servicePointCarrierId: "ES21366",
-    servicePointName: "PAPELERIA PILI",
-    servicePointAddress: "CALLE DE LA BATALLA DE LEPANTO, 50002 ZARAGOZA, ES",
-    servicePointPostNumber: null,
-  };
-  async verifyForCheckout(input: VerifyServicePointInput): Promise<ServicePointSnapshot | null> {
-    this.calls.push(input);
-    if (this.error !== null) {
-      throw this.error;
-    }
-    if (input.fulfilment.deliveryType === "HOME") {
-      if (input.servicePointId !== null) throw FulfilmentError.from("SERVICE_POINT_NOT_ALLOWED");
-      return null;
-    }
-    if (input.servicePointId === null) throw FulfilmentError.from("SERVICE_POINT_REQUIRED");
-    return this.snapshot;
   }
 }
 
@@ -254,7 +214,6 @@ interface Harness {
   inventory: FakeInventory;
   orders: FakeOrders;
   payments: FakePayments;
-  servicePoints: FakeServicePoints;
 }
 
 function buildHarness(cart: Cart = buildCart()): Harness {
@@ -264,7 +223,6 @@ function buildHarness(cart: Cart = buildCart()): Harness {
   const inventory = new FakeInventory();
   const orders = new FakeOrders(order);
   const payments = new FakePayments();
-  const servicePoints = new FakeServicePoints();
   const catalog = new FakeCatalog(
     new Map([
       [VARIANT_A, 100],
@@ -279,10 +237,9 @@ function buildHarness(cart: Cart = buildCart()): Harness {
     orders,
     payments,
     catalog,
-    servicePoints,
   );
 
-  return { service, cart: cartDouble, shipping, inventory, orders, payments, servicePoints };
+  return { service, cart: cartDouble, shipping, inventory, orders, payments };
 }
 
 const ACTOR: CartActor = { customerId: null, cartToken: "tok_guest" };
@@ -335,33 +292,34 @@ describe("CheckoutService.startCheckout", () => {
 
     expect(harness.shipping.calls).toHaveLength(1);
     const quote = harness.shipping.calls[0];
-    expect(quote?.countryCode).toBe("ES");
+    expect(quote?.countryCode).toBe("CO");
     expect(quote?.shippingMethodId).toBe("eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee");
-    // 1×4999 + 2×4999 gross.
-    expect(quote?.subtotalGross).toBe(toMinor(14997));
+    // 1×$89.000 + 2×$89.000 gross, in centavos.
+    expect(quote?.subtotalGross).toBe(toMinor(26_700_000));
     // 1×100g + 2×250g.
     expect(quote?.weightGrams).toBe(600);
   });
 
   it("measures the free-shipping basis AFTER the discount, not on the raw line totals (D3a)", async () => {
-    // €260.00 of lines, a €20.00 coupon: a €240.00 order. Summing
-    // lineTotalGross (the old basis) would give 26 000 and buy free shipping
-    // over a €250 threshold that the quote endpoint correctly refused.
+    // $310.000 of lines, a $20.000 coupon: a $290.000 order. Summing
+    // lineTotalGross (the old basis) would give 31 000 000 and buy free
+    // shipping over a $300.000 threshold that the quote endpoint correctly
+    // refused.
     const items = [cartItem(VARIANT_A, 1)].map((item) => ({
       ...item,
-      unitPriceGross: toMinor(26_000),
-      lineTotalGross: toMinor(26_000),
+      unitPriceGross: toMinor(31_000_000),
+      lineTotalGross: toMinor(31_000_000),
     }));
     harness = buildHarness(
       buildCart({
         items,
         totals: {
-          currency: "EUR",
-          subtotal: toMinor(26_000),
-          discountTotal: toMinor(2_000),
+          currency: "COP",
+          subtotal: toMinor(31_000_000),
+          discountTotal: toMinor(2_000_000),
           shippingTotal: toMinor(0),
           taxTotal: toMinor(0),
-          grandTotal: toMinor(24_000),
+          grandTotal: toMinor(29_000_000),
         },
         discountCode: "SAVE20",
       }),
@@ -369,29 +327,30 @@ describe("CheckoutService.startCheckout", () => {
 
     await harness.service.startCheckout(ACTOR, request());
 
-    expect(harness.shipping.calls[0]?.subtotalGross).toBe(toMinor(24_000));
+    expect(harness.shipping.calls[0]?.subtotalGross).toBe(toMinor(29_000_000));
   });
 
   it("measures the basis over COUNTED lines only — the cart's subtotal, not every line", async () => {
     // A PRICE_CHANGED line is non-blocking, so checkout proceeds; the cart's
     // own totals are the authority on which lines count. Here the totals say
-    // 4 999 while the lines sum to 14 997 — the basis must follow the totals.
+    // 8 900 000 while the lines sum to 26 700 000 — the basis must follow the
+    // totals.
     harness = buildHarness(
       buildCart({
         totals: {
-          currency: "EUR",
-          subtotal: toMinor(4_999),
+          currency: "COP",
+          subtotal: toMinor(8_900_000),
           discountTotal: toMinor(0),
           shippingTotal: toMinor(0),
           taxTotal: toMinor(0),
-          grandTotal: toMinor(4_999),
+          grandTotal: toMinor(8_900_000),
         },
       }),
     );
 
     await harness.service.startCheckout(ACTOR, request());
 
-    expect(harness.shipping.calls[0]?.subtotalGross).toBe(toMinor(4_999));
+    expect(harness.shipping.calls[0]?.subtotalGross).toBe(toMinor(8_900_000));
   });
 
   it("refuses an empty cart before holding any stock", async () => {
@@ -479,112 +438,41 @@ describe("CheckoutService.startCheckout", () => {
   });
 });
 
-describe("CheckoutService.startCheckout — pickup points and the fulfilment snapshot (Sendcloud §3.3)", () => {
-  const PICKUP: RateFulfilment = {
-    deliveryType: "SERVICE_POINT",
-    carrierCode: "inpost_es",
-    sendcloudOptionCode: "inpost_es:service_point,national_c2c",
-    transitDaysMin: 1,
-    transitDaysMax: 2,
-  };
-  const PICKUP_SHIPPING: ResolvedShipping = { ...SHIPPING, fulfilment: PICKUP };
-
+describe("CheckoutService.startCheckout — the order snapshot", () => {
   let harness: Harness;
 
   beforeEach(() => {
     harness = buildHarness();
   });
 
-  function expectNoSideEffects(): void {
-    expect(harness.inventory.reserved).toEqual([]);
-    expect(harness.orders.calls).toEqual([]);
-    expect(harness.cart.clearCalls).toBe(0);
-    expect(harness.payments.calls).toEqual([]);
-  }
-
-  async function reasonOf(promise: Promise<unknown>): Promise<string | null> {
-    const error = await promise.then(
-      () => null,
-      (e: unknown) => e,
-    );
-    return error instanceof FulfilmentError ? error.reason : null;
-  }
-
-  it("stamps the snapshot for a HOME rate: rate id, option code, parcel weight, house number, no point", async () => {
-    harness.shipping.resolved = {
-      ...SHIPPING,
-      fulfilment: { ...UNMAPPED_FULFILMENT, sendcloudOptionCode: "ups:standard" },
-    };
-
+  it("hands the buyer's identity document to the order, as the schema normalised it", async () => {
     await harness.service.startCheckout(
       ACTOR,
-      request({ shippingAddress: { ...request().shippingAddress, houseNumber: " 12B " } }),
+      request({ documentType: "NIT", documentNumber: "800197268-4" }),
     );
 
-    expect(harness.orders.calls[0]?.fulfilment).toEqual({
-      shippingRateId: SHIPPING.rateId,
-      sendcloudOptionCode: "ups:standard",
-      // 1×100 g + 2×250 g — the SAME weights shipping was priced with.
-      parcelWeightGrams: 600,
-      shipHouseNumber: "12B",
-      servicePointId: null,
-      servicePointCarrierId: null,
-      servicePointName: null,
-      servicePointAddress: null,
-      servicePointPostNumber: null,
+    expect(harness.orders.calls[0]?.customerDocument).toEqual({
+      type: "NIT",
+      number: "800197268-4",
     });
   });
 
-  it("verifies the chosen point against the RESOLVED rate and the shipping country, then snapshots it", async () => {
-    harness.shipping.resolved = PICKUP_SHIPPING;
+  it("records the RESOLVED rate id, never one the client could have named", async () => {
+    harness.shipping.resolved = { ...SHIPPING, rateId: "99999999-9999-4999-8999-999999999999" };
 
-    await harness.service.startCheckout(ACTOR, request({ servicePointId: "12188365" }));
+    await harness.service.startCheckout(ACTOR, request());
 
-    expect(harness.servicePoints.calls).toEqual([
-      { fulfilment: PICKUP, servicePointId: "12188365", countryCode: "ES" },
-    ]);
-    expect(harness.orders.calls[0]?.fulfilment).toMatchObject({
-      shippingRateId: SHIPPING.rateId,
-      sendcloudOptionCode: "inpost_es:service_point,national_c2c",
-      parcelWeightGrams: 600,
-      servicePointId: "12188365",
-      servicePointCarrierId: "ES21366",
-      servicePointName: "PAPELERIA PILI",
-      servicePointAddress: "CALLE DE LA BATALLA DE LEPANTO, 50002 ZARAGOZA, ES",
-      servicePointPostNumber: null,
+    expect(harness.orders.calls[0]?.shippingRateId).toBe("99999999-9999-4999-8999-999999999999");
+  });
+
+  it("passes the Colombian shipping address through unchanged", async () => {
+    await harness.service.startCheckout(ACTOR, request());
+
+    expect(harness.orders.calls[0]?.shippingAddress).toMatchObject({
+      region: "Antioquia",
+      city: "Medellín",
+      postalCode: null,
+      phone: "3001234567",
     });
-  });
-
-  it("refuses a pickup rate with no point (SERVICE_POINT_REQUIRED) before holding stock", async () => {
-    harness.shipping.resolved = PICKUP_SHIPPING;
-
-    expect(await reasonOf(harness.service.startCheckout(ACTOR, request()))).toBe("SERVICE_POINT_REQUIRED");
-    expectNoSideEffects();
-  });
-
-  it("refuses a point on a HOME rate (SERVICE_POINT_NOT_ALLOWED) before holding stock", async () => {
-    expect(
-      await reasonOf(harness.service.startCheckout(ACTOR, request({ servicePointId: "12188365" }))),
-    ).toBe("SERVICE_POINT_NOT_ALLOWED");
-    expectNoSideEffects();
-  });
-
-  it("refuses an unavailable point (wrong carrier / country / expired / closed / Sendcloud down) with no side effects", async () => {
-    harness.shipping.resolved = PICKUP_SHIPPING;
-    harness.servicePoints.error = FulfilmentError.from("SERVICE_POINT_UNAVAILABLE");
-
-    expect(
-      await reasonOf(harness.service.startCheckout(ACTOR, request({ servicePointId: "12188365" }))),
-    ).toBe("SERVICE_POINT_UNAVAILABLE");
-    expectNoSideEffects();
-  });
-
-  it("does not verify a point at all when shipping itself is refused", async () => {
-    harness.shipping.error = new Error("method unavailable");
-
-    await expect(harness.service.startCheckout(ACTOR, request({ servicePointId: "1" }))).rejects.toThrow(
-      /method unavailable/,
-    );
-    expect(harness.servicePoints.calls).toEqual([]);
   });
 });

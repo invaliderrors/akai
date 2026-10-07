@@ -2,7 +2,6 @@ import type { ShippingQuoteResponse } from "@akai/contracts";
 import { toMinor } from "@akai/money";
 
 import type { CartShippingBasis } from "../cart/cart.service";
-import { carrierDisplayName } from "./carrier-names";
 import type { ShippingOption } from "./shipping-rate.selector";
 
 /**
@@ -12,7 +11,7 @@ import type { ShippingOption } from "./shipping-rate.selector";
  * for the same reason `product.mapper.ts` exists: the two shapes are not the
  * same and must not become the same by accident. `ShippingOption` is the
  * selector's own vocabulary and is free to grow internal fields (a zone id, a
- * carrier code, a bracket bound) that have no business on a public response.
+ * bracket bound) that have no business on a public response.
  *
  * Pure and exported so the flattening rules — an unserved destination, an empty
  * bracket set, the echoed inputs — are assertable without a Nest context or a
@@ -46,13 +45,8 @@ export function toShippingQuote(
       // shipping total the customer is then charged.
       priceGross: toMinor(option.priceGross),
       isFree: option.isFree,
-      // The rate's Sendcloud mapping, MINUS the option code: which Sendcloud
-      // product a parcel is announced as is internal routing, never public.
-      // Picked field by field for that reason rather than spread.
-      deliveryType: option.fulfilment.deliveryType,
-      carrierName: carrierDisplayName(option.fulfilment.carrierCode),
-      transitDaysMin: option.fulfilment.transitDaysMin,
-      transitDaysMax: option.fulfilment.transitDaysMax,
+      transitDaysMin: option.transitDaysMin,
+      transitDaysMax: option.transitDaysMax,
     })),
   };
 }

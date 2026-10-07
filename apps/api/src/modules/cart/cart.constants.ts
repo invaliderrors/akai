@@ -51,7 +51,7 @@ export const CART_TOKEN_ENCODED_LENGTH = 43;
 /**
  * Currency a newly created cart is denominated in.
  *
- * The store is EUR-first but the schema is not EUR-only (`currency` is a column
+ * The store sells in Colombian pesos, but the schema is not COP-only (`currency` is a column
  * on cart, cart_item and product_variant), so this is the DEFAULT, not an
  * assumption baked into the arithmetic. A cart never mixes currencies: adding a
  * variant priced in another currency is rejected rather than silently converted,
@@ -60,7 +60,7 @@ export const CART_TOKEN_ENCODED_LENGTH = 43;
  * INTEGRATION: should move to validated config once a currency/region setting
  * exists in libs/config. See followUps.
  */
-export const DEFAULT_CART_CURRENCY = "EUR";
+export const DEFAULT_CART_CURRENCY = "COP";
 
 /**
  * Locale a cart is presented in when the caller names none.

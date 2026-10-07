@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { CurrencyCode, Minor } from "@akai/contracts";
 import { toMinor } from "@akai/money";
 
-import { type ShippingRateRow, UNMAPPED_FULFILMENT } from "./shipping-rate.selector";
+import { type ShippingRateRow } from "./shipping-rate.selector";
 import type {
   OfferableRateThreshold,
   ShippingRepository,
@@ -54,7 +54,8 @@ function flatRate(overrides: Partial<ShippingRateRow> = {}): ShippingRateRow {
     maxValue: null,
     freeOverSubtotal: null,
     isActive: true,
-    fulfilment: UNMAPPED_FULFILMENT,
+    transitDaysMin: null,
+    transitDaysMax: null,
     ...overrides,
   };
 }

@@ -66,29 +66,29 @@ function orderRow(overrides: OrderRowOverrides = {}): Record<string, unknown> {
     taxTotal: 1735,
     grandTotal: overrides.grandTotal ?? 9998,
     refundedTotal: overrides.refundedTotal ?? 0,
-    shipFirstName: "Ana",
-    shipLastName: "García",
+    shipFirstName: "Valentina",
+    shipLastName: "Restrepo",
     shipCompany: null,
-    shipLine1: "Calle Mayor 1",
+    shipLine1: "Calle 10 # 43-21",
     shipLine2: null,
-    shipCity: "Madrid",
-    shipRegion: null,
-    shipPostalCode: "28013",
-    shipCountryCode: "ES",
-    shipPhone: null,
-    billFirstName: "Ana",
-    billLastName: "García",
+    shipCity: "Medellín",
+    shipRegion: "Antioquia",
+    shipPostalCode: null,
+    shipCountryCode: "CO",
+    shipPhone: "3001234567",
+    billFirstName: "Valentina",
+    billLastName: "Restrepo",
     billCompany: null,
-    billLine1: "Calle Mayor 1",
+    billLine1: "Calle 10 # 43-21",
     billLine2: null,
-    billCity: "Madrid",
-    billRegion: null,
-    billPostalCode: "28013",
-    billCountryCode: "ES",
+    billCity: "Medellín",
+    billRegion: "Antioquia",
+    billPostalCode: null,
+    billCountryCode: "CO",
     billPhone: null,
     invoiceNumber: null,
-    vatNumber: null,
-    reverseCharge: false,
+    documentType: "CC",
+    documentNumber: "1020304050",
     shippingMethodName: "Estándar",
     acceptedTermsVersion: "2026-01",
     providerCheckoutToken: null,
@@ -1017,16 +1017,15 @@ describe("OrdersService — delivery-confirmation producer", () => {
     expect(harness.outboxMessage.create).not.toHaveBeenCalled();
   });
 
-  it("ignores a CANCELLED label beside the delivered parcel", async () => {
+  it("holds the order short of DELIVERED while another parcel is returned or lost", async () => {
     harness.order.findUnique.mockResolvedValue({
       ...orderRow({ status: "SHIPPED", version: 3 }),
-      shipments: [{ status: "DELIVERED" }, { status: "CANCELLED" }, { status: "FAILED" }],
+      shipments: [{ status: "DELIVERED" }, { status: "RETURNED" }],
     });
 
     await service.markShipmentDelivered(SHIPMENT_ID, STAFF);
 
-    const envelope = enqueuedEmail(harness.outboxMessage);
-    expect(envelope["templateKey"]).toBe("delivery-confirmation");
+    expect(harness.outboxMessage.create).not.toHaveBeenCalled();
   });
 
   it("does not re-mail an already-delivered parcel", async () => {
@@ -1041,7 +1040,7 @@ describe("OrdersService — delivery-confirmation producer", () => {
     expect(harness.outboxMessage.create).not.toHaveBeenCalled();
   });
 
-  it("accepts NO actor — the Sendcloud tracking sync delivers on the carrier's word", async () => {
+  it("accepts NO actor — an automated carrier integration delivers on the carrier's word", async () => {
     harness.order.findUnique.mockResolvedValue({
       ...orderRow({ status: "SHIPPED", version: 3 }),
       shipments: [{ status: "DELIVERED" }],
@@ -1126,16 +1125,16 @@ describe("OrdersService.createFromCart — packs", () => {
   const VARIANT_C = "20000000-0000-4000-8000-000000000003";
 
   const ADDRESS = {
-    firstName: "Ana",
-    lastName: "García",
+    firstName: "Valentina",
+    lastName: "Restrepo",
     company: null,
-    line1: "Calle Mayor 1",
+    line1: "Calle 10 # 43-21",
     line2: null,
-    city: "Madrid",
-    region: null,
-    postalCode: "28013",
-    countryCode: "ES",
-    phone: null,
+    city: "Medellín",
+    region: "Antioquia",
+    postalCode: null,
+    countryCode: "CO",
+    phone: "3001234567",
   };
 
   function componentItem(
@@ -1269,10 +1268,10 @@ describe("OrdersService.createFromCart — packs", () => {
       locale: "es" as const,
       shippingAddress: ADDRESS,
       billingAddress: ADDRESS,
-      shipping: { net: toMinor(0), taxRateBps: 2100 },
-      shippingMethodName: "Estándar",
+      shipping: { net: toMinor(0), taxRateBps: 1900 },
+      shippingMethodName: "Envío nacional",
       acceptedTermsVersion: "2026-01",
-      vatNumber: null,
+      customerDocument: { type: "CC" as const, number: "1020304050" },
     };
   }
 
@@ -1302,51 +1301,31 @@ describe("OrdersService.createFromCart — packs", () => {
     expect(total).toBe(5499);
   });
 
-  it("stamps checkout's fulfilment snapshot onto the order row (Sendcloud §3.3)", async () => {
+  it("snapshots the buyer's identity document and the chosen rate onto the order row", async () => {
     const { harness, service } = await buildOrdersHarness();
     harness.cart.findUnique.mockResolvedValueOnce(
-      cartRow([
-        componentItem("item-a", VARIANT_A, 1000),
-        componentItem("item-b", VARIANT_B, 2000),
-        componentItem("item-c", VARIANT_C, 3000),
-      ]),
+      cartRow([standaloneItem("item-x", VARIANT_A, 4999)]),
     );
-    harness.product.findMany.mockResolvedValueOnce([packRow(5499)]);
 
     const order = await service.createFromCart({
       ...baseInput(),
-      fulfilment: {
-        shippingRateId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
-        sendcloudOptionCode: "inpost_es:service_point,national_c2c",
-        parcelWeightGrams: 600,
-        shipHouseNumber: "12B",
-        servicePointId: "12188365",
-        servicePointCarrierId: "ES21366",
-        servicePointName: "PAPELERIA PILI",
-        servicePointAddress: "CALLE DE LA BATALLA DE LEPANTO, 50002 ZARAGOZA, ES",
-        servicePointPostNumber: null,
-      },
+      customerDocument: { type: "NIT", number: "800197268-4" },
+      shippingRateId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
     });
 
     const args: unknown = harness.order.create.mock.calls[0]?.[0];
     expect(args).toMatchObject({
       data: {
+        documentType: "NIT",
+        documentNumber: "800197268-4",
         shippingRateId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
-        sendcloudOptionCode: "inpost_es:service_point,national_c2c",
-        parcelWeightGrams: 600,
-        shipHouseNumber: "12B",
-        servicePointId: "12188365",
-        servicePointCarrierId: "ES21366",
-        servicePointName: "PAPELERIA PILI",
-        servicePointAddress: "CALLE DE LA BATALLA DE LEPANTO, 50002 ZARAGOZA, ES",
-        servicePointPostNumber: null,
+        shipRegion: "Antioquia",
+        shipPostalCode: null,
+        shipPhone: "3001234567",
       },
     });
-    expect(order.servicePoint).toEqual({
-      name: "PAPELERIA PILI",
-      address: "CALLE DE LA BATALLA DE LEPANTO, 50002 ZARAGOZA, ES",
-    });
-    expect(order.shippingHouseNumber).toBe("12B");
+    expect(order.documentType).toBe("NIT");
+    expect(order.documentNumber).toBe("800197268-4");
   });
 
   it("prices proportionally to each component's own live price, not evenly", async () => {

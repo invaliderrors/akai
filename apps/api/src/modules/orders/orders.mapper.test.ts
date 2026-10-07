@@ -59,48 +59,40 @@ function orderRow(overrides: Partial<OrderWithDetail> = {}): OrderWithDetail {
     email: "cliente@example.com",
     status: "PAID",
     locale: "es",
-    currency: "EUR",
+    currency: "COP",
     subtotal: 8263,
     discountTotal: 0,
     shippingTotal: 0,
     taxTotal: 1735,
     grandTotal: 9998,
     refundedTotal: 0,
-    shipFirstName: "Ana",
-    shipLastName: "García",
+    shipFirstName: "Valentina",
+    shipLastName: "Restrepo",
     shipCompany: null,
-    shipLine1: "Calle Mayor 1",
-    shipLine2: null,
-    shipCity: "Madrid",
-    shipRegion: null,
-    shipPostalCode: "28013",
-    shipCountryCode: "ES",
-    shipPhone: null,
-    billFirstName: "Ana",
-    billLastName: "García",
+    shipLine1: "Calle 10 # 43-21",
+    shipLine2: "Apto 502",
+    shipCity: "Medellín",
+    shipRegion: "Antioquia",
+    shipPostalCode: null,
+    shipCountryCode: "CO",
+    shipPhone: "3001234567",
+    billFirstName: "Valentina",
+    billLastName: "Restrepo",
     billCompany: null,
-    billLine1: "Calle Mayor 1",
-    billLine2: null,
-    billCity: "Madrid",
-    billRegion: null,
-    billPostalCode: "28013",
-    billCountryCode: "ES",
+    billLine1: "Calle 10 # 43-21",
+    billLine2: "Apto 502",
+    billCity: "Medellín",
+    billRegion: "Antioquia",
+    billPostalCode: null,
+    billCountryCode: "CO",
     billPhone: null,
     invoiceNumber: "INV-2026-000045",
-    vatNumber: null,
-    reverseCharge: false,
-    shippingMethodName: "Estándar",
+    documentType: "CC",
+    documentNumber: "1020304050",
+    shippingMethodName: "Envío nacional",
     acceptedTermsVersion: "2026-01",
     providerCheckoutId: "cs_test_123",
     shippingRateId: null,
-    sendcloudOptionCode: null,
-    servicePointId: null,
-    servicePointCarrierId: null,
-    servicePointName: null,
-    servicePointAddress: null,
-    servicePointPostNumber: null,
-    shipHouseNumber: null,
-    parcelWeightGrams: null,
     placedAt: PLACED,
     paidAt: new Date("2026-07-01T10:05:00.000Z"),
     cancelledAt: null,
@@ -172,8 +164,8 @@ describe("toOrderDto", () => {
 
   it("carries the snapshotted address, not a reference to the address book", () => {
     const dto = toOrderDto(orderRow(), "customer");
-    expect(dto.shippingAddress.line1).toBe("Calle Mayor 1");
-    expect(dto.shippingAddress.countryCode).toBe("ES");
+    expect(dto.shippingAddress.line1).toBe("Calle 10 # 43-21");
+    expect(dto.shippingAddress.countryCode).toBe("CO");
     // No addressId anywhere: a customer editing their address book must not
     // rewrite where a two-year-old parcel was sent.
     expect(JSON.stringify(dto)).not.toContain("addressId");
@@ -192,114 +184,63 @@ function shipmentRow(
   return {
     id: "ffffffff-0000-4000-8000-000000000001",
     orderId: "bbbbbbbb-0000-4000-8000-000000000001",
-    status: "LABEL_CREATED",
-    carrier: "InPost",
-    trackingNumber: "SCCWF3P9K4PJ",
-    trackingUrl: "https://tracking.example.com/SCCWF3P9K4PJ",
-    provider: "SENDCLOUD",
-    sendcloudShipmentId: "95524bc9-174f-47c8-a03a-e60b83a24fe1",
-    sendcloudParcelId: 718530367n,
-    labelObjectKey: "labels/bbbbbbbb/718530367.pdf",
-    sendcloudStatusCode: "READY_TO_SEND",
-    failureReason: null,
-    lastSyncedAt: null,
-    shippedAt: null,
+    status: "IN_TRANSIT",
+    carrier: "Servientrega",
+    trackingNumber: "2087654321",
+    trackingUrl: "https://tracking.example.com/2087654321",
+    shippedAt: new Date("2026-07-02T09:00:00.000Z"),
     deliveredAt: null,
     createdAt: new Date("2026-07-02T09:00:00.000Z"),
     ...overrides,
   };
 }
 
-const PICKUP_SNAPSHOT = {
-  shippingRateId: "99999999-0000-4000-8000-000000000001",
-  sendcloudOptionCode: "inpost_es:service_point,national_c2c",
-  servicePointId: "12188365",
-  servicePointCarrierId: "ES21366",
-  servicePointName: "PAPELERIA PILI",
-  servicePointAddress: "CALLE DE LA BATALLA DE LEPANTO, 50002 ZARAGOZA, ES",
-  servicePointPostNumber: null,
-  shipHouseNumber: "1",
-  parcelWeightGrams: 120,
-} as const;
-
-describe("toOrderDto — fulfilment", () => {
-  it("includes the method name, house number, point and parcels for the customer", () => {
-    const dto = toOrderDto(orderRow({ ...PICKUP_SNAPSHOT, shipments: [shipmentRow()] }), "customer");
+describe("toOrderDto — identity document, method and parcels", () => {
+  it("includes the document, the Colombian address, the method name and the parcels", () => {
+    const dto = toOrderDto(orderRow({ shipments: [shipmentRow()] }), "customer");
 
     expect(orderSchema.parse(dto)).toEqual(dto);
-    expect(dto.shippingMethodName).toBe("Estándar");
-    expect(dto.shippingHouseNumber).toBe("1");
-    expect(dto.servicePoint).toEqual({
-      name: "PAPELERIA PILI",
-      address: "CALLE DE LA BATALLA DE LEPANTO, 50002 ZARAGOZA, ES",
+    expect(dto.documentType).toBe("CC");
+    expect(dto.documentNumber).toBe("1020304050");
+    expect(dto.shippingMethodName).toBe("Envío nacional");
+    expect(dto.shippingAddress).toMatchObject({
+      region: "Antioquia",
+      city: "Medellín",
+      postalCode: null,
+      phone: "3001234567",
     });
     expect(dto.shipments).toEqual([
       {
         id: "ffffffff-0000-4000-8000-000000000001",
-        carrier: "InPost",
-        trackingNumber: "SCCWF3P9K4PJ",
-        trackingUrl: "https://tracking.example.com/SCCWF3P9K4PJ",
-        status: "LABEL_CREATED",
-        shippedAt: null,
+        carrier: "Servientrega",
+        trackingNumber: "2087654321",
+        trackingUrl: "https://tracking.example.com/2087654321",
+        status: "IN_TRANSIT",
+        shippedAt: "2026-07-02T09:00:00.000Z",
         deliveredAt: null,
       },
     ]);
   });
 
-  it("NEVER shows the customer the label key, vendor ids or failure detail", () => {
-    const dto = toOrderDto(
-      orderRow({
-        ...PICKUP_SNAPSHOT,
-        shipments: [shipmentRow({ status: "FAILED", failureReason: "to_address.house_number required" })],
-      }),
-      "customer",
-    );
-    const wire = JSON.stringify(dto);
-
-    for (const leak of ["labels/", "718530367", "95524bc9", "house_number required", "national_c2c", "ES21366"]) {
-      expect(wire).not.toContain(leak);
-    }
-  });
-
-  it("renders a home-delivery order with no point and no parcels", () => {
-    const dto = toOrderDto(orderRow(), "customer");
-    expect(dto.servicePoint).toBeNull();
-    expect(dto.shipments).toEqual([]);
-  });
-
-  it("treats a half-written point snapshot as no point", () => {
-    const dto = toOrderDto(
-      orderRow({ ...PICKUP_SNAPSHOT, servicePointName: null }),
-      "customer",
-    );
-    expect(dto.servicePoint).toBeNull();
+  it("renders an order with no parcels yet", () => {
+    expect(toOrderDto(orderRow(), "customer").shipments).toEqual([]);
   });
 });
 
 describe("toAdminOrderDto", () => {
-  it("adds the staff-only fulfilment facts and satisfies the admin contract", () => {
+  it("adds the staff-only facts and satisfies the admin contract", () => {
     const dto = toAdminOrderDto(
       orderRow({
-        ...PICKUP_SNAPSHOT,
-        shipments: [shipmentRow({ status: "FAILED", labelObjectKey: null, failureReason: "bad address" })],
+        shippingRateId: "99999999-0000-4000-8000-000000000001",
+        shipments: [shipmentRow()],
       }),
     );
 
     expect(adminOrderSchema.parse(dto)).toEqual(dto);
-    expect(dto.labelEligible).toBe(true);
-    expect(dto.parcelWeightGrams).toBe(120);
-    expect(dto.servicePoint).toEqual({
-      name: "PAPELERIA PILI",
-      address: "CALLE DE LA BATALLA DE LEPANTO, 50002 ZARAGOZA, ES",
-      id: "12188365",
-      carrierServicePointId: "ES21366",
-      postNumber: null,
-    });
+    expect(dto.shippingRateId).toBe("99999999-0000-4000-8000-000000000001");
+    expect(dto.documentNumber).toBe("1020304050");
     expect(dto.shipments[0]).toMatchObject({
-      provider: "SENDCLOUD",
-      hasLabel: false,
-      providerStatusCode: "READY_TO_SEND",
-      failureReason: "bad address",
+      carrier: "Servientrega",
       createdAt: "2026-07-02T09:00:00.000Z",
     });
   });
@@ -307,10 +248,6 @@ describe("toAdminOrderDto", () => {
   it("keeps internal timeline entries (admin view)", () => {
     const dto = toAdminOrderDto(orderRow({ events: [eventRow({ isInternal: true })] }));
     expect(dto.events).toHaveLength(1);
-  });
-
-  it("is not label-eligible without an option-code snapshot", () => {
-    expect(toAdminOrderDto(orderRow()).labelEligible).toBe(false);
   });
 });
 

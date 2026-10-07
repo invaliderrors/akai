@@ -1,47 +1,29 @@
 /**
- * The shop's shipping setup — zones, rates, their Sendcloud mapping and the
- * STANDARD VAT rate of every country a zone serves — as ONE definition, plus the
- * idempotent writer both `seed.ts` (fresh databases) and `seed-shipping.ts`
- * (re-applying it to an existing one) call.
+ * The shop's shipping setup — its one zone, its one rate, and the STANDARD tax
+ * rate of the country it serves — as ONE definition, plus the idempotent writer
+ * both `seed.ts` (fresh databases) and `seed-shipping.ts` (re-applying it to an
+ * existing one) call.
  *
  * NO TOP-LEVEL SIDE EFFECTS. `seed.ts` runs its whole seed on import, so anything
  * another script needs has to live in a module like this one, which only
  * declares things.
  *
- * What ships where (Sendcloud options from ES, spec
- * docs/superpowers/specs/2026-09-24-sendcloud-shipping.md §11a):
+ * Akai sells in COLOMBIA ONLY, so the setup is deliberately simple:
  *
- *   | Zone              | Countries          | UPS Access Point | InPost pickup        |
- *   | Spain (mainland)  | ES                 | 1–3 days         | national, 1–2 days   |
- *   | European Union    | PT FR DE IT NL BE  | 2–4 days         | international, 2–4   |
- *   | Ireland           | IE                 | 2–4 days         | NOT AVAILABLE        |
+ *   | Zone     | Countries | Rate                                 | Price     |
+ *   | Colombia | CO        | Envío nacional / National shipping   | $ 15.000  |
  *
- * Every zone also gets an UNMAPPED home-delivery rate. The storefront's checkout
- * offers HOME rates only until the API grows pickup-point search, and Akai's own
- * Sendcloud contract (so its home option codes) does not exist yet: staff map
- * the rate in /admin/shipping, and until then label purchase skips it as
- * RATE_NOT_MAPPED rather than guessing a carrier.
- *
- * Ireland is its own zone because a zone's rates are offered to every country in
- * it, and InPost cannot ship to IE. Every rate ships free at or above
- * `FREE_SHIPPING_THRESHOLD_MINOR`. Prices are placeholders for the new shop and
- * are editable in /admin/shipping.
+ * free at or above `FREE_SHIPPING_THRESHOLD_MINOR` ($ 300.000). Staff ship by
+ * hand (carrier and tracking number typed into the order), so a rate carries no
+ * carrier mapping. Prices are placeholders, editable in /admin/shipping.
  */
 
 import { type Locale, type PrismaClient, TaxClass } from "@prisma/client";
 
 import { FREE_SHIPPING_THRESHOLD_MINOR } from "./free-shipping-threshold";
 
-export type SeedDeliveryType = "HOME" | "SERVICE_POINT";
-
-/** The Sendcloud mapping of one rate (`shipping_rate` columns of the same names). */
-export interface RateMapping {
-  readonly deliveryType: SeedDeliveryType;
-  readonly carrierCode: string | null;
-  readonly sendcloudOptionCode: string | null;
-  readonly transitDaysMin: number | null;
-  readonly transitDaysMax: number | null;
-}
+/** The currency every seeded amount is in. Minor units are centavos. */
+export const SEED_CURRENCY = "COP";
 
 export interface SeedRate {
   /**
@@ -54,9 +36,11 @@ export interface SeedRate {
    */
   readonly name: Readonly<Record<Locale, string>>;
   readonly strategy: "FLAT";
+  /** Centavos: 1_500_000 is $ 15.000. */
   readonly priceGross: number;
   readonly freeOverSubtotal: number | null;
-  readonly mapping: RateMapping;
+  readonly transitDaysMin: number | null;
+  readonly transitDaysMax: number | null;
 }
 
 export interface SeedZone {
@@ -67,94 +51,30 @@ export interface SeedZone {
   readonly rates: readonly SeedRate[];
 }
 
-const UPS_NATIONAL: RateMapping = {
-  deliveryType: "SERVICE_POINT",
-  carrierCode: "ups",
-  sendcloudOptionCode: "ups:standard/service_point",
-  transitDaysMin: 1,
-  transitDaysMax: 3,
-};
-
-const UPS_INTERNATIONAL: RateMapping = { ...UPS_NATIONAL, transitDaysMin: 2, transitDaysMax: 4 };
-
-const INPOST_NATIONAL: RateMapping = {
-  deliveryType: "SERVICE_POINT",
-  carrierCode: "inpost_es",
-  sendcloudOptionCode: "inpost_es:service_point,national_c2c",
-  transitDaysMin: 1,
-  transitDaysMax: 2,
-};
-
-const INPOST_INTERNATIONAL: RateMapping = {
-  deliveryType: "SERVICE_POINT",
-  carrierCode: "inpost_es",
-  sendcloudOptionCode: "inpost_es:service_point,international_c2c",
-  transitDaysMin: 2,
-  transitDaysMax: 4,
-};
-
-const HOME_UNMAPPED: RateMapping = {
-  deliveryType: "HOME",
-  carrierCode: null,
-  sendcloudOptionCode: null,
-  transitDaysMin: 2,
-  transitDaysMax: 5,
-};
-
-function homeRate(): SeedRate {
-  return {
-    name: { es: "Envío a domicilio", en: "Home delivery" },
-    strategy: "FLAT",
-    priceGross: 699,
-    freeOverSubtotal: FREE_SHIPPING_THRESHOLD_MINOR,
-    mapping: HOME_UNMAPPED,
-  };
-}
-
-function upsRate(mapping: RateMapping): SeedRate {
-  return {
-    name: { es: "Envío en punto de recogida UPS", en: "UPS pickup-point shipping" },
-    strategy: "FLAT",
-    priceGross: 1999,
-    freeOverSubtotal: FREE_SHIPPING_THRESHOLD_MINOR,
-    mapping,
-  };
-}
-
-function inpostRate(mapping: RateMapping): SeedRate {
-  return {
-    name: { es: "Envío en punto de recogida INPOST", en: "InPost pickup-point shipping" },
-    strategy: "FLAT",
-    priceGross: 899,
-    freeOverSubtotal: FREE_SHIPPING_THRESHOLD_MINOR,
-    mapping,
-  };
-}
+/** $ 15.000 COP, in centavos. */
+export const NATIONAL_SHIPPING_PRICE_MINOR = 1_500_000;
 
 export const SHIPPING_ZONES: readonly SeedZone[] = [
   {
-    name: "Spain (mainland)",
-    countryCodes: ["ES"],
+    name: "Colombia",
+    countryCodes: ["CO"],
     sortOrder: 0,
-    rates: [homeRate(), upsRate(UPS_NATIONAL), inpostRate(INPOST_NATIONAL)],
-  },
-  {
-    name: "European Union",
-    countryCodes: ["PT", "FR", "DE", "IT", "NL", "BE"],
-    sortOrder: 1,
-    rates: [homeRate(), upsRate(UPS_INTERNATIONAL), inpostRate(INPOST_INTERNATIONAL)],
-  },
-  {
-    name: "Ireland",
-    countryCodes: ["IE"],
-    sortOrder: 2,
-    rates: [homeRate(), upsRate(UPS_INTERNATIONAL)],
+    rates: [
+      {
+        name: { es: "Envío nacional", en: "National shipping" },
+        strategy: "FLAT",
+        priceGross: NATIONAL_SHIPPING_PRICE_MINOR,
+        freeOverSubtotal: FREE_SHIPPING_THRESHOLD_MINOR,
+        transitDaysMin: 2,
+        transitDaysMax: 5,
+      },
+    ],
   },
 ];
 
 /**
- * The STANDARD VAT rate, in basis points, of every country a zone serves.
- * Clothing is standard-rated in all of them.
+ * The STANDARD tax rate, in basis points, of every country a zone serves:
+ * Colombia's general IVA rate, 19%. Clothing is standard-rated.
  *
  * REQUIRED, not decorative: `PrismaShippingTaxResolver` THROWS when a served
  * destination has no STANDARD rate — deliberately, since defaulting shipping to
@@ -162,15 +82,11 @@ export const SHIPPING_ZONES: readonly SeedZone[] = [
  * quote into a configuration error.
  */
 export const STANDARD_VAT_BPS: Readonly<Record<string, number>> = {
-  ES: 2100,
-  PT: 2300,
-  FR: 2000,
-  DE: 1900,
-  IT: 2200,
-  NL: 2100,
-  BE: 2100,
-  IE: 2300,
+  CO: 1900,
 };
+
+/** The store's own country — the one its catalogue prices are taxed in. */
+export const STORE_COUNTRY = "CO";
 
 /** `validFrom` is part of the tax rate's natural key, so it is pinned. */
 export const TAX_VALID_FROM = new Date("2020-01-01T00:00:00.000Z");
@@ -222,13 +138,14 @@ async function upsertZone(prisma: PrismaClient, zone: SeedZone): Promise<void> {
       name: { ...rate.name },
       strategy: rate.strategy,
       priceGross: rate.priceGross,
-      currency: "EUR",
+      currency: SEED_CURRENCY,
       minValue: null,
       maxValue: null,
       freeOverSubtotal: rate.freeOverSubtotal,
       isActive: true,
       deletedAt: null,
-      ...rate.mapping,
+      transitDaysMin: rate.transitDaysMin,
+      transitDaysMax: rate.transitDaysMax,
     };
 
     if (match === null) {

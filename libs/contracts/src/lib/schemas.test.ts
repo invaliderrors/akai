@@ -14,7 +14,7 @@ import {
   discountFailureReasonSchema,
   orderStatusSchema,
 } from "./enums";
-import { addCartItemSchema, createCheckoutSessionSchema } from "./commerce";
+import { addCartItemSchema, createCheckoutSessionObjectSchema } from "./commerce";
 import { createAddressSchema, loginResponseSchema } from "./identity";
 import { z } from "zod";
 
@@ -225,12 +225,12 @@ describe("request schemas are strict", () => {
       firstName: "Ana",
       lastName: "García",
       company: null,
-      line1: "Calle Mayor 1",
+      line1: "Calle 10 # 43-21",
       line2: null,
-      city: "Madrid",
-      region: null,
-      postalCode: "28013",
-      countryCode: "ES",
+      city: "Medellín",
+      region: "Antioquia",
+      postalCode: null,
+      countryCode: "CO",
       phone: null,
       type: "SHIPPING",
       role: "ADMIN",
@@ -239,7 +239,7 @@ describe("request schemas are strict", () => {
   });
 
   it("gives the checkout request NO amount field — totals are server-computed only", () => {
-    const keys = Object.keys(createCheckoutSessionSchema.shape);
+    const keys = Object.keys(createCheckoutSessionObjectSchema.shape);
     for (const forbidden of ["amount", "total", "grandTotal", "price"]) {
       expect(keys).not.toContain(forbidden);
     }

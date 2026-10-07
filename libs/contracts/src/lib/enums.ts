@@ -96,15 +96,7 @@ export const ORDER_STATUS_TRANSITIONS: Readonly<
     "CANCELLED",
     "FAILED",
   ],
-  // FULFILLING -> PAID exists for ONE caller: cancelling a Sendcloud label
-  // (spec 2026-09-24-sendcloud-shipping §3.5). Buying the label moved the order
-  // PAID -> FULFILLING without any goods leaving; cancelling it (credited by
-  // the carrier) must put the order back where "Generar etiqueta" can see it
-  // again. Nothing else walks it: PAID is not operator-assignable
-  // (`assertAdminMayAssign`), and the webhook path treats a late settlement on
-  // a FULFILLING order as redundant (`isRedundantTransition`) BEFORE asking
-  // this table, so the edge cannot be taken by a replayed payment event.
-  FULFILLING: ["SHIPPED", "CANCELLED", "REFUNDED", "PARTIALLY_REFUNDED", "PAID"],
+  FULFILLING: ["SHIPPED", "CANCELLED", "REFUNDED", "PARTIALLY_REFUNDED"],
   SHIPPED: ["DELIVERED", "REFUNDED", "PARTIALLY_REFUNDED"],
   DELIVERED: ["REFUNDED", "PARTIALLY_REFUNDED"],
   // Terminal states. Nothing leaves them.
@@ -154,14 +146,8 @@ export const refundReasonSchema = z.enum([
 export type RefundReason = z.infer<typeof refundReasonSchema>;
 
 /**
- * PENDING/IN_TRANSIT/DELIVERED/RETURNED/LOST are the manual-fulfilment states.
- * The rest arrived with Sendcloud (spec 2026-09-24-sendcloud-shipping §3.7,
- * §11a G4):
- *  - LABEL_CREATED   — a label was bought; the carrier has not scanned it yet.
- *  - AWAITING_PICKUP — at the pickup point, waiting for the customer.
- *  - CANCELLED       — the label was cancelled (and credited).
- *  - FAILED          — Sendcloud refused the announcement; no label exists.
- *  - EXCEPTION       — the carrier reports a problem a human must look at.
+ * The manual-fulfilment states: staff record a parcel by hand (carrier and
+ * tracking number as free text) and later mark it delivered.
  *
  * Mirrors the Prisma enum; `orders.mapper.ts` holds the compile-time proof.
  */
@@ -171,60 +157,8 @@ export const shipmentStatusSchema = z.enum([
   "DELIVERED",
   "RETURNED",
   "LOST",
-  "LABEL_CREATED",
-  "AWAITING_PICKUP",
-  "CANCELLED",
-  "FAILED",
-  "EXCEPTION",
 ]);
 export type ShipmentStatus = z.infer<typeof shipmentStatusSchema>;
-
-/** Who made a shipment: staff by hand, or a label bought through Sendcloud. */
-export const shipmentProviderSchema = z.enum(["MANUAL", "SENDCLOUD"]);
-export type ShipmentProvider = z.infer<typeof shipmentProviderSchema>;
-
-/**
- * How a shipping rate hands the parcel over. A SERVICE_POINT rate requires the
- * customer to choose a pickup point at checkout.
- */
-export const shippingDeliveryTypeSchema = z.enum(["HOME", "SERVICE_POINT"]);
-export type ShippingDeliveryType = z.infer<typeof shippingDeliveryTypeSchema>;
-
-/**
- * Why a fulfilment action (pickup-point checkout, a label, a cancel) was
- * refused.
- *
- * A SUB-CODE carried as the error envelope's `reason`, NOT an `ErrorCode` —
- * the same reasoning `translationFailureReasonSchema` records: the closed
- * `errorCodeSchema` is exhausted by `satisfies Record<ErrorCode, …>` maps in
- * both web apps, and the coarse code that is right here (VALIDATION_FAILED /
- * CONFLICT) cannot tell "pick a point" from "that point just closed" from
- * "fulfilment is not set up". The API's error class for these maps each reason
- * to its code; clients branch on the reason against their own message
- * catalogue and never render the message.
- */
-export const fulfilmentFailureReasonSchema = z.enum([
-  /** The chosen rate is SERVICE_POINT and no `servicePointId` was sent. (VALIDATION_FAILED) */
-  "SERVICE_POINT_REQUIRED",
-  /** A `servicePointId` was sent for a HOME rate. (VALIDATION_FAILED) */
-  "SERVICE_POINT_NOT_ALLOWED",
-  /**
-   * The point does not exist, is expired, belongs to another carrier or
-   * country, or failed Sendcloud's availability check — pick another. (CONFLICT)
-   */
-  "SERVICE_POINT_UNAVAILABLE",
-  /** No SENDCLOUD_* configuration on this deployment. (CONFLICT, 409 — not a 500) */
-  "FULFILMENT_NOT_CONFIGURED",
-  /** Sendcloud is down, timed out or answered unusably. Retrying may help. (CONFLICT) */
-  "VENDOR_UNAVAILABLE",
-  /** Sendcloud rejected the request (bad address, weight, option). (CONFLICT) */
-  "VENDOR_REJECTED",
-  /** The carrier no longer allows cancelling this label (Sendcloud 409). (CONFLICT) */
-  "CANCEL_REJECTED",
-  /** The shipment has no stored label to download or print. (CONFLICT) */
-  "LABEL_NOT_AVAILABLE",
-]);
-export type FulfilmentFailureReason = z.infer<typeof fulfilmentFailureReasonSchema>;
 
 /**
  * Inventory ledger movement kinds. The ledger is append-only, so the CURRENT
@@ -338,10 +272,10 @@ export const translationFailureReasonSchema = z.enum([
 export type TranslationFailureReason = z.infer<typeof translationFailureReasonSchema>;
 
 /**
- * Tax class. Clothing is standard-rated almost everywhere, but a few goods fall
- * under a reduced class in some member states, so the class is a per-product
- * property, not a global constant.
- * ZERO_RATED covers B2B reverse charge.
+ * Tax class. Clothing carries Colombia's general IVA rate (19%), but some goods
+ * fall under the reduced rate (5%) or are exempt/excluded, so the class is a
+ * per-product property, not a global constant. ZERO_RATED covers exempt and
+ * excluded goods (bienes exentos / excluidos de IVA).
  */
 export const taxClassSchema = z.enum(["STANDARD", "REDUCED", "ZERO_RATED"]);
 export type TaxClass = z.infer<typeof taxClassSchema>;
@@ -364,12 +298,6 @@ export const emailTemplateKeySchema = z.enum([
   "payment-receipt",
   "payment-failed",
   "shipping-confirmation",
-  /**
-   * "Your parcel is waiting at the pickup point" — sent once per parcel when
-   * Sendcloud reports AWAITING_CUSTOMER_PICKUP (spec 2026-09-24-sendcloud-shipping
-   * §8, decision D6). Per-parcel, like `shipping-confirmation`.
-   */
-  "ready-for-pickup",
   "delivery-confirmation",
   "refund-confirmation",
   "order-cancelled",

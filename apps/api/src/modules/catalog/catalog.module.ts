@@ -54,9 +54,9 @@ import { CATALOG_BASE_COUNTRY, TaxRateResolver } from "./tax-rate.resolver";
     TaxRateResolver,
     {
       // Interim home for the store's base country; belongs in validated config
-      // as STORE_BASE_COUNTRY. "ES" matches the storefront's default locale.
+      // as STORE_BASE_COUNTRY. "CO": the store sells in Colombia only.
       provide: CATALOG_BASE_COUNTRY,
-      useValue: "ES",
+      useValue: "CO",
     },
   ],
   exports: [ProductsService, ProductInventoryService],

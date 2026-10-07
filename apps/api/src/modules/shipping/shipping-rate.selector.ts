@@ -1,4 +1,4 @@
-import type { CurrencyCode, Minor, ShippingDeliveryType } from "@akai/contracts";
+import type { CurrencyCode, Minor } from "@akai/contracts";
 import { ZERO, toMinor } from "@akai/money";
 
 import { hasLocalizedText, type LocalizedText } from "../../common/localized-text";
@@ -15,7 +15,7 @@ import { hasLocalizedText, type LocalizedText } from "../../common/localized-tex
  *
  *  * FLAT   — a fixed price. Always offered (its bounds are ignored).
  *  * WEIGHT — offered only when the parcel weight falls inside [minValue,
- *             maxValue) grams. This is how "up to 1 kg = €4.95, 1–2 kg = €6.95"
+ *             maxValue) grams. This is how "up to 1 kg = $ 12.000, 1–2 kg = $ 18.000"
  *             brackets are expressed.
  *  * PRICE  — offered only when the GROSS subtotal falls inside [minValue,
  *             maxValue) minor units.
@@ -63,33 +63,10 @@ export interface ShippingRateRow {
   /** Free at or above this GROSS subtotal. Null disables the threshold. */
   readonly freeOverSubtotal: number | null;
   readonly isActive: boolean;
-  /**
-   * The Sendcloud mapping (spec 2026-09-24-sendcloud-shipping §3.1). NONE of
-   * these affect selection or price — they are carried through so the quote
-   * can describe the method and checkout can route the parcel.
-   */
-  readonly fulfilment: RateFulfilment;
-}
-
-/** How a rate's parcel travels. Carried, never priced. */
-export interface RateFulfilment {
-  readonly deliveryType: ShippingDeliveryType;
-  /** Sendcloud carrier code (`inpost_es`, `ups`); null when unmapped. */
-  readonly carrierCode: string | null;
-  /** INTERNAL — never on a public DTO (`shipping.mapper.test.ts`). */
-  readonly sendcloudOptionCode: string | null;
+  /** The "2–5 días" sub-line. Carried through to the quote; never priced. */
   readonly transitDaysMin: number | null;
   readonly transitDaysMax: number | null;
 }
-
-/** The mapping every rate had before Sendcloud: home delivery, unmapped. */
-export const UNMAPPED_FULFILMENT: RateFulfilment = {
-  deliveryType: "HOME",
-  carrierCode: null,
-  sendcloudOptionCode: null,
-  transitDaysMin: null,
-  transitDaysMax: null,
-};
 
 export interface ShippingSelectionContext {
   readonly currency: CurrencyCode;
@@ -112,7 +89,8 @@ export interface ShippingOption {
   /** VAT-inclusive price for THIS cart. Zero when the free-over threshold is met. */
   readonly priceGross: Minor;
   readonly isFree: boolean;
-  readonly fulfilment: RateFulfilment;
+  readonly transitDaysMin: number | null;
+  readonly transitDaysMax: number | null;
 }
 
 function parseStrategy(value: string): ShippingStrategy | null {
@@ -170,7 +148,8 @@ function toOption(rate: ShippingRateRow, context: ShippingSelectionContext): Shi
     currency: context.currency,
     priceGross: isFree ? ZERO : toMinor(rate.priceGross),
     isFree,
-    fulfilment: rate.fulfilment,
+    transitDaysMin: rate.transitDaysMin,
+    transitDaysMax: rate.transitDaysMax,
   };
 }
 

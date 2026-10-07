@@ -5,9 +5,15 @@ import {
   paymentStatusSchema,
   refundReasonSchema,
   refundStatusSchema,
-  shipmentProviderSchema,
   shipmentStatusSchema,
 } from "./enums";
+import {
+  colombianMobileSchema,
+  documentNumberInputSchema,
+  documentNumberSchema,
+  identityDocumentTypeSchema,
+  normaliseDocumentNumber,
+} from "./colombia";
 import { emailSchema, idSchema, isoDateTimeSchema, localeSchema } from "./common";
 import { currencyCodeSchema, nonNegativeMinorSchema } from "./money";
 import { addressFieldsSchema } from "./identity";
@@ -208,8 +214,7 @@ export type OrderEvent = z.infer<typeof orderEventSchema>;
 /**
  * One parcel of an order, as its CUSTOMER sees it: who carries it, how to
  * track it, where it is. Deliberately narrower than `shipmentSchema` (no line
- * split, no order id — it is nested under its order) and than
- * `adminOrderShipmentSchema` (no vendor failure detail, no label).
+ * split, no order id — it is nested under its order).
  */
 export const orderShipmentSchema = z
   .object({
@@ -224,20 +229,6 @@ export const orderShipmentSchema = z
   .strict();
 
 export type OrderShipment = z.infer<typeof orderShipmentSchema>;
-
-/**
- * The pickup point snapshotted at checkout. `address` is one pre-formatted
- * line ("Calle Mayor 1, 50002 Zaragoza, ES") — the snapshot survives the point
- * disappearing from Sendcloud, so it is display text, not a live lookup.
- */
-export const orderServicePointSchema = z
-  .object({
-    name: z.string().max(120),
-    address: z.string().max(255),
-  })
-  .strict();
-
-export type OrderServicePoint = z.infer<typeof orderServicePointSchema>;
 
 export const orderSchema = z
   .object({
@@ -268,22 +259,18 @@ export const orderSchema = z
 
     /** Allocated from a gap-free sequence at PAID only. */
     invoiceNumber: z.string().nullable(),
-    /** Validated VAT number for B2B reverse charge. */
-    vatNumber: z.string().max(20).nullable(),
 
     /**
-     * FULFILMENT (Sendcloud spec §5). All four DEFAULTED: this schema is
-     * `.strict()`, the clients deploy first, and a new client must still parse
-     * an API that does not send them yet — as "no method name, no point, no
-     * house number, no parcels", which is exactly what the old API meant.
+     * The buyer's identity document, snapshotted at checkout (normalised —
+     * see `normaliseDocumentNumber`). Shown to the customer and to staff, and
+     * what a PSE payment's `customer_data` is built from.
      */
+    documentType: identityDocumentTypeSchema,
+    documentNumber: documentNumberSchema,
+
     /** The chosen method's name, stamped at checkout in the order's locale. */
     shippingMethodName: z.string().max(120).nullable().default(null),
-    /** The shipping address's separate house number (checkout collects it). */
-    shippingHouseNumber: z.string().max(16).nullable().default(null),
-    /** Null for a home-delivery order, and for every order before pickup points. */
-    servicePoint: orderServicePointSchema.nullable().default(null),
-    /** Oldest first. Empty until staff create a label or a manual shipment. */
+    /** Oldest first. Empty until staff record a shipment. */
     shipments: z.array(orderShipmentSchema).default([]),
 
     events: z.array(orderEventSchema),
@@ -297,58 +284,21 @@ export const orderSchema = z
 
 export type Order = z.infer<typeof orderSchema>;
 
-/**
- * A parcel as STAFF see it: the customer shape plus what the dashboard's
- * shipment card acts on. `failureReason` is Sendcloud's own detail for a FAILED
- * announcement or refused cancel — for staff eyes only, which is why it is not
- * on `orderShipmentSchema`. `hasLabel` rather than the object key: the key is
- * a storage detail, the download goes through its own admin endpoint.
- *
- * Defaulted fields for the same clients-first rollout as `orderSchema`.
- */
+/** A parcel as STAFF see it: the customer shape plus when it was recorded. */
 export const adminOrderShipmentSchema = orderShipmentSchema
   .extend({
-    provider: shipmentProviderSchema.default("MANUAL"),
-    hasLabel: z.boolean().default(false),
-    /** Sendcloud's own last status code, verbatim (e.g. AWAITING_CUSTOMER_PICKUP). */
-    providerStatusCode: z.string().max(64).nullable().default(null),
-    failureReason: z.string().max(2000).nullable().default(null),
-    createdAt: isoDateTimeSchema.nullable().default(null),
+    createdAt: isoDateTimeSchema,
   })
   .strict();
 
 export type AdminOrderShipment = z.infer<typeof adminOrderShipmentSchema>;
 
-/**
- * The pickup point as STAFF see it: the customer's name + address plus the
- * identifiers a carrier desk asks for.
- */
-export const adminOrderServicePointSchema = orderServicePointSchema
-  .extend({
-    /** Sendcloud's point id (string). */
-    id: z.string().max(32),
-    /** The carrier's own id for the point (e.g. `ES21366`). */
-    carrierServicePointId: z.string().max(64).nullable(),
-    postNumber: z.string().max(32).nullable(),
-  })
-  .strict();
-
-export type AdminOrderServicePoint = z.infer<typeof adminOrderServicePointSchema>;
-
-/**
- * The admin order detail. `orderSchema` plus the fulfilment facts only staff
- * need. Everything added is DEFAULTED, for the clients-first rollout.
- */
+/** The admin order detail: `orderSchema` plus the facts only staff need. */
 export const adminOrderSchema = orderSchema
   .extend({
-    servicePoint: adminOrderServicePointSchema.nullable().default(null),
-    shipments: z.array(adminOrderShipmentSchema).default([]),
-    /** The rate chosen at checkout; null for older orders or a since-deleted rate. */
-    shippingRateId: idSchema.nullable().default(null),
-    /** Frozen at checkout — the label weight. Null for older orders. */
-    parcelWeightGrams: z.number().int().min(0).nullable().default(null),
-    /** True when the order's method is mapped to a Sendcloud option (labels possible). */
-    labelEligible: z.boolean().default(false),
+    shipments: z.array(adminOrderShipmentSchema),
+    /** The rate chosen at checkout; null for a since-deleted rate. */
+    shippingRateId: idSchema.nullable(),
   })
   .strict();
 
@@ -370,6 +320,37 @@ export const orderSummarySchema = z
 export type OrderSummary = z.infer<typeof orderSummarySchema>;
 
 /**
+ * `GET /v1/admin/orders?shipping=` — the questions staff ask of the list:
+ *  - NOT_SHIPPED — paid, and no parcel recorded yet: "what still has to go out?"
+ *  - IN_TRANSIT  — a parcel is on its way.
+ *  - ISSUE       — a parcel came back (RETURNED) or went missing (LOST) on an
+ *                  order that is still ours to fix.
+ */
+export const orderShippingFilterSchema = z.enum(["NOT_SHIPPED", "IN_TRANSIT", "ISSUE"]);
+export type OrderShippingFilter = z.infer<typeof orderShippingFilterSchema>;
+
+/** The newest parcel of an order, compact enough for a table cell. */
+export const adminOrderShipmentSummarySchema = z
+  .object({
+    id: idSchema,
+    status: shipmentStatusSchema,
+    carrier: z.string().max(64),
+    trackingNumber: z.string().max(128).nullable(),
+  })
+  .strict();
+
+export type AdminOrderShipmentSummary = z.infer<typeof adminOrderShipmentSummarySchema>;
+
+/** One row of the ADMIN order list: the customer summary plus the newest shipment. */
+export const adminOrderSummarySchema = orderSummarySchema
+  .extend({
+    shipment: adminOrderShipmentSummarySchema.nullable(),
+  })
+  .strict();
+
+export type AdminOrderSummary = z.infer<typeof adminOrderSummarySchema>;
+
+/**
  * The polled status endpoint backing the post-checkout "processing" screen.
  * An order becomes PAID only via webhook (spec §9), so the browser returning
  * from the hosted payment page polls this instead of asserting success — a client-side success
@@ -389,43 +370,28 @@ export const orderStatusResponseSchema = z
 // ---------------------------------------------------------------------------
 
 /**
- * A phone number a carrier can use, validated LOOSELY on purpose: 7–20
- * characters of digits, spaces and a leading `+`, with at least 7 digits. Real
- * numbers come in too many national formats for anything stricter to be right,
- * and the only job here is to refuse an empty or obviously non-phone value.
- */
-const checkoutPhoneSchema = z
-  .string()
-  .trim()
-  .min(7)
-  .max(20)
-  .regex(/^\+?[0-9 ]+$/, "Phone may contain only digits, spaces and a leading +")
-  .refine((value) => value.replace(/[^0-9]/g, "").length >= 7, {
-    message: "Phone must contain at least 7 digits",
-  });
-
-/**
  * The SHIPPING address at checkout — stricter than the address book, and only
- * here (Sendcloud spec §3.4, decision D5):
- *  - `phone` is REQUIRED: several ES carriers refuse a label without it, and
- *    every pickup notification is sent to it.
- *  - `houseNumber` is a separate REQUIRED field: InPost ES and Mondial Relay take
- *    it apart from the street, and parsing it out of `line1` is fragile.
+ * here: `phone` is REQUIRED (the carrier calls it, and a PSE payment asks for
+ * it). It is a Colombian mobile, normalised to 10 digits without +57.
  *
  * Composed rather than changing `addressFieldsSchema`, which the address book
  * and the order snapshot share: tightening that would reject saved addresses
- * and historical orders that legitimately have no phone.
+ * that legitimately have no phone.
  */
 export const checkoutShippingAddressSchema = addressFieldsSchema
   .extend({
-    houseNumber: z.string().trim().min(1).max(16),
-    phone: checkoutPhoneSchema,
+    phone: colombianMobileSchema,
   })
   .strict();
 
 export type CheckoutShippingAddress = z.infer<typeof checkoutShippingAddressSchema>;
 
-export const createCheckoutSessionSchema = z
+/**
+ * The checkout request's fields, before the document number is normalised
+ * against its type. Exported for introspection (`.shape`); validate requests
+ * with `createCheckoutSessionSchema`.
+ */
+export const createCheckoutSessionObjectSchema = z
   .object({
     cartId: idSchema,
     email: emailSchema,
@@ -433,18 +399,37 @@ export const createCheckoutSessionSchema = z
     billingAddress: addressFieldsSchema.nullable().default(null),
     shippingMethodId: idSchema,
     /**
-     * The pickup point chosen for a SERVICE_POINT rate — the `id` from
-     * `servicePointSchema`, sent back verbatim. REQUIRED (non-null) for a
-     * SERVICE_POINT rate and REFUSED for a HOME rate; that depends on the rate,
-     * so the server enforces it (reasons SERVICE_POINT_REQUIRED /
-     * SERVICE_POINT_NOT_ALLOWED) and re-verifies the point with Sendcloud.
+     * The buyer's identity document (Colombia): its type and number. REQUIRED
+     * — it is snapshotted on the order, printed for staff, and a PSE payment's
+     * `customer_data` needs both.
      */
-    servicePointId: z.string().trim().min(1).max(32).nullable().default(null),
-    vatNumber: z.string().max(20).nullable().default(null),
+    documentType: identityDocumentTypeSchema,
+    documentNumber: documentNumberInputSchema,
     locale: localeSchema.default("es"),
     acceptedTermsVersion: z.string().max(32),
   })
   .strict();
+
+/**
+ * The checkout request. `documentNumber` comes out NORMALISED for its type
+ * (`normaliseDocumentNumber`: "1.020.304.050" → "1020304050",
+ * "900.123.456-7" → "900123456-7"); a number that is not valid for the type is
+ * a validation error on `documentNumber`.
+ */
+export const createCheckoutSessionSchema = createCheckoutSessionObjectSchema.transform(
+  (request, ctx) => {
+    const documentNumber = normaliseDocumentNumber(request.documentType, request.documentNumber);
+    if (documentNumber === null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["documentNumber"],
+        message: `documentNumber is not a valid ${request.documentType} number`,
+      });
+      return z.NEVER;
+    }
+    return { ...request, documentNumber };
+  },
+);
 
 export type CreateCheckoutSession = z.infer<typeof createCheckoutSessionSchema>;
 

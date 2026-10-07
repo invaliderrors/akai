@@ -22,7 +22,7 @@ const EMPTY_CART: Cart = {
   items: [],
   itemCount: 0,
   totals: {
-    currency: "EUR",
+    currency: "COP",
     subtotal: toMinor(0),
     discountTotal: toMinor(0),
     shippingTotal: toMinor(0),
@@ -83,7 +83,7 @@ describe("CartController", () => {
       // rate inputs from the cart rather than from the request body.
       getShippingBasis: vi.fn(async () => ({
         cartId: EMPTY_CART.id,
-        currency: "EUR",
+        currency: "COP",
         subtotalGross: toMinor(0),
         weightGrams: 0,
       })),

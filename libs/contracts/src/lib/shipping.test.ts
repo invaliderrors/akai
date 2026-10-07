@@ -17,14 +17,14 @@ import {
  */
 describe("shippingQuoteRequestSchema", () => {
   it("accepts a destination and defaults the postal code to null", () => {
-    const parsed = shippingQuoteRequestSchema.parse({ countryCode: "ES" });
+    const parsed = shippingQuoteRequestSchema.parse({ countryCode: "CO" });
 
-    expect(parsed).toEqual({ countryCode: "ES", postalCode: null });
+    expect(parsed).toEqual({ countryCode: "CO", postalCode: null });
   });
 
   it("rejects a client-supplied subtotal — the price input must be server-derived", () => {
     const result = shippingQuoteRequestSchema.safeParse({
-      countryCode: "ES",
+      countryCode: "CO",
       subtotalGross: 50_000,
     });
 
@@ -33,7 +33,7 @@ describe("shippingQuoteRequestSchema", () => {
 
   it("rejects a client-supplied parcel weight", () => {
     const result = shippingQuoteRequestSchema.safeParse({
-      countryCode: "ES",
+      countryCode: "CO",
       weightGrams: 1,
     });
 
@@ -42,7 +42,7 @@ describe("shippingQuoteRequestSchema", () => {
 
   it("rejects a cart id — ownership comes from the actor, never from the body", () => {
     const result = shippingQuoteRequestSchema.safeParse({
-      countryCode: "ES",
+      countryCode: "CO",
       cartId: "6f1b9e2c-2a1e-4a4e-9a53-2f9a4a7c1b11",
     });
 
@@ -63,11 +63,9 @@ describe("shippingOptionSchema", () => {
   const option = {
     rateId: "0a5b2c3d-4e5f-4a6b-8c9d-0e1f2a3b4c5d",
     name: { es: "Estándar (2-3 días)", en: "Standard (2-3 days)" },
-    currency: "EUR",
-    priceGross: 495,
+    currency: "COP",
+    priceGross: 1_500_000,
     isFree: false,
-    deliveryType: "HOME",
-    carrierName: null,
     transitDaysMin: 2,
     transitDaysMax: 3,
   };
@@ -122,7 +120,7 @@ describe("shippingQuoteResponseSchema", () => {
   it("models an unserved destination as a valid, empty quote", () => {
     const parsed = shippingQuoteResponseSchema.parse({
       countryCode: "US",
-      currency: "EUR",
+      currency: "COP",
       destinationServed: false,
       subtotalGross: 3980,
       weightGrams: 540,
@@ -135,8 +133,8 @@ describe("shippingQuoteResponseSchema", () => {
 
   it("distinguishes 'served but no bracket fits' from 'not served'", () => {
     const parsed = shippingQuoteResponseSchema.parse({
-      countryCode: "ES",
-      currency: "EUR",
+      countryCode: "CO",
+      currency: "COP",
       destinationServed: true,
       subtotalGross: 3980,
       weightGrams: 99_000,
@@ -150,7 +148,7 @@ describe("shippingQuoteResponseSchema", () => {
 
 describe("freeShippingThresholdResponseSchema", () => {
   it("accepts a threshold in minor units with its currency", () => {
-    const body = { threshold: { amount: 25_000, currency: "EUR" } };
+    const body = { threshold: { amount: 30_000_000, currency: "COP" } };
     expect(freeShippingThresholdResponseSchema.parse(body)).toEqual(body);
   });
 
@@ -163,7 +161,7 @@ describe("freeShippingThresholdResponseSchema", () => {
   it("rejects a float amount — money is integer minor units", () => {
     expect(
       freeShippingThresholdResponseSchema.safeParse({
-        threshold: { amount: 250.5, currency: "EUR" },
+        threshold: { amount: 250.5, currency: "COP" },
       }).success,
     ).toBe(false);
   });

@@ -1,7 +1,9 @@
 import { z } from "zod";
 import {
+  addressFieldsSchema,
   addressSchema,
   addressTypeSchema,
+  colombianMobileSchema,
   customerSchema,
   emailSchema,
   idSchema,
@@ -65,22 +67,14 @@ export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
  * while an explicit false is a request that is refused when it would leave the
  * customer with no default at all.
  */
-export const createAddressRequestSchema = z
-  .object({
+export const createAddressRequestSchema = addressFieldsSchema
+  .extend({
     type: addressTypeSchema,
-    firstName: z.string().min(1).max(80),
-    lastName: z.string().min(1).max(80),
+    // The address-book form may omit what is optional; the Colombian rules for
+    // region (departamento), postal code, phone and country are the contract's.
     company: z.string().max(120).nullable().default(null),
-    line1: z.string().min(1).max(200),
     line2: z.string().max(200).nullable().default(null),
-    city: z.string().min(1).max(120),
-    region: z.string().max(120).nullable().default(null),
-    postalCode: z.string().min(1).max(20),
-    countryCode: z
-      .string()
-      .length(2)
-      .regex(/^[A-Z]{2}$/, "Country must be an uppercase ISO-3166-1 alpha-2 code"),
-    phone: z.string().max(32).nullable().default(null),
+    phone: colombianMobileSchema.nullable().default(null),
     isDefault: z.boolean().optional(),
   })
   .strict();

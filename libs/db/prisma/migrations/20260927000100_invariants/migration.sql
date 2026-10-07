@@ -127,6 +127,14 @@ ALTER TABLE "blog_post"
   ADD CONSTRAINT "blog_post_published_has_date"
   CHECK ("status" <> 'PUBLISHED' OR "publishedAt" IS NOT NULL);
 
+-- The buyer's identity document, as `normaliseDocumentNumber` (libs/contracts)
+-- writes it: uppercase alphanumerics, plus at most one "-D" check digit (a NIT).
+-- The per-type rules (digits only for CC/TI, …) live in the contract; this is the
+-- backstop against a writer that skipped it.
+ALTER TABLE "order"
+  ADD CONSTRAINT "order_document_number_format"
+  CHECK ("documentNumber" ~ '^[0-9A-Z]+(-[0-9])?$');
+
 -- SINGLETONS BY CONSTRUCTION: `id` is a boolean pinned to true, so the primary
 -- key doubles as the "there is exactly one row" constraint.
 ALTER TABLE "invoice_counter"

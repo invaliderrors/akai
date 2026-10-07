@@ -1,4 +1,10 @@
 import { z } from "zod";
+import {
+  colombianMobileSchema,
+  colombianPostalCodeSchema,
+  departamentoSchema,
+} from "./colombia";
+import { isDestinationCountry } from "./destinations";
 import { addressTypeSchema, roleSchema } from "./enums";
 import {
   countryCodeSchema,
@@ -79,20 +85,33 @@ export type Session = z.infer<typeof sessionSchema>;
  * Orders copy these values into their own columns rather than holding an FK
  * (spec §13): if a customer edits their address next year, a shipped order's
  * historical record must not silently rewrite itself.
+ *
+ * COLOMBIAN SHAPE — Colombia is the only country served:
+ *  - `countryCode` must be a destination (`DESTINATION_COUNTRY_CODES`: "CO").
+ *  - `region` is the DEPARTAMENTO, required, normalised to its canonical name
+ *    from `COLOMBIAN_DEPARTAMENTOS` (a DANE code or a loosely-typed name is
+ *    accepted and rewritten).
+ *  - `city` is the municipio, free text.
+ *  - `line1` carries the street AND number the Colombian way
+ *    ("Calle 10 # 43-21"); `line2` the apartment, tower or neighbourhood.
+ *  - `postalCode` is optional (rarely used in Colombia); six digits when given.
+ *  - `phone`, when present, is a Colombian mobile normalised to 10 digits
+ *    without +57. Checkout requires it (`checkoutShippingAddressSchema`).
  */
 export const addressFieldsSchema = z
   .object({
-    firstName: z.string().min(1).max(80),
-    lastName: z.string().min(1).max(80),
+    firstName: z.string().trim().min(1).max(80),
+    lastName: z.string().trim().min(1).max(80),
     company: z.string().max(120).nullable(),
-    line1: z.string().min(1).max(200),
+    line1: z.string().trim().min(1).max(200),
     line2: z.string().max(200).nullable(),
-    city: z.string().min(1).max(120),
-    /** Province/state. Optional: many EU addresses have none. */
-    region: z.string().max(120).nullable(),
-    postalCode: z.string().min(1).max(20),
-    countryCode: countryCodeSchema,
-    phone: z.string().max(32).nullable(),
+    city: z.string().trim().min(1).max(120),
+    region: departamentoSchema,
+    postalCode: colombianPostalCodeSchema.nullable().default(null),
+    countryCode: countryCodeSchema.refine((code): boolean => isDestinationCountry(code), {
+      message: "countryCode must be a country the store ships to (CO)",
+    }),
+    phone: colombianMobileSchema.nullable(),
   })
   .strict();
 

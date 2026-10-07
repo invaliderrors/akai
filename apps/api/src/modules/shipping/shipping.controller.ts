@@ -2,9 +2,6 @@ import { Body, Controller, Get, HttpCode, HttpStatus, Post, UseGuards } from "@n
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import {
   type FreeShippingThresholdResponse,
-  servicePointSearchRequestSchema,
-  type ServicePointSearchRequest,
-  type ServicePointSearchResponse,
   shippingQuoteRequestSchema,
   type ShippingQuoteRequest,
   type ShippingQuoteResponse,
@@ -18,7 +15,6 @@ import { THROTTLE_RULES, Throttle } from "../throttler/throttle.decorator";
 import { ThrottleGuard } from "../throttler/throttle.guard";
 import { ShippingError } from "./shipping.errors";
 import { ShippingService } from "./shipping.service";
-import { ServicePointsService } from "./service-points/service-points.service";
 import { toShippingQuote } from "./shipping.mapper";
 
 /**
@@ -51,7 +47,6 @@ export class ShippingController {
   constructor(
     private readonly shipping: ShippingService,
     private readonly cart: CartService,
-    private readonly servicePoints: ServicePointsService,
   ) {}
 
   /**
@@ -123,32 +118,6 @@ export class ShippingController {
       }
       throw error;
     }
-  }
-
-  /**
-   * Pickup points for a SERVICE_POINT rate near a destination (spec §3.2).
-   *
-   * The body names the RATE, never a carrier: the server resolves the carrier,
-   * so no one is offered another carrier's points under this method. Every
-   * vendor outcome — found, address not found, nothing nearby, Sendcloud down —
-   * is a 200 with a `status` the storefront renders; only a bad rate (404) or a
-   * HOME rate (422 SERVICE_POINT_NOT_ALLOWED) is an error.
-   *
-   * THE QUOTE'S THROTTLE BUCKET, deliberately shared: both are fired by the same
-   * address form, and a scraper walking postcodes must not get a second budget
-   * of Sendcloud calls for free (the service also caches for five minutes).
-   */
-  @Public()
-  @UseGuards(ThrottleGuard)
-  @Throttle(THROTTLE_RULES.shippingQuote)
-  @Post("service-points")
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: "Pickup points of a shipping rate's carrier near a postcode" })
-  async servicePointSearch(
-    @Body(new ZodValidationPipe(servicePointSearchRequestSchema))
-    body: ServicePointSearchRequest,
-  ): Promise<ServicePointSearchResponse> {
-    return this.servicePoints.search(body);
   }
 }
 

@@ -46,7 +46,7 @@ const REDACTED_KEY_FRAGMENTS: readonly string[] = [
   "line1",
   "line2",
   "postalcode",
-  "vatnumber",
+  "documentnumber",
   "ipaddress",
   "recoverycode",
 ];

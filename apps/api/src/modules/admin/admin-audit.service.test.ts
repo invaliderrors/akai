@@ -116,6 +116,18 @@ describe("AdminAuditService — PII redaction", () => {
     expect(serialised).toContain("Madrid");
   });
 
+  it("redacts the buyer's identity document number", () => {
+    const { service } = buildService();
+
+    const diff = service.buildDiff(
+      { documentType: "CC", documentNumber: "1020304050" },
+      { documentType: "CE", documentNumber: "E123456" },
+    );
+
+    expect(diff["documentNumber"]).toEqual({ before: REDACTED, after: REDACTED });
+    expect(JSON.stringify(diff)).not.toContain("1020304050");
+  });
+
   it("redacts case-insensitively across naming conventions", () => {
     const { service } = buildService();
 

@@ -15,15 +15,15 @@ const owner = makeCustomerRow();
 function addressInput(overrides: Partial<CreateAddressInput> = {}): CreateAddressInput {
   return {
     type: "SHIPPING",
-    firstName: "Ana",
-    lastName: "García",
+    firstName: "Valentina",
+    lastName: "Restrepo",
     company: null,
-    line1: "Calle Mayor 1",
+    line1: "Calle 10 # 43-21",
     line2: null,
-    city: "Madrid",
-    region: null,
-    postalCode: "28013",
-    countryCode: "ES",
+    city: "Medellín",
+    region: "Antioquia",
+    postalCode: null,
+    countryCode: "CO",
     phone: null,
     ...overrides,
   };
@@ -182,12 +182,12 @@ describe("AddressesService", () => {
     it("returns the created address in the contract shape", async () => {
       const created = await service.create(
         owner.id,
-        addressInput({ company: "Akai SL", phone: "+34600000000" }),
+        addressInput({ company: "Akai SAS", phone: "3001234567" }),
       );
 
       expect(created.customerId).toBe(owner.id);
-      expect(created.company).toBe("Akai SL");
-      expect(created.countryCode).toBe("ES");
+      expect(created.company).toBe("Akai SAS");
+      expect(created.countryCode).toBe("CO");
       // Serialised as ISO strings, never Date objects — the wire format is JSON.
       expect(typeof created.createdAt).toBe("string");
     });
@@ -199,7 +199,7 @@ describe("AddressesService", () => {
 
       expect(updated.city).toBe("Barcelona");
       expect(updated.company).toBe("Akai SL");
-      expect(updated.line1).toBe("Calle Mayor 1");
+      expect(updated.line1).toBe("Calle 10 # 43-21");
     });
 
     it("distinguishes an explicit null from an omitted field", async () => {

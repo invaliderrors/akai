@@ -2,8 +2,8 @@
  * @akai/money — the ONLY money implementation in the platform.
  *
  * Absorbs the old apps/storefront/src/lib/pricing.ts and fixes its two defects:
- *   1. it hardcoded `Intl.NumberFormat("en-US")`, rendering "€1,234.56" to a
- *      Spanish-default EU store that expects "1.234,56 €";
+ *   1. it hardcoded `Intl.NumberFormat("en-US")`, ignoring the shopper's locale
+ *      (a Colombian shopper expects "$ 89.000", not "$89,000.00");
  *   2. it parsed Woo's string minor units inline with `parseInt(x || "0")`,
  *      which silently turns malformed input into zero — a free product.
  *
@@ -89,7 +89,7 @@ export function multiply(amount: Minor, factor: number): Minor {
  *
  * The alternative (sum then round) produces different totals on multi-line
  * orders, and the difference is a real accounting defect that surfaces as an
- * invoice that does not foot. Half-up is chosen because it matches what EU
+ * invoice that does not foot. Half-up is chosen because it matches what
  * invoicing conventions and every finance stakeholder expect; banker's rounding
  * would be defensible but must not be mixed in.
  *
@@ -112,7 +112,7 @@ export function multiplyByRate(amount: Minor, rate: number): Minor {
  * Apply a rate expressed in BASIS POINTS (1 bp = 0.01%).
  *
  * Tax rates are stored as integer bps rather than floats precisely so the
- * stored rate is exact: 21% VAT is 2100, not 0.21000000000000002.
+ * stored rate is exact: 19% IVA is 1900, not 0.19000000000000003.
  */
 export function applyBasisPoints(amount: Minor, basisPoints: number): Minor {
   if (!Number.isInteger(basisPoints)) {
@@ -124,9 +124,9 @@ export function applyBasisPoints(amount: Minor, basisPoints: number): Minor {
 /**
  * Extract the tax component from a VAT-INCLUSIVE (gross) amount.
  *
- * EU consumer prices are displayed gross, so this is the direction that
- * actually runs at checkout: given €49.99 gross at 21%, the net is
- * gross / 1.21 and the tax is the remainder. Deriving tax as `gross - net`
+ * Colombian consumer prices are displayed IVA-inclusive, so this is the
+ * direction that actually runs at checkout: given $89.000 gross at 19%, the net
+ * is gross / 1.19 and the tax is the remainder. Deriving tax as `gross - net`
  * rather than computing it independently guarantees `net + tax === gross`
  * exactly, with no ±1 cent drift on the invoice.
  */
@@ -160,9 +160,9 @@ export function grossFromNet(
  * remainder-distributing allocator).
  *
  * This is why an order-level discount can be pushed down onto lines and the
- * lines still sum to the order total. Naive per-line rounding loses cents, and
- * a €10.00 discount that only removes €9.99 is a defect nobody can explain to
- * an accountant.
+ * lines still sum to the order total. Naive per-line rounding loses centavos,
+ * and a $10.000 discount that only removes $9.999,99 is a defect nobody can
+ * explain to an accountant.
  *
  * Remainder cents go to the earliest shares, which is deterministic and
  * therefore reproducible in a dispute.
@@ -272,9 +272,9 @@ export function tryParseMinorUnitString(value: unknown): Minor | null {
 // ---------------------------------------------------------------------------
 
 /**
- * Minor units per major unit, by currency. Almost everything is 100, but
- * assuming so breaks on JPY (0) and the dinars (1000) the moment the store
- * sells outside the euro zone.
+ * Minor units per major unit, by currency — the ISO 4217 exponent. Almost
+ * everything is 2 (COP included: amounts are stored in centavos), but assuming
+ * so breaks on JPY (0) and the dinars (3).
  */
 const CURRENCY_EXPONENT: Readonly<Record<string, number>> = {
   JPY: 0,
@@ -290,11 +290,34 @@ export function minorUnitExponent(currency: CurrencyCode): number {
 }
 
 /**
+ * Fraction digits a currency is DISPLAYED and ENTERED with, where that differs
+ * from its ISO exponent.
+ *
+ * COP has exponent 2 — we store centavos, and a payment provider's
+ * `amount_in_cents` is exactly that — but nobody in Colombia prices in
+ * centavos: a tee is "$ 89.000", never "$ 89.000,00", and an operator types
+ * "89000". So COP is shown and typed in WHOLE PESOS while every stored and
+ * computed amount stays in centavos.
+ */
+const DISPLAY_FRACTION_DIGITS: Readonly<Record<string, number>> = {
+  COP: 0,
+};
+
+export function displayFractionDigits(currency: CurrencyCode): number {
+  return DISPLAY_FRACTION_DIGITS[currency] ?? minorUnitExponent(currency);
+}
+
+/** The Intl locale each UI locale formats with. */
+export function intlLocale(locale: Locale): string {
+  return locale === "es" ? "es-CO" : "en-US";
+}
+
+/**
  * Format for display, driven by the ACTIVE locale.
  *
- * `es` yields "49,99 €" and `en` yields "€49.99" — the storefront's default
- * locale is Spanish, so the old hardcoded en-US was wrong for most visitors.
- * Locale is a required parameter precisely so no call site can forget it.
+ * For COP, `es` (es-CO) yields "$ 89.000" and `en` (en-US) yields "$89,000" —
+ * whole pesos, no decimals (`displayFractionDigits`). Locale is a required
+ * parameter precisely so no call site can forget it.
  */
 export function formatMoney(
   amount: Minor,
@@ -315,14 +338,14 @@ export function formatMoneyValue(value: Money, locale: Locale): string {
  *
  * WHY THIS EXISTS AND WHY IT DOES NOT TAKE `Minor`. An aggregate is a sum over
  * an unbounded number of orders, so it has no ceiling; `Minor` has one, at
- * `MINOR_MAX` (€20,000,000), and `toMinor` THROWS above it. That cap is correct
- * for a single amount — a €20m line item is a bug or an attack — and wrong for
+ * `MINOR_MAX` ($20.000.000 COP), and `toMinor` THROWS above it. That cap is
+ * correct for a single amount — a $20m line item is a bug or an attack — and wrong for
  * a lifetime total, which is why the admin schemas type these figures as a bare
  * `z.number().int()` rather than parsing them as `Minor`. Branding one anyway
  * would make the dashboard start crashing on a SUCCESSFUL business, and the
  * usual `isMinor(...)` narrowing degrades to the same defect from the other
  * side: it returns false for exactly the over-cap values, so the fallback path
- * renders a bare integer — `2400000000` where a euro figure belongs.
+ * renders a bare integer — `2400000000` where a peso figure belongs.
  *
  * So this takes an unbranded integer, applies no range check, and never throws.
  * The Intl call is the same one `formatMoney` makes, so an aggregate and a line
@@ -346,7 +369,12 @@ export function formatAggregateMinor(
 /**
  * The one Intl call. Shared by `formatMoney` and `formatAggregateMinor` so the
  * branded and the display-only paths cannot drift into two spellings of the
- * same euro figure.
+ * same figure.
+ *
+ * `narrowSymbol` so English renders "$89,000" rather than "COP 89,000": the
+ * store sells in one currency, so the bare "$" is unambiguous to its shoppers.
+ * A COP amount with stray centavos is ROUNDED for display only — it is never
+ * the stored value, which stays exact.
  */
 function formatMinorUnits(
   amount: number,
@@ -354,20 +382,20 @@ function formatMinorUnits(
   locale: Locale,
 ): string {
   const exponent = minorUnitExponent(currency);
+  const fractionDigits = displayFractionDigits(currency);
   const major = amount / 10 ** exponent;
 
-  // en-IE rather than en-US: English-speaking EU formatting keeps the euro
-  // symbol leading without importing US thousand-separator conventions.
-  return new Intl.NumberFormat(locale === "es" ? "es-ES" : "en-IE", {
+  return new Intl.NumberFormat(intlLocale(locale), {
     style: "currency",
     currency,
-    minimumFractionDigits: exponent,
-    maximumFractionDigits: exponent,
+    currencyDisplay: "narrowSymbol",
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
   }).format(major);
 }
 
 /**
- * The MACHINE-readable decimal form: `3450` EUR → `"34.50"`.
+ * The MACHINE-readable decimal form: `8900000` COP → `"89000.00"`.
  *
  * NOT a display format. `formatMoney` is locale-driven and emits grouping
  * separators, a currency symbol and, in Spanish, a decimal COMMA — all correct
@@ -376,12 +404,14 @@ function formatMinorUnits(
  * analytics event. Feeding a rendered "1.234,56 €" to any of those is a
  * thousand-fold price error a rich result will happily publish.
  *
+ * Uses the ISO exponent, NOT the display digits: this is the exact value.
+ *
  * Computed with INTEGER and STRING operations only. `amount / 10 ** exponent`
  * would reintroduce exactly the binary-float rounding that integer minor units
  * exist to prevent, and the point of insertion for a wrong price is a `.toFixed`
  * on a value that is already 34.499999999999996.
  *
- * Always emits the currency's full precision (2 for EUR, 0 for JPY, 3 for KWD),
+ * Always emits the currency's full precision (2 for COP, 0 for JPY, 3 for KWD),
  * because a consumer of this string has no way to guess how many decimals it
  * was meant to carry.
  */
@@ -397,7 +427,7 @@ export function toDecimalString(amount: Minor, currency: CurrencyCode): string {
 }
 
 /**
- * The INVERSE of `toDecimalString`: `"34.50"` EUR -> `3450`.
+ * The INVERSE of `toDecimalString`: `"89000.00"` COP -> `8900000`.
  *
  * THE PAYMENT-PROVIDER BOUNDARY. Whop speaks major units in three dialects and
  * this is the only place any of them becomes a `Minor`:

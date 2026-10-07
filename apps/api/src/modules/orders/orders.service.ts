@@ -15,6 +15,7 @@ import type {
   OrderSummary,
   Paginated,
   Refund,
+  IdentityDocumentType,
   Shipment,
   TaxClass,
 } from "@akai/contracts";
@@ -60,7 +61,6 @@ import {
 // The SAME allocator the cart's own live re-pricing uses — see its own doc
 // comment for why one function has to serve both call sites.
 import { allocatePackComponents } from "../cart/pack-pricing";
-import { carriesGoods } from "./shipment-status";
 import {
   ADMIN_SUMMARY_INCLUDE,
   shippingFilterWhere,
@@ -169,29 +169,18 @@ export interface CreateOrderFromCartInput {
   readonly shipping: ShippingCharge;
   readonly shippingMethodName: string;
   readonly acceptedTermsVersion: string;
-  readonly vatNumber: string | null;
   /**
-   * The fulfilment snapshot checkout resolved and VERIFIED (Sendcloud spec
-   * §3.3/§3.4): the chosen rate, its option code, the parcel weight, the
-   * separate house number and — for a pickup rate — the re-verified point.
-   * Frozen onto the order so a later rate remap, product purge or point
-   * closure cannot change how an already-paid order ships. Optional only so
-   * callers that pre-date it keep compiling; checkout always sends it.
+   * The buyer's identity document, already NORMALISED by the checkout schema
+   * (`createCheckoutSessionSchema`). Snapshotted on the order.
    */
-  readonly fulfilment?: OrderFulfilmentSnapshot | undefined;
+  readonly customerDocument: CustomerDocument;
+  /** The rate the customer chose, resolved server-side. Kept as a SET NULL reference. */
+  readonly shippingRateId?: string | undefined;
 }
 
-/** Column-for-column the `Order` fulfilment snapshot (migration 20260925120000). */
-export interface OrderFulfilmentSnapshot {
-  readonly shippingRateId: string;
-  readonly sendcloudOptionCode: string | null;
-  readonly parcelWeightGrams: number;
-  readonly shipHouseNumber: string | null;
-  readonly servicePointId: string | null;
-  readonly servicePointCarrierId: string | null;
-  readonly servicePointName: string | null;
-  readonly servicePointAddress: string | null;
-  readonly servicePointPostNumber: string | null;
+export interface CustomerDocument {
+  readonly type: IdentityDocumentType;
+  readonly number: string;
 }
 
 export interface MarkPaidInput {
@@ -534,10 +523,11 @@ export class OrdersService {
           ...shippingColumns(input.shippingAddress),
           ...billingColumns(input.billingAddress),
 
-          vatNumber: input.vatNumber,
+          documentType: input.customerDocument.type,
+          documentNumber: input.customerDocument.number,
           shippingMethodName: input.shippingMethodName,
           acceptedTermsVersion: input.acceptedTermsVersion,
-          ...(input.fulfilment === undefined ? {} : fulfilmentColumns(input.fulfilment)),
+          ...(input.shippingRateId === undefined ? {} : { shippingRateId: input.shippingRateId }),
 
           items: { create: priced.lines.map((line) => ({ ...line })) },
           events: {
@@ -928,11 +918,6 @@ export class OrdersService {
       const orderedByItemId = new Map(order.items.map((item) => [item.id, item.quantity]));
       const shippedByItemId = new Map<string, number>();
       for (const shipment of order.shipments) {
-        // A cancelled label or a refused announcement moved nothing; counting
-        // its lines as shipped would block the replacement parcel.
-        if (!carriesGoods(shipment.status)) {
-          continue;
-        }
         for (const line of shipment.items) {
           shippedByItemId.set(
             line.orderItemId,
@@ -1110,10 +1095,9 @@ export class OrdersService {
   /**
    * Mark a parcel delivered; move the order to DELIVERED once all parcels are.
    *
-   * `actor` is null when no person did it: the Sendcloud tracking sync
-   * (fulfilment/tracking) calls this when the carrier reports DELIVERED /
-   * COLLECTED_BY_CUSTOMER, so the automated and the manual path share one
-   * transition and one `delivery-confirmation` producer.
+   * `actor` is null when no person did it (an automated carrier integration,
+   * should one be added), so every path shares one transition and one
+   * `delivery-confirmation` producer.
    */
   async markShipmentDelivered(shipmentId: string, actor: Principal | null): Promise<Shipment> {
     return this.prisma.$transaction(async (tx) => {
@@ -1143,12 +1127,7 @@ export class OrdersService {
         "Order",
       );
 
-      // Over the parcels that actually carry goods: a cancelled label or a
-      // FAILED announcement beside the delivered parcel must not hold the order
-      // short of DELIVERED forever.
-      const allDelivered = order.shipments
-        .filter((row) => carriesGoods(row.status))
-        .every((row) => row.status === "DELIVERED");
+      const allDelivered = order.shipments.every((row) => row.status === "DELIVERED");
 
       if (allDelivered && order.status === "SHIPPED") {
         assertTransition(order.status, "DELIVERED");
@@ -1417,10 +1396,9 @@ function cancellationReason(locale: Locale): string {
 }
 
 /**
- * EXPORTED for the fulfilment module's label service (PAID -> FULFILLING on a
- * bought label, FULFILLING -> PAID on a cancelled one), so every status write
- * in the platform still goes through this one optimistic-concurrency check
- * after `assertTransition` — never a second hand-rolled `updateMany`.
+ * EXPORTED so any future writer of `order.status` goes through this one
+ * optimistic-concurrency check after `assertTransition` — never a second
+ * hand-rolled `updateMany`.
  */
 export async function applyStatus(
   tx: Prisma.TransactionClient,
@@ -1454,33 +1432,6 @@ export async function applyStatus(
  * addresses would then silently write as nulls. Spelling the keys out means a
  * renamed column is a compile error at the one place that cares.
  */
-function fulfilmentColumns(
-  snapshot: OrderFulfilmentSnapshot,
-): Pick<
-  Prisma.OrderUncheckedCreateInput,
-  | "shippingRateId"
-  | "sendcloudOptionCode"
-  | "parcelWeightGrams"
-  | "shipHouseNumber"
-  | "servicePointId"
-  | "servicePointCarrierId"
-  | "servicePointName"
-  | "servicePointAddress"
-  | "servicePointPostNumber"
-> {
-  return {
-    shippingRateId: snapshot.shippingRateId,
-    sendcloudOptionCode: snapshot.sendcloudOptionCode,
-    parcelWeightGrams: snapshot.parcelWeightGrams,
-    shipHouseNumber: snapshot.shipHouseNumber,
-    servicePointId: snapshot.servicePointId,
-    servicePointCarrierId: snapshot.servicePointCarrierId,
-    servicePointName: snapshot.servicePointName,
-    servicePointAddress: snapshot.servicePointAddress,
-    servicePointPostNumber: snapshot.servicePointPostNumber,
-  };
-}
-
 function shippingColumns(
   address: AddressFields,
 ): Pick<

@@ -5,7 +5,6 @@ import { toMinor } from "@akai/money";
 import {
   type ShippingRateRow,
   type ShippingSelectionContext,
-  UNMAPPED_FULFILMENT,
   selectShippingOptions,
 } from "./shipping-rate.selector";
 
@@ -22,7 +21,8 @@ function rate(overrides: Partial<ShippingRateRow> = {}): ShippingRateRow {
     maxValue: null,
     freeOverSubtotal: null,
     isActive: true,
-    fulfilment: UNMAPPED_FULFILMENT,
+    transitDaysMin: null,
+    transitDaysMax: null,
     ...overrides,
   };
 }

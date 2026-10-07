@@ -8,8 +8,8 @@ import { CatalogError } from "./catalog.errors";
  *
  * TEMPORARY HOME. This belongs in the validated config (`STORE_BASE_COUNTRY`),
  * but `libs/config` is owned by another module and adding a var there would
- * collide with a parallel agent. Defaulting to "ES" matches the storefront's
- * Spanish-default routing. Listed in followUps.
+ * collide with a parallel agent. "CO": the store sells in Colombia only.
+ * Listed in followUps.
  */
 export const CATALOG_BASE_COUNTRY = "akai:catalog:baseCountry";
 

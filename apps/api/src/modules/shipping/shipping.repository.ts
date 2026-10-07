@@ -81,13 +81,8 @@ export class PrismaShippingRepository implements ShippingRepository {
         maxValue: row.maxValue,
         freeOverSubtotal: row.freeOverSubtotal,
         isActive: row.isActive,
-        fulfilment: {
-          deliveryType: row.deliveryType,
-          carrierCode: row.carrierCode,
-          sendcloudOptionCode: row.sendcloudOptionCode,
-          transitDaysMin: row.transitDaysMin,
-          transitDaysMax: row.transitDaysMax,
-        },
+        transitDaysMin: row.transitDaysMin,
+        transitDaysMax: row.transitDaysMax,
       })),
     };
   }

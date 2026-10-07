@@ -28,7 +28,13 @@ import path from "node:path";
 
 import { ScryptPasswordHasher } from "../modules/auth/crypto/scrypt-password-hasher";
 import { CATEGORIES } from "./seed-taxonomy";
-import { applyShippingSetup, STANDARD_VAT_BPS, TAX_VALID_FROM } from "./shipping-setup";
+import {
+  applyShippingSetup,
+  SEED_CURRENCY,
+  STANDARD_VAT_BPS,
+  STORE_COUNTRY,
+  TAX_VALID_FROM,
+} from "./shipping-setup";
 import {
   isSeedObjectKey,
   parseSeedMediaEnv,
@@ -52,8 +58,11 @@ const ADMIN_PASSWORD = "dev-admin-password-change-me";
 const CUSTOMER_EMAIL = "customer@akai.test";
 const CUSTOMER_PASSWORD = "dev-customer-password-change-me";
 
-/** Spain's standard VAT rate, in basis points. 21% -> 2100. Clothing is standard-rated. */
-const ES_STANDARD_VAT_BPS = STANDARD_VAT_BPS["ES"] ?? 2100;
+/** Colombia's general IVA rate, in basis points. 19% -> 1900. Clothing is standard-rated. */
+const CO_STANDARD_VAT_BPS = STANDARD_VAT_BPS[STORE_COUNTRY] ?? 1900;
+
+/** Colombia's reduced IVA rate (5%), seeded so the REDUCED class resolves. */
+const CO_REDUCED_VAT_BPS = 500;
 
 /**
  * Where the fixture images live on disk.
@@ -70,7 +79,7 @@ const ASSET_DIR = path.join(__dirname, "assets");
 /**
  * Split a VAT-INCLUSIVE gross price into net and tax components.
  *
- * Display prices in an EU store are gross (spec §13), and the order line stores
+ * Display prices in Colombia are IVA-inclusive (spec §13), and the order line stores
  * net/tax/gross separately. Deriving net from gross — rather than the other way
  * round — is what keeps the advertised price exactly what the customer pays,
  * with the rounding remainder absorbed into tax rather than shifting the total.
@@ -93,7 +102,8 @@ interface SeedVariant {
   readonly size: string;
   /** Optional colour, per locale. The `options` key is the English word, lower-cased. */
   readonly color?: { readonly es: string; readonly en: string };
-  readonly grossCents: number;
+  /** IVA-inclusive price in MINOR units (centavos): 8_900_000 is $ 89.000. */
+  readonly grossMinor: number;
   readonly stock: number;
   /** SHIPPING weight in grams, packaging included. It picks the shipping bracket. */
   readonly weightGrams: number;
@@ -134,7 +144,7 @@ const NAVY = { es: "Marino", en: "Navy" } as const;
 function sized(
   skuPrefix: string,
   color: { readonly es: string; readonly en: string } | undefined,
-  grossCents: number,
+  grossMinor: number,
   weightGrams: number,
   stock: readonly [number, number, number, number],
 ): SeedVariant[] {
@@ -142,7 +152,7 @@ function sized(
     sku: `${skuPrefix}-${size}`,
     size,
     ...(color === undefined ? {} : { color }),
-    grossCents,
+    grossMinor,
     stock: stock[index] ?? 0,
     weightGrams,
   }));
@@ -155,7 +165,9 @@ function sized(
  * pricing assumption, so the shapes differ on purpose. Replace it with the real
  * catalogue through /admin/products.
  *
- * Prices are integer minor units (cents) — the money rule end to end.
+ * Prices are integer minor units (centavos, so ×100 the peso figure) — the money
+ * rule end to end. Realistic COP placeholders: tee $ 89.000, hoodie $ 219.000,
+ * cargo $ 239.000, coach jacket $ 289.000, cap $ 79.000, tote $ 59.000.
  */
 const PRODUCTS: readonly SeedProduct[] = [
   {
@@ -171,8 +183,8 @@ const PRODUCTS: readonly SeedProduct[] = [
       long: "240 gsm combed-cotton tee with a boxy oversized fit, dropped shoulders and a ribbed collar. Screen-printed chest graphic. Wash inside out at 30 °C.",
     },
     variants: [
-      ...sized("AK-TEE-BLK", BLACK, 3900, 280, [40, 60, 60, 30]),
-      ...sized("AK-TEE-WHT", WHITE, 3900, 280, [30, 50, 50, 20]),
+      ...sized("AK-TEE-BLK", BLACK, 8_900_000, 280, [40, 60, 60, 30]),
+      ...sized("AK-TEE-WHT", WHITE, 8_900_000, 280, [30, 50, 50, 20]),
     ],
     categories: ["tops"],
     images: ["oversized-tee-1.png", "oversized-tee-2.png"],
@@ -189,7 +201,7 @@ const PRODUCTS: readonly SeedProduct[] = [
       short: "400 gsm brushed fleece with a double-layer hood.",
       long: "Hooded sweatshirt in 400 gsm brushed fleece with a double-layer hood, kangaroo pocket and an embroidered chest logo.",
     },
-    variants: sized("AK-HOOD-BLK", BLACK, 8900, 750, [20, 35, 35, 15]),
+    variants: sized("AK-HOOD-BLK", BLACK, 21_900_000, 750, [20, 35, 35, 15]),
     categories: ["tops"],
     images: ["box-logo-hoodie-1.png"],
   },
@@ -205,7 +217,7 @@ const PRODUCTS: readonly SeedProduct[] = [
       short: "Cotton twill with side pockets and an adjustable hem.",
       long: "Cotton-twill cargo pants with a relaxed straight fit, bellowed side pockets and a drawcord-adjustable hem.",
     },
-    variants: sized("AK-CARGO-OLV", OLIVE, 9900, 850, [15, 25, 25, 10]),
+    variants: sized("AK-CARGO-OLV", OLIVE, 23_900_000, 850, [15, 25, 25, 10]),
     categories: ["bottoms"],
     images: ["cargo-pants-1.png"],
   },
@@ -222,7 +234,7 @@ const PRODUCTS: readonly SeedProduct[] = [
       long: "Windproof nylon coach jacket with a mesh lining, snap-button front and drawcord hem. Printed back graphic.",
     },
     // Low stock on XL on purpose: exercises the low-stock UI without selling out.
-    variants: sized("AK-COACH-NVY", NAVY, 11900, 650, [10, 18, 18, 4]),
+    variants: sized("AK-COACH-NVY", NAVY, 28_900_000, 650, [10, 18, 18, 4]),
     categories: ["outerwear"],
     images: ["coach-jacket-1.png"],
   },
@@ -239,8 +251,8 @@ const PRODUCTS: readonly SeedProduct[] = [
       long: "Six-panel cap in washed cotton with a curved brim, embroidered eyelets and a metal-buckle back strap. One adjustable size.",
     },
     variants: [
-      { sku: "AK-CAP-BLK", size: "One size", color: BLACK, grossCents: 3500, stock: 60, weightGrams: 150 },
-      { sku: "AK-CAP-OLV", size: "One size", color: OLIVE, grossCents: 3500, stock: 40, weightGrams: 150 },
+      { sku: "AK-CAP-BLK", size: "One size", color: BLACK, grossMinor: 7_900_000, stock: 60, weightGrams: 150 },
+      { sku: "AK-CAP-OLV", size: "One size", color: OLIVE, grossMinor: 7_900_000, stock: 40, weightGrams: 150 },
     ],
     categories: ["accessories"],
     images: ["six-panel-cap-1.png"],
@@ -264,7 +276,7 @@ const PRODUCTS: readonly SeedProduct[] = [
       long: "Tote bag in 340 gsm cotton canvas with long handles and a front print. Fits a 15-inch laptop.",
     },
     variants: [
-      { sku: "AK-TOTE-NAT", size: "One size", grossCents: 1500, stock: 200, weightGrams: 200 },
+      { sku: "AK-TOTE-NAT", size: "One size", grossMinor: 5_900_000, stock: 200, weightGrams: 200 },
     ],
     categories: ["accessories"],
     images: ["canvas-tote-1.png"],
@@ -291,7 +303,7 @@ function variantOptions(variant: SeedVariant): Record<string, string> {
 }
 
 /**
- * Zones, rates and the served countries' STANDARD VAT rates — one definition in
+ * The zone, its rate and Colombia's STANDARD IVA rate — one definition in
  * `shipping-setup.ts`, shared with `seed-shipping.ts`.
  */
 async function seedShipping(): Promise<void> {
@@ -345,17 +357,17 @@ async function seedTaxRates(): Promise<void> {
   for (const taxClass of [TaxClass.STANDARD, TaxClass.REDUCED, TaxClass.ZERO_RATED]) {
     const rateBps =
       taxClass === TaxClass.STANDARD
-        ? ES_STANDARD_VAT_BPS
+        ? CO_STANDARD_VAT_BPS
         : taxClass === TaxClass.REDUCED
-          ? 1000
+          ? CO_REDUCED_VAT_BPS
           : 0;
 
     await prisma.taxRate.upsert({
       where: {
-        countryCode_taxClass_validFrom: { countryCode: "ES", taxClass, validFrom },
+        countryCode_taxClass_validFrom: { countryCode: STORE_COUNTRY, taxClass, validFrom },
       },
       update: { rateBps },
-      create: { countryCode: "ES", taxClass, rateBps, validFrom },
+      create: { countryCode: STORE_COUNTRY, taxClass, rateBps, validFrom },
     });
   }
 }
@@ -453,7 +465,7 @@ async function seedCatalog(publisher: MediaPublisher): Promise<void> {
     }
 
     for (const variant of product.variants) {
-      const price = splitGross(variant.grossCents, ES_STANDARD_VAT_BPS);
+      const price = splitGross(variant.grossMinor, CO_STANDARD_VAT_BPS);
 
       // Same reason as the product above: `sku` is unique among LIVE variants
       // only, so it is no longer a `WhereUniqueInput`.
@@ -470,11 +482,11 @@ async function seedCatalog(publisher: MediaPublisher): Promise<void> {
                 sku: variant.sku,
                 name: variantName(variant),
                 options: variantOptions(variant),
-                currency: "EUR",
+                currency: SEED_CURRENCY,
                 priceNet: price.net,
                 priceTax: price.tax,
                 priceGross: price.gross,
-                taxRateBps: ES_STANDARD_VAT_BPS,
+                taxRateBps: CO_STANDARD_VAT_BPS,
                 weightGrams: variant.weightGrams,
                 isActive: true,
               },
@@ -482,9 +494,11 @@ async function seedCatalog(publisher: MediaPublisher): Promise<void> {
           : await prisma.productVariant.update({
               where: { id: existingVariant.id },
               data: {
+                currency: SEED_CURRENCY,
                 priceNet: price.net,
                 priceTax: price.tax,
                 priceGross: price.gross,
+                taxRateBps: CO_STANDARD_VAT_BPS,
               },
             });
 
@@ -773,8 +787,8 @@ async function main(): Promise<void> {
 
   await seedTaxRates();
   // Zones BEFORE the catalog only for readability; they are independent. What is
-  // NOT optional is that they exist at all: without a zone covering ES, a fully
-  // valid checkout for a Madrid address fails with "We do not ship to ES", and
+  // NOT optional is that they exist at all: without a zone covering CO, a fully
+  // valid checkout for a Medellín address fails with "We do not ship to CO", and
   // the funnel is unusable end to end regardless of any storefront work.
   await seedShipping();
   await seedCategories();

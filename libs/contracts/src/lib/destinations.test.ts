@@ -4,6 +4,7 @@ import { countryCodeSchema } from "./common";
 import {
   ADVERTISED_FREE_SHIPPING_THRESHOLD_MINOR,
   DESTINATION_COUNTRY_CODES,
+  STORE_COUNTRY_CODE,
   isDestinationCountry,
 } from "./destinations";
 
@@ -15,13 +16,15 @@ describe("DESTINATION_COUNTRY_CODES", () => {
     }
   });
 
-  it("starts with the served zones' countries and excludes the rest of the world", () => {
-    expect(DESTINATION_COUNTRY_CODES.slice(0, 8)).toEqual(["ES", "PT", "FR", "DE", "IT", "NL", "BE", "IE"]);
-    expect(isDestinationCountry("ES")).toBe(true);
+  it("is Colombia and nothing else", () => {
+    expect(DESTINATION_COUNTRY_CODES).toEqual(["CO"]);
+    expect(STORE_COUNTRY_CODE).toBe("CO");
+    expect(isDestinationCountry("CO")).toBe(true);
+    expect(isDestinationCountry("ES")).toBe(false);
     expect(isDestinationCountry("US")).toBe(false);
   });
 
-  it("advertises free shipping at €250.00, in minor units", () => {
-    expect(ADVERTISED_FREE_SHIPPING_THRESHOLD_MINOR).toBe(25_000);
+  it("advertises free shipping at $300.000 COP, in minor units (centavos)", () => {
+    expect(ADVERTISED_FREE_SHIPPING_THRESHOLD_MINOR).toBe(30_000_000);
   });
 });

@@ -42,7 +42,7 @@ describe.skipIf(!RUN)("admin metrics aggregates (real Postgres)", () => {
   const WINDOW = {
     from: new Date("2026-01-01T00:00:00.000Z"),
     to: new Date("2026-12-31T00:00:00.000Z"),
-    currency: "EUR",
+    currency: "COP",
   };
 
   let sequence = 0;
@@ -59,19 +59,19 @@ describe.skipIf(!RUN)("admin metrics aggregates (real Postgres)", () => {
       `INSERT INTO "order" (
          id, "orderNumber", email, status, locale, currency,
          subtotal, "discountTotal", "shippingTotal", "taxTotal", "grandTotal", "refundedTotal",
-         "shipFirstName","shipLastName","shipLine1","shipCity","shipPostalCode","shipCountryCode",
-         "billFirstName","billLastName","billLine1","billCity","billPostalCode","billCountryCode",
-         "reverseCharge","placedAt","updatedAt",version
+         "shipFirstName","shipLastName","shipLine1","shipCity","shipRegion","shipCountryCode",
+         "billFirstName","billLastName","billLine1","billCity","billRegion","billCountryCode",
+         "documentType","documentNumber","placedAt","updatedAt",version
        ) VALUES (
          gen_random_uuid(), $1, 'buyer@akai.test', $2::"OrderStatus", 'es', $3,
          $4, 0, 0, 0, $4, $5,
-         'A','B','L1','City','00000','ES',
-         'A','B','L1','City','00000','ES',
-         false, $6, now(), 0
+         'A','B','Calle 10 # 43-21','Medellín','Antioquia','CO',
+         'A','B','Calle 10 # 43-21','Medellín','Antioquia','CO',
+         'CC', '1020304050', $6, now(), 0
        )`,
       `AK-2026-${String(sequence).padStart(6, "0")}`,
       input.status,
-      input.currency ?? "EUR",
+      input.currency ?? "COP",
       input.grandTotal,
       input.refundedTotal ?? 0,
       input.placedAt ?? new Date("2026-06-01T10:00:00.000Z"),

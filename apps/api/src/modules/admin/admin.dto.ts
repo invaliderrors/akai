@@ -46,7 +46,7 @@ export const MAX_WINDOW_DAYS = 366;
 const metricsWindowShape = {
   from: z.coerce.date().optional(),
   to: z.coerce.date().optional(),
-  currency: currencyCodeSchema.default("EUR"),
+  currency: currencyCodeSchema.default("COP"),
 } as const;
 
 /** Fills the defaults. Shared so both schemas normalise identically. */
