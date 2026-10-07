@@ -14,7 +14,7 @@ import type { NextFunction, Request, Response } from "express";
  * is looking at. Scoping it is not a micro-optimisation; it is keeping raw
  * credentials out of memory they have no reason to be in.
  *
- * WHY THE BYTES ARE NEEDED AT ALL. Whop signs the raw body: the HMAC covers
+ * WHY THE BYTES ARE NEEDED AT ALL. Resend (Svix) signs the raw body: the HMAC is
  * computed over the exact octets it transmitted. `JSON.parse` followed by
  * `JSON.stringify` does not reliably reproduce them — key order, unicode
  * escaping and number formatting are all free to differ — so a signature

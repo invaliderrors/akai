@@ -2024,7 +2024,7 @@ export class ProductsService {
    * only consumer was the TagadaPay catalog mirror: a hosted checkout there
    * could reference a mirrored variant and nothing else, so an unmirrored
    * variant could not be sold and every catalog write had to reach the provider.
-   * Whop accepts our computed amount directly on the checkout call, so the
+   * Wompi takes our computed amount directly on the checkout URL, so the
    * mirror and its consumer are deleted — and an outbox row whose only handler
    * is gone does not sit harmlessly, it fails routing and dead-letters into
    * /admin/jobs on every single product edit.

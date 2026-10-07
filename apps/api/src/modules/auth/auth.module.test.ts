@@ -29,15 +29,11 @@ const TEST_ENV: NodeJS.ProcessEnv = {
   DATABASE_URL: "postgresql://akai:akai@localhost:5432/akai",
   DIRECT_DATABASE_URL: "postgresql://akai:akai@localhost:5432/akai",
   JWT_ACCESS_SECRET: "a".repeat(32),
-  WHOP_API_KEY: "whop_test_abc123def456ghi789",
-  WHOP_ACCOUNT_ID: "biz_test_1",
-  WHOP_PRODUCT_ID: "prod_test_1",
-  WHOP_WEBHOOK_SECRET: `ws_${"c".repeat(32)}`,
-  WHOP_API_VERSION_DATE: "2026-08-14",
-  // PINNED, as every real deployment does. NODE_ENV="test" is not production, so
-  // an unset value resolves to SANDBOX and the schema then demands a sandbox
-  // credential set — the parse throws and takes the whole suite with it.
-  WHOP_ENVIRONMENT: "live",
+  WOMPI_ENVIRONMENT: "sandbox",
+  WOMPI_PUBLIC_KEY: "pub_test_unit",
+  WOMPI_PRIVATE_KEY: "prv_test_unit",
+  WOMPI_INTEGRITY_SECRET: "test_integrity_unit",
+  WOMPI_EVENTS_SECRET: "test_events_unit",
   EMAIL_TRANSPORT: "smtp",
   SMTP_URL: "smtp://localhost:1025",
   EMAIL_FROM: "no-reply@example.com",

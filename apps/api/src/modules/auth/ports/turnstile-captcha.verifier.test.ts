@@ -117,7 +117,7 @@ describe("TurnstileCaptchaVerifier", () => {
 
   it("fails CLOSED when the siteverify body is not the expected shape", async () => {
     // An unreadable verdict is not a verdict. Reading it as "human" is the same
-    // mistake the Whop webhook rule forbids: a total we cannot read exactly is a
+    // mistake the payment settlement rule forbids: a total we cannot read exactly is a
     // total we must not agree with.
     fetchMock.mockResolvedValue(new Response(JSON.stringify({ ok: 1 }), { status: 200 }));
     await expect(verifier().verify("good-token", null)).resolves.toBe(false);

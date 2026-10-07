@@ -86,7 +86,7 @@ export class CheckoutController {
       "response; the same key with a different body is a 409.",
   })
   @ApiOperation({
-    summary: "Reserve stock, create the order, and open a Whop checkout session",
+    summary: "Reserve stock, create the order, and open a Wompi Web Checkout",
   })
   async start(
     @CurrentCartActor() actor: CartActor,

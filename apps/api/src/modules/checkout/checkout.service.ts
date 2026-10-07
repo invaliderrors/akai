@@ -46,16 +46,16 @@ export type CheckoutPaymentsPort = Pick<PaymentsService, "startCheckout">;
 /**
  * How long stock is withheld for an in-flight checkout.
  *
- * Capped at 1800s by the reserve schema. This is deliberately GENEROUS, but the
- * hosted checkout's own lifetime is not documented by the Whop SDK and we do not
- * pin one ourselves (the Stripe path's `CHECKOUT_TTL` had no analogue on either
- * successor and was deleted rather than invented). So the two windows are
- * UNRELATED, which is tracked in followUps: if a customer pays after the
- * reservation lapses, the sale is still recorded but the stock decrement can no
- * longer be guaranteed. Measuring the real session lifetime, then aligning the
- * two (and widening the reserve cap), is the fix.
+ * Capped at 1800s by the reserve schema. The Wompi checkout link expires
+ * FIRST (`CHECKOUT_EXPIRY_MS`, 25 minutes, signed into the URL as
+ * `expiration-time`), so a shopper cannot pay after the reservation lapsed and
+ * the stock was handed back. `payments.service.test.ts` pins that ordering.
+ *
+ * A staff RE-ISSUE (`admin/payments/orders/:id/checkout-sessions`) mints a new
+ * link without re-reserving; paying it after the reservation lapsed still
+ * settles, but the stock decrement can no longer be guaranteed.
  */
-const RESERVATION_TTL_SECONDS = 1800;
+export const RESERVATION_TTL_SECONDS = 1800;
 
 /**
  * CheckoutService — the missing bridge between a validated cart and a hosted

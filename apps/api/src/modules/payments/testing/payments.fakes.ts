@@ -1,19 +1,16 @@
-import { type Minor, toMinor } from "@akai/contracts";
-import { add, subtract } from "@akai/money";
+import { toMinor } from "@akai/contracts";
 
 import type {
   JsonObject,
+  OrderCheckoutDetails,
   OrderLineSnapshot,
   OrderSnapshot,
   PaymentSnapshot,
   PaymentsRepository,
   PaymentsWriter,
-  ProviderOrderReference,
-  RecordDisputeInput,
   RecordPaymentAttemptInput,
-  RecordRefundInput,
-  UpdatePaymentInput,
-  UpsertSettlementPaymentInput,
+  RecordTransactionInput,
+  StalledTransaction,
 } from "../repository/payments.repository";
 
 /**
@@ -31,10 +28,9 @@ import type {
  * its own — two classes implementing the same port, each modelling a different
  * subset of it. Two fakes for one port is worse than none: a change that breaks
  * an invariant in one can pass every suite that uses the other, and "does the
- * repository behave like this?" acquires two answers. The webhook-specific
- * behaviours (the `provider_event` dedupe ledger, the
- * three-way correlation lookup, the never-overwrite `providerOrderId` backfill)
- * are modelled HERE, where every suite gets them.
+ * repository behave like this?" acquires two answers. The settlement-specific
+ * behaviours (the `provider_event` dedupe ledger, reference correlation, the
+ * three-case `recordTransaction`) are modelled HERE, where every suite gets them.
  */
 
 // ---------------------------------------------------------------------------
@@ -48,13 +44,13 @@ export function orderSnapshot(overrides: Partial<OrderSnapshot> = {}): OrderSnap
     status: "PENDING",
     email: "customer@example.com",
     locale: "es",
-    currency: "EUR",
-    grandTotal: toMinor(4999),
+    currency: "COP",
+    // $ 89.000, IVA-inclusive at 19%: 8_900_000 / 1.19 = 7_478_992 net.
+    grandTotal: toMinor(8_900_000),
     discountTotal: toMinor(0),
     shippingTotal: toMinor(0),
-    taxTotal: toMinor(867),
+    taxTotal: toMinor(1_421_008),
     refundedTotal: toMinor(0),
-    providerCheckoutId: null,
   };
 
   return Object.assign({}, base, overrides);
@@ -68,11 +64,11 @@ export function orderLine(overrides: Partial<OrderLineSnapshot> = {}): OrderLine
     sku: "AK-HOOD-M",
     imageUrl: null,
     quantity: 1,
-    unitPriceGross: toMinor(4999),
-    lineTotalGross: toMinor(4999),
-    // The VAT inside 4999 at the order fixture's rate, so a default line and a
-    // default order agree: taxTotal(867) - lineTax(867) leaves shipping untaxed.
-    taxAmount: toMinor(867),
+    unitPriceGross: toMinor(8_900_000),
+    lineTotalGross: toMinor(8_900_000),
+    // The IVA inside $ 89.000 at 19%, so a default line and a default order
+    // agree: taxTotal - lineTax leaves shipping untaxed.
+    taxAmount: toMinor(1_421_008),
   };
 
   return Object.assign({}, base, overrides);
@@ -84,11 +80,34 @@ export function paymentSnapshot(
   const base: PaymentSnapshot = {
     id: "33333333-3333-4333-8333-333333333333",
     orderId: "11111111-1111-4111-8111-111111111111",
-    status: "SUCCEEDED",
-    amount: toMinor(4999),
-    currency: "EUR",
-    providerPaymentId: "tgd_pay_test",
-    providerTransactionId: "tgd_txn_test",
+    status: "REQUIRES_PAYMENT_METHOD",
+    amount: toMinor(8_900_000),
+    currency: "COP",
+    providerReference: "AK-2026-000123-1",
+    providerPaymentId: null,
+  };
+
+  return Object.assign({}, base, overrides);
+}
+
+export function checkoutDetails(
+  overrides: Partial<OrderCheckoutDetails> = {},
+): OrderCheckoutDetails {
+  const base: OrderCheckoutDetails = {
+    billingName: "Ana García",
+    billingPhone: "3001234567",
+    documentType: "CC",
+    documentNumber: "1020304050",
+    shipping: {
+      name: "Ana García",
+      line1: "Calle 10 # 43-21",
+      line2: null,
+      city: "Medellín",
+      region: "Antioquia",
+      postalCode: null,
+      countryCode: "CO",
+      phone: "3001234567",
+    },
   };
 
   return Object.assign({}, base, overrides);
@@ -118,17 +137,20 @@ export interface RecordedProviderEvent {
 
 interface StateSnapshot {
   readonly orders: Map<string, OrderSnapshot>;
-  readonly payments: PaymentSnapshot[];
+  readonly payments: FakePaymentRow[];
   /** Invoice allocation rolls back with the transaction — see `invoiceNumbersIssued`. */
   readonly invoiceNumbers: Map<string, string>;
   readonly invoiceNumbersIssuedLength: number;
   readonly outboxLength: number;
   readonly eventsLength: number;
-  readonly refundsLength: number;
-  readonly disputesLength: number;
   readonly committedReservationsLength: number;
   readonly releasedReservationsLength: number;
-  readonly checkoutIdLinksLength: number;
+}
+
+/** One ledger row as the fake stores it — the snapshot plus what a test asserts on. */
+export interface FakePaymentRow extends PaymentSnapshot {
+  readonly failureCode: string | null;
+  readonly capturedAt: Date | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -138,10 +160,9 @@ interface StateSnapshot {
 export class FakePaymentsRepository implements PaymentsRepository {
   readonly orders = new Map<string, OrderSnapshot>();
   readonly lines = new Map<string, OrderLineSnapshot[]>();
-  readonly payments: PaymentSnapshot[] = [];
+  readonly details = new Map<string, OrderCheckoutDetails>();
+  readonly payments: FakePaymentRow[] = [];
 
-  readonly refunds: RecordRefundInput[] = [];
-  readonly disputes: RecordDisputeInput[] = [];
   readonly orderEvents: RecordedOrderEvent[] = [];
   readonly outbox: RecordedOutbox[] = [];
   /** Order ids whose reservations were converted to a sale (commit at PAID). */
@@ -151,8 +172,10 @@ export class FakePaymentsRepository implements PaymentsRepository {
 
   /** Every `provider_event` row this fake accepted, in order. */
   readonly providerEvents: RecordedProviderEvent[] = [];
-  /** Every `linkCheckoutId` call, in order. */
-  readonly checkoutIdLinks: { orderId: string; checkoutId: string }[] = [];
+  /** Order ids `lockOrder` / `findOrderByPaymentReference` locked, in order. */
+  readonly locks: string[] = [];
+  /** What `findStalledTransactions` answers. Tests set it. */
+  stalled: StalledTransaction[] = [];
   /** When each order was marked paid — the settlement time the event carried. */
   readonly paidAt = new Map<string, Date>();
 
@@ -195,13 +218,18 @@ export class FakePaymentsRepository implements PaymentsRepository {
   /** Set to make the next `runInTransaction` body fail AFTER the gateway succeeded. */
   failNextTransaction = false;
 
-  seedOrder(order: OrderSnapshot, lines: readonly OrderLineSnapshot[] = []): void {
+  seedOrder(
+    order: OrderSnapshot,
+    lines: readonly OrderLineSnapshot[] = [],
+    details: OrderCheckoutDetails = checkoutDetails(),
+  ): void {
     this.orders.set(order.id, order);
     this.lines.set(order.id, [...lines]);
+    this.details.set(order.id, details);
   }
 
   seedPayment(payment: PaymentSnapshot): void {
-    this.payments.push(payment);
+    this.payments.push({ ...payment, failureCode: null, capturedAt: null });
   }
 
   /** The seeded order, or a loud test-setup failure. Never silently undefined. */
@@ -236,129 +264,113 @@ export class FakePaymentsRepository implements PaymentsRepository {
     return null;
   }
 
-  async findOrderByProviderReference(
-    reference: ProviderOrderReference,
-  ): Promise<OrderSnapshot | null> {
-    switch (reference.kind) {
-      // Our own order UUID, round-tripped through the provider's metadata — a
-      // primary-key lookup.
-      case "orderId":
-        return this.findOrderById(reference.id);
-
-      case "checkoutId": {
-        for (const order of this.orders.values()) {
-          if (order.providerCheckoutId === reference.id) {
-            return order;
-          }
-        }
-        return null;
-      }
+  async findOrderByPaymentReference(reference: string): Promise<OrderSnapshot | null> {
+    const row = this.payments.find((entry) => entry.providerReference === reference);
+    if (row === undefined) {
+      return null;
     }
+    this.locks.push(row.orderId);
+    return this.findOrderById(row.orderId);
+  }
+
+  async lockOrder(orderId: string): Promise<OrderSnapshot | null> {
+    this.locks.push(orderId);
+    return this.findOrderById(orderId);
   }
 
   async findOrderLines(orderId: string): Promise<readonly OrderLineSnapshot[]> {
     return this.lines.get(orderId) ?? [];
   }
 
-  async findPaymentByProviderId(
-    providerPaymentId: string,
-  ): Promise<PaymentSnapshot | null> {
-    return (
-      this.payments.find((entry) => entry.providerPaymentId === providerPaymentId) ?? null
-    );
+  async findOrderCheckoutDetails(orderId: string): Promise<OrderCheckoutDetails | null> {
+    return this.details.get(orderId) ?? null;
   }
 
-  async findRefundablePaymentForOrder(orderId: string): Promise<PaymentSnapshot | null> {
-    return (
-      this.payments.find(
-        (entry) => entry.orderId === orderId && entry.status === "SUCCEEDED",
-      ) ?? null
-    );
+  async countPaymentAttempts(orderId: string): Promise<number> {
+    return this.payments.filter(
+      (entry) => entry.orderId === orderId && entry.providerReference !== null,
+    ).length;
+  }
+
+  /** The ledger row for a transaction id, or a loud test failure. */
+  paymentFor(providerPaymentId: string): FakePaymentRow {
+    const found = this.payments.find((entry) => entry.providerPaymentId === providerPaymentId);
+    if (found === undefined) {
+      throw new Error(`Test assertion: no payment row for ${providerPaymentId}`);
+    }
+    return found;
   }
 
   // --- Writes --------------------------------------------------------------
 
-  async recordPaymentAttempt(
-    input: RecordPaymentAttemptInput,
-  ): Promise<PaymentSnapshot> {
-    const payment: PaymentSnapshot = {
+  async recordPaymentAttempt(input: RecordPaymentAttemptInput): Promise<PaymentSnapshot> {
+    const payment: FakePaymentRow = {
       id: `pay_${this.payments.length + 1}`,
       orderId: input.orderId,
       status: input.status,
       amount: input.amount,
       currency: input.currency,
-      providerPaymentId: input.providerPaymentId,
-      providerTransactionId: null,
+      providerReference: input.providerReference,
+      providerPaymentId: null,
+      failureCode: null,
+      capturedAt: null,
     };
 
     this.payments.push(payment);
     return payment;
   }
 
-  /**
-   * Insert-or-update on `providerPaymentId`, mirroring the production upsert.
-   *
-   * Modelled as ONE operation, not a find followed by a push, because the whole
-   * reason the port has this method is that a check-then-insert is not atomic. A
-   * fake that split it in two would let a test pass against an implementation the
-   * database rejects.
-   */
-  async upsertSettlementPayment(input: UpsertSettlementPaymentInput): Promise<void> {
-    const index = this.payments.findIndex(
+  /** Mirrors the adapter's three cases, in the same order. */
+  async recordTransaction(input: RecordTransactionInput): Promise<void> {
+    const state = {
+      status: input.status,
+      failureCode: input.failureCode,
+      capturedAt: input.capturedAt,
+    };
+
+    const existing = this.payments.findIndex(
       (entry) => entry.providerPaymentId === input.providerPaymentId,
     );
-
-    const existing = this.payments[index];
-
-    if (existing === undefined) {
-      this.payments.push({
-        id: `pay_${this.payments.length + 1}`,
-        orderId: input.orderId,
-        status: input.status,
-        amount: input.amount,
-        currency: input.currency,
-        providerPaymentId: input.providerPaymentId,
-        providerTransactionId: null,
-      });
+    const existingRow = this.payments[existing];
+    if (existingRow !== undefined) {
+      if (existingRow.orderId === input.orderId) {
+        this.payments[existing] = { ...existingRow, ...state };
+      }
       return;
     }
 
-    // `amount` deliberately NOT rewritten — the first settlement figure is the
-    // evidence the mismatch path preserves. `orderId` IS re-scoped, mirroring the
-    // Prisma repo: `providerPaymentId` is globally unique, so a settlement for one
-    // order landing on a row another order created must re-attribute the row to the
-    // order this settlement belongs to, not silently mutate the other order's row.
-    this.payments[index] = {
-      ...existing,
-      orderId: input.orderId,
-      status: input.status,
-    };
-  }
-
-  async updatePaymentByProviderId(input: UpdatePaymentInput): Promise<void> {
-    // Scoped to the correlated order too: mirrors the production `updateMany` predicate,
-    // so an event correlated to order A cannot mutate a paymentId belonging to order B.
-    const index = this.payments.findIndex(
+    const attempt = this.payments.findIndex(
       (entry) =>
-        entry.providerPaymentId === input.providerPaymentId &&
-        entry.orderId === input.orderId,
+        entry.orderId === input.orderId &&
+        entry.providerReference === input.providerReference &&
+        entry.providerPaymentId === null,
     );
-
-    const existing = this.payments[index];
-    if (existing === undefined) {
+    const attemptRow = this.payments[attempt];
+    if (attemptRow !== undefined) {
+      this.payments[attempt] = {
+        ...attemptRow,
+        ...state,
+        providerPaymentId: input.providerPaymentId,
+        ...(input.reported === null
+          ? {}
+          : { amount: input.reported.amount, currency: input.reported.currency }),
+      };
       return;
     }
 
-    this.payments[index] = {
-      ...existing,
-      status: input.status,
-      providerTransactionId: input.providerTransactionId,
-    };
-  }
+    if (input.reported === null || input.reported.amount <= 0) {
+      return;
+    }
 
-  async linkCheckoutId(orderId: string, checkoutId: string): Promise<void> {
-    this.checkoutIdLinks.push({ orderId, checkoutId });
-    this.mutateOrder(orderId, { providerCheckoutId: checkoutId });
+    this.payments.push({
+      ...state,
+      id: `pay_${this.payments.length + 1}`,
+      orderId: input.orderId,
+      amount: input.reported.amount,
+      currency: input.reported.currency,
+      providerReference: input.providerReference,
+      providerPaymentId: input.providerPaymentId,
+    });
   }
 
   async setOrderStatus(orderId: string, status: OrderSnapshot["status"]): Promise<void> {
@@ -366,12 +378,8 @@ export class FakePaymentsRepository implements PaymentsRepository {
   }
 
   /**
-   * PAID, and the invoice number that legally goes with it, in one step.
-   *
-   * The allocation is conditional, mirroring the adapter's check-under-lock:
-   * that guard is the whole reason a duplicate webhook cannot consume a second
-   * number, so a fake that allocated unconditionally would hide exactly the
-   * defect worth testing for.
+   * PAID, and the invoice number that legally goes with it, in one step. The
+   * allocation is conditional, mirroring the adapter's check-under-lock.
    */
   async markOrderPaid(orderId: string, paidAt: Date): Promise<void> {
     this.paidAt.set(orderId, paidAt);
@@ -382,8 +390,6 @@ export class FakePaymentsRepository implements PaymentsRepository {
       return;
     }
 
-    // Shaped like `allocate_invoice_number()`: INV-<year>-<six digits>, from a
-    // counter that never resets per year.
     const sequence = String(this.invoiceNumbersIssued.length + 1).padStart(6, "0");
     const invoiceNumber = `INV-${String(paidAt.getUTCFullYear())}-${sequence}`;
     this.invoiceNumbersIssued.push(invoiceNumber);
@@ -397,14 +403,6 @@ export class FakePaymentsRepository implements PaymentsRepository {
     return this.invoiceNumbers.get(orderId) ?? null;
   }
 
-  async addRefundedTotal(orderId: string, delta: Minor): Promise<void> {
-    const order = this.orders.get(orderId);
-    if (order === undefined) {
-      return;
-    }
-    this.mutateOrder(orderId, { refundedTotal: add(order.refundedTotal, delta) });
-  }
-
   async commitReservationsForOrder(orderId: string): Promise<void> {
     this.committedReservationOrders.push(orderId);
   }
@@ -413,20 +411,19 @@ export class FakePaymentsRepository implements PaymentsRepository {
     this.releasedReservationOrders.push(orderId);
   }
 
-  async recordRefund(input: RecordRefundInput): Promise<void> {
-    this.refunds.push(input);
-  }
-
-  async recordDispute(input: RecordDisputeInput): Promise<void> {
-    this.disputes.push(input);
-  }
-
   async appendOrderEvent(input: RecordedOrderEvent): Promise<void> {
     this.orderEvents.push(input);
   }
 
   async enqueue(topic: string, payload: JsonObject): Promise<void> {
     this.outbox.push({ topic, payload });
+  }
+
+  async findStalledTransactions(
+    _olderThan: Date,
+    limit: number,
+  ): Promise<readonly StalledTransaction[]> {
+    return this.stalled.slice(0, limit);
   }
 
   // --- Transactions --------------------------------------------------------
@@ -440,8 +437,7 @@ export class FakePaymentsRepository implements PaymentsRepository {
    * which is what the single-transaction design buys in production.
    *
    * What it CANNOT prove is that Postgres actually behaves this way under
-   * concurrency; that is what `apps/api-e2e/src/whop-webhook-dedupe.spec.ts`
-   * is for.
+   * concurrency; that is what `apps/api-e2e/src/wompi-webhook.spec.ts` is for.
    */
   async runOnceForEvent(
     event: { readonly id: string; readonly type: string },
@@ -501,11 +497,8 @@ export class FakePaymentsRepository implements PaymentsRepository {
       invoiceNumbersIssuedLength: this.invoiceNumbersIssued.length,
       outboxLength: this.outbox.length,
       eventsLength: this.orderEvents.length,
-      refundsLength: this.refunds.length,
-      disputesLength: this.disputes.length,
       committedReservationsLength: this.committedReservationOrders.length,
       releasedReservationsLength: this.releasedReservationOrders.length,
-      checkoutIdLinksLength: this.checkoutIdLinks.length,
     };
   }
 
@@ -525,15 +518,7 @@ export class FakePaymentsRepository implements PaymentsRepository {
     this.invoiceNumbersIssued.length = snapshot.invoiceNumbersIssuedLength;
     this.outbox.length = snapshot.outboxLength;
     this.orderEvents.length = snapshot.eventsLength;
-    this.refunds.length = snapshot.refundsLength;
-    this.disputes.length = snapshot.disputesLength;
     this.committedReservationOrders.length = snapshot.committedReservationsLength;
     this.releasedReservationOrders.length = snapshot.releasedReservationsLength;
-    this.checkoutIdLinks.length = snapshot.checkoutIdLinksLength;
   }
-}
-
-/** Remaining refundable balance, for assertions. */
-export function refundable(order: OrderSnapshot): Minor {
-  return subtract(order.grandTotal, order.refundedTotal);
 }

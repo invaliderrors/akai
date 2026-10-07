@@ -7,8 +7,8 @@ import {
 } from "./resend-signature";
 
 /**
- * Resend signs with Svix, and every difference from the Whop scheme is a
- * way to get this silently wrong.
+ * Resend signs with Svix, and every detail of the scheme is a way to get this
+ * silently wrong.
  */
 
 const SECRET = `whsec_${Buffer.from("a-resend-signing-secret-of-decent-length").toString("base64")}`;

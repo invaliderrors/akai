@@ -1,65 +1,48 @@
 import { Module } from "@nestjs/common";
 
 import { PrismaModule } from "../prisma/prisma.module";
+import { ThrottlerModule } from "../throttler/throttler.module";
 import { ORDER_STATE_PORT, TransitionTableOrderState } from "./order-state.port";
 import { PaymentsController } from "./payments.controller";
 import { PaymentsService } from "./payments.service";
 import { PAYMENTS_REPOSITORY } from "./repository/payments.repository";
 import { PrismaPaymentsRepository } from "./repository/prisma-payments.repository";
-import { WhopWebhookController } from "./webhook/whop-webhook.controller";
-import { WhopWebhookService } from "./webhook/whop-webhook.service";
-import { LiveWhopGateway } from "./whop/live-whop.gateway";
-import { WHOP_GATEWAY } from "./whop/whop.gateway";
+import { WompiWebhookController } from "./webhook/wompi-webhook.controller";
+import { WompiSettlementService } from "./wompi-settlement.service";
+import { LiveWompiGateway, WOMPI_FETCH, type FetchLike } from "./wompi/live-wompi.gateway";
+import { WOMPI_GATEWAY } from "./wompi/wompi.gateway";
 
 /**
- * PaymentsModule — the ONLY module that talks to Whop.
+ * PaymentsModule — the ONLY module that talks to Wompi.
  *
- * Everything provider-shaped sits behind `WHOP_GATEWAY`, so "what can this
- * system do to the payment provider" has exactly one answer, in one file, and a
- * test can substitute the whole integration without a cast.
+ * Everything provider-shaped sits behind `WOMPI_GATEWAY` (one read: a
+ * transaction by id) and `wompi/wompi-checkout.ts` (the signed Web Checkout
+ * URL), so "what can this system do to the payment provider" has one answer.
  *
- * THREE SEAMS ARE TOKEN-BOUND so the modules that will eventually own them can
- * take over without editing anything here:
- *   - PAYMENTS_REPOSITORY — persistence, currently Prisma-backed.
- *   - WHOP_GATEWAY        — the live Whop adapter.
- *   - ORDER_STATE_PORT    — order transitions, until OrdersModule ships its
- *                           domain service; rebinding this token is the whole
- *                           migration.
+ * THERE IS EXACTLY ONE GATEWAY AND EXACTLY ONE SETTLEMENT PATH. Each provider
+ * migration deleted its predecessor outright — `stripe/**`, `tagada/**`, then
+ * `whop/**` — because two live payment adapters in one container is a routing
+ * decision nobody made. The webhook, the return-page confirmation and the
+ * reconciliation sweep all settle through `WompiSettlementService`.
  *
- * THERE IS EXACTLY ONE GATEWAY AND EXACTLY ONE WEBHOOK PLANE. Each provider
- * migration has deleted its predecessor outright rather than leaving it bound —
- * `stripe/**` then `tagada/**`, with their gateways and webhook pairs. Two live
- * payment adapters in one container is a routing decision nobody made, and the
- * way it fails is that a refund goes to the provider that did not take the
- * money.
+ * THERE IS NO REFUND HERE. Wompi has no refund API for Web Checkout payments;
+ * staff refund in the Wompi dashboard and record it through OrdersModule
+ * (`POST /admin/orders/:orderNumber/refunds`), the one refund implementation.
  *
- * SIMILARLY, THERE IS EXACTLY ONE REFUND IMPLEMENTATION. `refundOrder` lives on
- * `PaymentsService` and nowhere else. A parallel pass grew a second one in a
- * separate `RefundsModule`; both wrote the same ledger against the same order,
- * which is a double refund waiting for two operators to click at once. The
- * integration contract (§2, §11 Lane C) puts it here, so here is where it stayed.
- *
- * Services are EXPORTED because the checkout, orders and admin modules call them
- * in-process rather than over HTTP: CheckoutModule opens a checkout session once
- * it has verified cart ownership.
- *
- * CATALOGMODULE NO LONGER CALLS IN HERE AT ALL. It used to invoke
- * `ProductSyncService.enqueueSync` inside its own write transaction, because a
- * TagadaPay checkout could only reference a mirrored variant and an unmirrored
- * one could not be sold. Whop takes the amount directly on the checkout call, so
- * there is no mirror, no sync job, and no coupling between publishing a product
- * and being able to sell it.
+ * TOKEN-BOUND SEAMS: PAYMENTS_REPOSITORY (Prisma), WOMPI_GATEWAY (live
+ * adapter), ORDER_STATE_PORT (the transition table), WOMPI_FETCH (`fetch`).
  */
 @Module({
-  imports: [PrismaModule],
-  controllers: [PaymentsController, WhopWebhookController],
+  imports: [PrismaModule, ThrottlerModule],
+  controllers: [PaymentsController, WompiWebhookController],
   providers: [
     PaymentsService,
-    WhopWebhookService,
+    WompiSettlementService,
     { provide: PAYMENTS_REPOSITORY, useClass: PrismaPaymentsRepository },
-    { provide: WHOP_GATEWAY, useClass: LiveWhopGateway },
+    { provide: WOMPI_GATEWAY, useClass: LiveWompiGateway },
+    { provide: WOMPI_FETCH, useValue: ((url, init) => fetch(url, init)) satisfies FetchLike },
     { provide: ORDER_STATE_PORT, useClass: TransitionTableOrderState },
   ],
-  exports: [PaymentsService, WhopWebhookService, WHOP_GATEWAY],
+  exports: [PaymentsService, WompiSettlementService, WOMPI_GATEWAY],
 })
 export class PaymentsModule {}

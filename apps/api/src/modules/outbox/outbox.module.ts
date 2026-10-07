@@ -37,7 +37,7 @@ import {
  * THE CATALOG-MIRROR CONSUMERS ARE GONE, with the mirror itself. Under
  * TagadaPay a checkout item was `{ variantId, quantity }` with no amount field,
  * so every catalog write had to reach the provider before the variant could be
- * sold and these topics were load-bearing. Whop accepts our computed amount on
+ * sold and these topics were load-bearing. Wompi takes our computed amount on
  * the checkout call, so publishing a product and being able to sell it are no
  * longer coupled through a queue.
  *

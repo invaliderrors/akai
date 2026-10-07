@@ -16,8 +16,8 @@ import { CATALOG_BASE_COUNTRY, TaxRateResolver } from "./tax-rate.resolver";
  * single-variant product still gets exactly one variant row.
  *
  * DOES NOT OWN, AND DELIBERATELY DOES NOT TOUCH:
- *  - The payment gateway. There is no `@whop/sdk` import in this directory, and
- *    there is nothing for one to do: Whop accepts our computed amount on the
+ *  - The payment gateway. There is no payment-provider import in this directory, and
+ *    there is nothing for one to do: Wompi takes our computed amount on the
  *    checkout call, so publishing a product and being able to sell it are not
  *    coupled at all. The previous provider could only reference a mirrored
  *    variant, which made every catalog write a sync obligation; that mirror and

@@ -429,17 +429,11 @@ export function toDecimalString(amount: Minor, currency: CurrencyCode): string {
 /**
  * The INVERSE of `toDecimalString`: `"89000.00"` COP -> `8900000`.
  *
- * THE PAYMENT-PROVIDER BOUNDARY. Whop speaks major units in three dialects and
- * this is the only place any of them becomes a `Minor`:
- *
- *   - REST bodies carry `Money.amount` as an exact decimal STRING — the SDK's
- *     own comment reads "a string so no float rounds it in transit". Pass it
- *     straight in.
- *   - Webhook bodies (`PaymentLegacy.total`) carry a bare `number`. Pass
- *     `String(n)`: that is JS's shortest round-tripping decimal, so the string
- *     is exactly the value the provider serialised and nothing is invented.
- *   - Outbound requests take a `number`, which is `Number(toDecimalString(...))`
- *     — the other direction, and the reason these two functions belong together.
+ * THE PAYMENT-PROVIDER BOUNDARY. A provider that speaks MAJOR units (an exact
+ * decimal string, or a bare number passed as `String(n)` — JS's shortest
+ * round-tripping decimal, so nothing is invented) becomes a `Minor` here and
+ * nowhere else. Wompi does not need it: `amount_in_cents` is already centavos,
+ * the same unit as the ledger, so the payment path compares integers directly.
  *
  * INTEGER AND STRING OPERATIONS ONLY. `Number(value) * 10 ** exponent` is the
  * obvious implementation and it is wrong: `49.99 * 100` is 4998.999999999999,

@@ -1,21 +1,19 @@
 import { Injectable } from "@nestjs/common";
-import { type CurrencyCode, type Minor, toMinor } from "@akai/contracts";
+import { type CurrencyCode, toMinor } from "@akai/contracts";
 import { Prisma } from "@akai/db";
 
 import { PrismaService } from "../../prisma/prisma.service";
 import type {
   JsonObject,
+  OrderCheckoutDetails,
   OrderLineSnapshot,
   OrderSnapshot,
   PaymentSnapshot,
   PaymentsRepository,
   PaymentsWriter,
-  RecordDisputeInput,
   RecordPaymentAttemptInput,
-  ProviderOrderReference,
-  RecordRefundInput,
-  UpdatePaymentInput,
-  UpsertSettlementPaymentInput,
+  RecordTransactionInput,
+  StalledTransaction,
 } from "./payments.repository";
 import type { OrderStatus } from "@akai/contracts";
 
@@ -43,17 +41,6 @@ function isUniqueViolation(error: unknown): boolean {
 }
 
 /**
- * Canonical UUID shape, checked before a correlation value is cast to `uuid`.
- *
- * `order.id` is `@db.Uuid`, so comparing it against arbitrary text makes Postgres
- * raise `invalid input syntax for type uuid` — and inside the webhook transaction
- * that aborts everything, turning "we could not correlate this event" into a 500.
- * The value comes from a signed but externally-authored body, so it is validated
- * for shape before it reaches SQL.
- */
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-/**
  * The write surface, bound to either a transaction client or the base client.
  * Both satisfy the same delegate API, which is why one class covers both.
  */
@@ -75,78 +62,96 @@ class PrismaPaymentsWriter implements PaymentsWriter {
   }
 
   /**
-   * Correlate, AND LOCK THE ROW WE CORRELATED TO.
+   * Correlate a Wompi `reference`, AND LOCK THE ORDER IT BELONGS TO.
    *
-   * Two statements rather than one raw select of every column: `SELECT "id" …
-   * FOR UPDATE` takes the lock, and the ordinary `findUnique` that follows reads
-   * the snapshot through Prisma's own mapping. Under READ COMMITTED each
-   * statement takes a fresh snapshot, so the read after the lock sees whatever
-   * the transaction we just queued behind committed — which is the entire point.
-   * Doing it as one raw query would mean hand-mapping twelve columns here and a
-   * second place for the snapshot shape to drift.
+   * Two statements rather than one raw select of every column: `SELECT … FOR
+   * UPDATE` takes the lock, and the ordinary `findUnique` that follows reads the
+   * snapshot through Prisma's own mapping. Under READ COMMITTED each statement
+   * takes a fresh snapshot, so the read after the lock sees whatever the
+   * transaction we queued behind committed — which is the point. See the port
+   * doc for why the lock is the contract.
    *
-   * WHY A LOCK AT ALL: see the port doc on `findOrderByProviderReference`. In
-   * short, every webhook handler is a read-then-write on `order.status`, and
-   * `payment/succeeded` + `order/paid` arrive concurrently with different event
-   * ids, so `provider_event` alone does not serialise them.
-   *
-   * A reference that matches nothing locks nothing and returns null, which is
-   * correct: there is no row to protect.
+   * A reference that matches nothing locks nothing and returns null.
    */
-  async findOrderByProviderReference(
-    reference: ProviderOrderReference,
-  ): Promise<OrderSnapshot | null> {
-    const lockedId = await this.lockOrderIdByReference(reference);
+  async findOrderByPaymentReference(reference: string): Promise<OrderSnapshot | null> {
+    const rows = await this.db.$queryRaw<readonly { readonly id: unknown }[]>`
+      SELECT o."id" FROM "order" o
+      WHERE o."id" = (
+        SELECT p."orderId" FROM "payment" p
+        WHERE p."providerReference" = ${reference}
+        LIMIT 1
+      )
+      FOR UPDATE OF o
+    `;
 
-    return lockedId === null ? null : this.findOrderById(lockedId);
+    // `$queryRaw`'s generic is an assertion, not a check — narrowed, not trusted.
+    const id = rows[0]?.id;
+    return typeof id === "string" ? this.findOrderById(id) : null;
   }
 
-  private async lockOrderIdByReference(
-    reference: ProviderOrderReference,
-  ): Promise<string | null> {
-    const rows = await this.selectOrderIdForUpdate(reference);
-    const first = rows[0];
-
-    // `$queryRaw`'s generic is an assertion, not a check — so the one field we
-    // read is narrowed rather than trusted.
-    return typeof first?.id === "string" ? first.id : null;
+  async lockOrder(orderId: string): Promise<OrderSnapshot | null> {
+    const rows = await this.db.$queryRaw<readonly { readonly id: unknown }[]>`
+      SELECT "id" FROM "order" WHERE "id" = ${orderId}::uuid FOR UPDATE
+    `;
+    const id = rows[0]?.id;
+    return typeof id === "string" ? this.findOrderById(id) : null;
   }
 
-  private selectOrderIdForUpdate(
-    reference: ProviderOrderReference,
-  ): Promise<readonly { readonly id: unknown }[]> {
-    switch (reference.kind) {
-      // Rank 1. `metadata.order_id` is our own order UUID round-tripped, so
-      // this is a primary-key lookup and needs no dedicated column. The shape
-      // guard is load-bearing: `order.id` is `@db.Uuid`, and a signed-but-hostile
-      // body carrying a non-UUID value would otherwise make Postgres raise on the
-      // cast and abort the whole webhook transaction — a 500 on a delivery we
-      // should simply have failed to correlate.
-      case "orderId":
-        return UUID_PATTERN.test(reference.id)
-          ? this.db.$queryRaw<readonly { readonly id: unknown }[]>`
-              SELECT "id" FROM "order" WHERE "id" = ${reference.id}::uuid FOR UPDATE
-            `
-          : Promise.resolve([]);
+  async countPaymentAttempts(orderId: string): Promise<number> {
+    return this.db.payment.count({
+      where: { orderId, providerReference: { not: null } },
+    });
+  }
 
-      case "checkoutId":
-        return this.db.$queryRaw<readonly { readonly id: unknown }[]>`
-          SELECT "id" FROM "order"
-          WHERE "providerCheckoutId" = ${reference.id}
-          FOR UPDATE
-        `;
+  async findOrderCheckoutDetails(orderId: string): Promise<OrderCheckoutDetails | null> {
+    const row = await this.db.order.findUnique({
+      where: { id: orderId },
+      select: {
+        billFirstName: true,
+        billLastName: true,
+        billPhone: true,
+        documentType: true,
+        documentNumber: true,
+        shipFirstName: true,
+        shipLastName: true,
+        shipLine1: true,
+        shipLine2: true,
+        shipCity: true,
+        shipRegion: true,
+        shipPostalCode: true,
+        shipCountryCode: true,
+        shipPhone: true,
+      },
+    });
+
+    if (row === null) {
+      return null;
     }
+
+    return {
+      billingName: `${row.billFirstName} ${row.billLastName}`.trim(),
+      billingPhone: row.billPhone,
+      documentType: row.documentType,
+      documentNumber: row.documentNumber,
+      shipping: {
+        name: `${row.shipFirstName} ${row.shipLastName}`.trim(),
+        line1: row.shipLine1,
+        line2: row.shipLine2,
+        city: row.shipCity,
+        region: row.shipRegion,
+        postalCode: row.shipPostalCode,
+        countryCode: row.shipCountryCode,
+        phone: row.shipPhone,
+      },
+    };
   }
 
   /**
    * Order lines, exactly as stored.
    *
-   * ONE QUERY. It used to be two: a second `productVariant.findMany` looked up
-   * each line's mirrored provider variant id, because a TagadaPay checkout item
-   * carried a `variantId` and no amount, so the mirror was the only channel
-   * through which a price could reach the payment page. Whop takes the amount
-   * directly on the checkout call, so there is no mirror to join to and checkout
-   * reads nothing here beyond the money it already holds.
+   * ONE QUERY. Wompi is given the amount directly on the checkout URL, so there
+   * is no catalogue mirror to join to and checkout reads nothing here beyond the
+   * money it already holds.
    */
   async findOrderLines(orderId: string): Promise<readonly OrderLineSnapshot[]> {
     const rows = await this.db.orderItem.findMany({
@@ -167,32 +172,6 @@ class PrismaPaymentsWriter implements PaymentsWriter {
     }));
   }
 
-  async findPaymentByProviderId(
-    providerPaymentId: string,
-  ): Promise<PaymentSnapshot | null> {
-    return this.toPaymentSnapshot(
-      await this.db.payment.findUnique({
-        where: { providerPaymentId },
-      }),
-    );
-  }
-
-  /**
-   * The payment a refund can be issued against: the SUCCEEDED attempt.
-   *
-   * An order may have several attempts (a declined card, then a good one).
-   * Refunding the wrong one is an error the gateway would reject anyway, but
-   * selecting correctly here keeps the failure out of the money path entirely.
-   */
-  async findRefundablePaymentForOrder(orderId: string): Promise<PaymentSnapshot | null> {
-    return this.toPaymentSnapshot(
-      await this.db.payment.findFirst({
-        where: { orderId, status: "SUCCEEDED" },
-        orderBy: { createdAt: "desc" },
-      }),
-    );
-  }
-
   // --- Writes --------------------------------------------------------------
 
   async recordPaymentAttempt(
@@ -201,100 +180,87 @@ class PrismaPaymentsWriter implements PaymentsWriter {
     const created = await this.db.payment.create({
       data: {
         orderId: input.orderId,
-        provider: "WHOP",
+        provider: "WOMPI",
         status: input.status,
         amount: input.amount,
         currency: input.currency,
-        providerPaymentId: input.providerPaymentId,
+        providerReference: input.providerReference,
+        providerPaymentId: null,
       },
     });
 
-    const snapshot = this.toPaymentSnapshot(created);
-    if (snapshot === null) {
-      throw new Error("Payment row vanished immediately after creation");
-    }
-    return snapshot;
+    return this.toPaymentSnapshot(created);
   }
 
   /**
-   * INSERT ... ON CONFLICT, expressed as a Prisma upsert.
+   * Write one transaction's state. See `RecordTransactionInput` for the three
+   * cases. Runs under the order row lock the settlement already holds, so the
+   * claim in case 2 cannot race another claim for the same attempt.
    *
-   * One statement, so there is no window between "does a row with this provider
-   * payment id exist?" and "create one". The check-then-insert this replaces let
-   * two concurrent settlement events for the same `paymentId` both decide to
-   * insert; the loser raised P2002 out of the webhook transaction and the
-   * controller answered 500 to a delivery whose signature was perfectly valid.
-   *
-   * `amount` appears in `create` ONLY. On update the row keeps the amount the
-   * first settlement event reported — on the PAYMENT_MISMATCH path that figure is
-   * the provider's side of the discrepancy an operator reconciles, and silently
-   * rewriting it with a later event's number would destroy the evidence.
-   * `failureCode` / `failureMessage` are cleared because a settlement supersedes
-   * an earlier failed attempt on the same payment id.
-   *
-   * `orderId` is re-scoped on update, NOT left to `create` only. The upsert is
-   * keyed on `providerPaymentId` — which is `@unique` GLOBALLY, so at most one row
-   * exists per payment id regardless of order. If Whop ever delivers a
-   * settlement for order A carrying a `paymentId` already attached to order B's
-   * row, the update branch fires against B's row; without setting `orderId` here
-   * that write would flip B's ledger row to SUCCEEDED with A's capture time while
-   * `applySettlement` marks order A PAID — money attributed to the wrong order,
-   * silently. Writing `input.orderId` re-attributes the single row to the order
-   * this settlement actually belongs to. In the ordinary concurrent case (the
-   * same settlement delivered as both `payment/succeeded` and `order/paid` for the
-   * same order) `input.orderId` equals the existing value, so this is a no-op.
+   * SCOPED TO THE ORDER in case 1: a transaction id already attached to a
+   * DIFFERENT order's row is left alone rather than re-attributed — the
+   * reference resolved this event to `orderId`, and a disagreement between the
+   * two is for an operator, never for a silent rewrite of another order's
+   * ledger.
    */
-  async upsertSettlementPayment(input: UpsertSettlementPaymentInput): Promise<void> {
-    await this.db.payment.upsert({
+  async recordTransaction(input: RecordTransactionInput): Promise<void> {
+    const state = {
+      status: input.status,
+      failureCode: input.failureCode,
+      failureMessage: input.failureMessage,
+      capturedAt: input.capturedAt,
+    };
+
+    const existing = await this.db.payment.findUnique({
       where: { providerPaymentId: input.providerPaymentId },
-      create: {
-        orderId: input.orderId,
-        provider: "WHOP",
-        status: input.status,
-        amount: input.amount,
-        currency: input.currency,
-        providerPaymentId: input.providerPaymentId,
-        cardBrand: input.cardBrand,
-        cardLast4: input.cardLast4,
-        capturedAt: input.capturedAt,
-      },
-      update: {
-        orderId: input.orderId,
-        status: input.status,
-        cardBrand: input.cardBrand,
-        cardLast4: input.cardLast4,
-        capturedAt: input.capturedAt,
-        failureCode: null,
-        failureMessage: null,
-      },
+      select: { id: true, orderId: true },
     });
-  }
 
-  async updatePaymentByProviderId(input: UpdatePaymentInput): Promise<void> {
-    // updateMany, not update: an event can arrive for an intent we never
-    // recorded (e.g. created out-of-band). A zero-count result is a no-op
-    // rather than a thrown P2025 that would fail the whole webhook.
-    await this.db.payment.updateMany({
-      // Scoped to the correlated order as well as the provider payment id: an event
-      // correlated to order A must never mutate a payment row that belongs to order B
-      // just because it names B's paymentId.
-      where: { providerPaymentId: input.providerPaymentId, orderId: input.orderId },
+    if (existing !== null) {
+      if (existing.orderId === input.orderId) {
+        await this.db.payment.update({ where: { id: existing.id }, data: state });
+      }
+      return;
+    }
+
+    const attempt = await this.db.payment.findFirst({
+      where: {
+        orderId: input.orderId,
+        providerReference: input.providerReference,
+        providerPaymentId: null,
+      },
+      orderBy: { createdAt: "asc" },
+      select: { id: true },
+    });
+
+    if (attempt !== null) {
+      await this.db.payment.update({
+        where: { id: attempt.id },
+        data: {
+          ...state,
+          providerPaymentId: input.providerPaymentId,
+          ...(input.reported === null
+            ? {}
+            : { amount: input.reported.amount, currency: input.reported.currency }),
+        },
+      });
+      return;
+    }
+
+    if (input.reported === null || input.reported.amount <= 0) {
+      return;
+    }
+
+    await this.db.payment.create({
       data: {
-        status: input.status,
-        providerTransactionId: input.providerTransactionId,
-        cardBrand: input.cardBrand,
-        cardLast4: input.cardLast4,
-        failureCode: input.failureCode,
-        failureMessage: input.failureMessage,
-        capturedAt: input.capturedAt,
+        ...state,
+        orderId: input.orderId,
+        provider: "WOMPI",
+        amount: input.reported.amount,
+        currency: input.reported.currency,
+        providerReference: input.providerReference,
+        providerPaymentId: input.providerPaymentId,
       },
-    });
-  }
-
-  async linkCheckoutId(orderId: string, checkoutId: string): Promise<void> {
-    await this.db.order.update({
-      where: { id: orderId },
-      data: { providerCheckoutId: checkoutId },
     });
   }
 
@@ -345,7 +311,7 @@ class PrismaPaymentsWriter implements PaymentsWriter {
    *     the target-list `nextval` is evaluated BEFORE the tuple lock, and
    *     EvalPlanQual then discards a number already drawn.
    *
-   * Both leave permanent holes in a series EU member states require to be
+   * Both leave permanent holes in a series that must legally be
    * unbroken. So:
    *
    *   1. LOCK THE ORDER ROW AND READ IT. Under READ COMMITTED, `FOR UPDATE`
@@ -354,8 +320,8 @@ class PrismaPaymentsWriter implements PaymentsWriter {
    *      one's number and takes the early return. Without the lock the loser
    *      would still be safe (step 3 refuses to renumber and the throw rolls its
    *      allocation back) but it would fail an authentic delivery with a 500,
-   *      which is exactly the answer that makes Whop retry forever. The webhook
-   *      path already holds this lock from `findOrderByProviderReference`;
+   *      which is exactly the answer that makes Wompi retry. The settlement
+   *      path already holds this lock from `findOrderByPaymentReference`;
    *      re-taking it in the same transaction costs nothing and means the local
    *      `PAYMENTS_ENABLED=false` settlement is protected too, without relying
    *      on its caller.
@@ -417,13 +383,6 @@ class PrismaPaymentsWriter implements PaymentsWriter {
         `Invoice number ${invoiceNumber} could not be written to order ${orderId}; rolling back so it is not lost from the series`,
       );
     }
-  }
-
-  async addRefundedTotal(orderId: string, delta: Minor): Promise<void> {
-    await this.db.order.update({
-      where: { id: orderId },
-      data: { refundedTotal: { increment: delta }, version: { increment: 1 } },
-    });
   }
 
   /**
@@ -529,44 +488,6 @@ class PrismaPaymentsWriter implements PaymentsWriter {
     }
   }
 
-  async recordRefund(input: RecordRefundInput): Promise<void> {
-    await this.db.refund.create({
-      data: {
-        paymentId: input.paymentId,
-        orderId: input.orderId,
-        status: input.status,
-        reason: input.reason,
-        amount: input.amount,
-        currency: input.currency,
-        providerRefundId: input.providerRefundId,
-        note: input.note,
-        actorId: input.actorId,
-        completedAt: input.status === "SUCCEEDED" ? new Date() : null,
-      },
-    });
-  }
-
-  async recordDispute(input: RecordDisputeInput): Promise<void> {
-    await this.db.dispute.upsert({
-      where: { providerDisputeId: input.providerDisputeId },
-      create: {
-        orderId: input.orderId,
-        providerDisputeId: input.providerDisputeId,
-        status: input.status,
-        reason: input.reason,
-        amount: input.amount,
-        currency: input.currency,
-        evidenceDueBy: input.evidenceDueBy,
-        closedAt: input.closedAt,
-      },
-      update: {
-        status: input.status,
-        evidenceDueBy: input.evidenceDueBy,
-        closedAt: input.closedAt,
-      },
-    });
-  }
-
   async appendOrderEvent(input: {
     readonly orderId: string;
     readonly type: string;
@@ -589,9 +510,6 @@ class PrismaPaymentsWriter implements PaymentsWriter {
     });
   }
 
-  // --- Catalog mirror ------------------------------------------------------
-
-
   // --- Mapping -------------------------------------------------------------
 
   private toOrderSnapshot(
@@ -607,7 +525,6 @@ class PrismaPaymentsWriter implements PaymentsWriter {
       shippingTotal: number;
       taxTotal: number;
       refundedTotal: number;
-      providerCheckoutId: string | null;
     } | null,
   ): OrderSnapshot | null {
     if (row === null) {
@@ -626,25 +543,18 @@ class PrismaPaymentsWriter implements PaymentsWriter {
       shippingTotal: toMinor(row.shippingTotal),
       taxTotal: toMinor(row.taxTotal),
       refundedTotal: toMinor(row.refundedTotal),
-      providerCheckoutId: row.providerCheckoutId,
     };
   }
 
-  private toPaymentSnapshot(
-    row: {
-      id: string;
-      orderId: string;
-      status: PaymentSnapshot["status"];
-      amount: number;
-      currency: string;
-      providerPaymentId: string | null;
-      providerTransactionId: string | null;
-    } | null,
-  ): PaymentSnapshot | null {
-    if (row === null) {
-      return null;
-    }
-
+  private toPaymentSnapshot(row: {
+    id: string;
+    orderId: string;
+    status: PaymentSnapshot["status"];
+    amount: number;
+    currency: string;
+    providerReference: string | null;
+    providerPaymentId: string | null;
+  }): PaymentSnapshot {
     const currency: CurrencyCode = row.currency;
 
     return {
@@ -653,8 +563,8 @@ class PrismaPaymentsWriter implements PaymentsWriter {
       status: row.status,
       amount: toMinor(row.amount),
       currency,
+      providerReference: row.providerReference,
       providerPaymentId: row.providerPaymentId,
-      providerTransactionId: row.providerTransactionId,
     };
   }
 }
@@ -682,9 +592,9 @@ export class PrismaPaymentsRepository
         // `apply` (say, a duplicate refund) is a real error and must not be
         // silently reported as "already processed".
         try {
-          // The id is Whop's own `webhook-id`, so this INSERT is the dedupe:
-          // a redelivery repeats the header verbatim and violates the primary
-          // key, rolling the whole transaction back atomically.
+          // `wompi:<transactionId>:<status>`, so this INSERT is the dedupe: a
+          // redelivery (or the return page seeing the same state) violates the
+          // primary key, rolling the whole transaction back atomically.
           await tx.providerEvent.create({
             data: { id: event.id, type: event.type },
           });
@@ -709,5 +619,28 @@ export class PrismaPaymentsRepository
 
   async runInTransaction<T>(apply: (tx: PaymentsWriter) => Promise<T>): Promise<T> {
     return this.prisma.$transaction(async (tx) => apply(new PrismaPaymentsWriter(tx)));
+  }
+
+  async findStalledTransactions(
+    olderThan: Date,
+    limit: number,
+  ): Promise<readonly StalledTransaction[]> {
+    const rows = await this.prisma.payment.findMany({
+      where: {
+        status: "PROCESSING",
+        providerPaymentId: { not: null },
+        updatedAt: { lte: olderThan },
+        order: { status: "AWAITING_PAYMENT" },
+      },
+      orderBy: { updatedAt: "asc" },
+      take: limit,
+      select: { providerPaymentId: true, order: { select: { orderNumber: true } } },
+    });
+
+    return rows.flatMap((row) =>
+      row.providerPaymentId === null
+        ? []
+        : [{ transactionId: row.providerPaymentId, orderNumber: row.order.orderNumber }],
+    );
   }
 }

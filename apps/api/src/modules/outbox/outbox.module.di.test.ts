@@ -32,28 +32,24 @@ const FAKE_CONFIG = {
   STOREFRONT_URL: "https://shop.akai.test",
   LOG_LEVEL: "info",
   NODE_ENV: "test",
-  WHOP_API_KEY: "whop_test_abc123def456ghi789",
-  WHOP_ACCOUNT_ID: "biz_test_1",
-  WHOP_PRODUCT_ID: "prod_test_1",
-  WHOP_WEBHOOK_SECRET: `ws_${"c".repeat(32)}`,
-  WHOP_API_VERSION_DATE: "2026-08-14",
-  WHOP_ENVIRONMENT: "live",
+  WOMPI_ENVIRONMENT: "sandbox",
+  WOMPI_PUBLIC_KEY: "pub_test_unit",
+  WOMPI_PRIVATE_KEY: "prv_test_unit",
+  WOMPI_INTEGRITY_SECRET: "test_integrity_unit",
+  WOMPI_EVENTS_SECRET: "test_events_unit",
   /**
-   * THE RESOLVED CREDENTIALS the schema normally derives at boot.
-   *
-   * A cast fixture has to carry this or the payments module throws while Nest is
-   * still wiring it up. Consumers read `config.whop` and never choose between
-   * sandbox and live themselves — a gateway talking to one environment while the
-   * webhook verifies against the other is a payment taken in sandbox and settled
-   * against production.
+   * THE RESOLVED CONFIGURATION the schema normally derives at boot. Consumers
+   * read `config.wompi` and never choose between sandbox and live themselves.
    */
-  whop: {
-    environment: "live",
-    apiKey: "whop_test_abc123def456ghi789",
-    accountId: "biz_test_1",
-    productId: "prod_test_1",
-    webhookSecret: `ws_${"c".repeat(32)}`,
-    baseUrl: "https://api.whop.com/api/v1",
+  wompi: {
+    environment: "sandbox",
+    publicKey: "pub_test_unit",
+    privateKey: "prv_test_unit",
+    integritySecret: "test_integrity_unit",
+    eventsSecret: "test_events_unit",
+    apiBaseUrl: "https://sandbox.wompi.co/v1",
+    checkoutUrl: "https://checkout.wompi.co/p/",
+    eventEnvironment: "test",
   },
 } as unknown as ServerEnv;
 
@@ -110,7 +106,7 @@ describe("OutboxModule — dependency injection", () => {
     // ...and the storefront purge. THE CATALOG-SYNC CONSUMERS ARE GONE: they
     // drove the TagadaPay catalog mirror, which existed only because a checkout
     // there could name a variant id and no amount, so an unmirrored variant
-    // could not be sold. Whop takes the amount on the checkout call, and the
+    // could not be sold. Wompi takes the amount on the checkout URL, and the
     // `catalog.*` topics are no longer produced at all.
     expect(topics.has("storefront.revalidate")).toBe(true);
     // Nothing else: Sendcloud (`shipment-sync`, `order-fulfilment`) is gone.

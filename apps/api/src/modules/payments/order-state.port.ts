@@ -51,11 +51,12 @@ export class TransitionTableOrderState implements OrderStatePort {
 /**
  * Is the order already at (or past) the state this event wants to set?
  *
- * Whop guarantees NO delivery order and retries up to 12 times over ~71 hours, so
- * `payment/succeeded` and `order/paid` routinely both
- * arrive wanting PAID. They carry different event ids, so the `provider_event`
- * dedupe does not collapse them — the second must be recognised as a no-op here
- * instead of throwing PAID -> PAID at the transition table.
+ * The same settlement can reach us more than once under DIFFERENT dedupe keys:
+ * the webhook, the return-page confirmation and the reconciliation sweep each
+ * carry it, Wompi retries an unacknowledged event, and one order can have two
+ * transactions (a decline, then an approval). The `provider_event` dedupe only
+ * collapses identical (transaction, status) pairs, so a second "wants PAID" must
+ * be recognised as a no-op here instead of throwing PAID -> PAID at the table.
  *
  * This is the "handler is either commutative or gated by the state machine"
  * requirement from spec §9, made explicit.
@@ -86,8 +87,8 @@ export function isRedundantTransition(
   // §6 places PAYMENT_MISMATCH downstream of PENDING / AWAITING_PAYMENT only. A
   // settlement event that reports a wrong — or, crucially, an ABSENT — amount
   // targets PAYMENT_MISMATCH, and a provider can deliver a SECOND settlement
-  // for the same order (`payment/succeeded` then `order/paid`, each a distinct event
-  // id the dedupe table cannot collapse) where the second carries no amount. If the
+  // for the same order (a second transaction, each a distinct dedupe key the
+  // table cannot collapse) where the second carries no amount. If the
   // order has already left the pre-settlement states — it is PAID, refunded,
   // cancelled or failed — that late, out-of-order event must be a no-op, NOT an
   // attempt to drag a resolved order into an operator-only hold. Without this clause
@@ -108,7 +109,7 @@ export function isRedundantTransition(
   // `ORDER_STATUS_TRANSITIONS` deliberately permits it — an operator who has
   // reconciled the discrepancy must be able to settle the order — but the
   // AUTOMATED path must never take it. Without this clause a second
-  // `payment/succeeded` delivery reporting the correct amount would quietly
+  // APPROVED transaction reporting the correct amount would quietly
   // promote a flagged order to PAID, erasing the very discrepancy the state
   // exists to surface, and triggering the invoice and fulfilment jobs that
   // `applyMismatch` withheld on purpose. "Legal" and "legal for a webhook to do"
@@ -131,18 +132,16 @@ export function isRedundantTransition(
   }
 
   // A SETTLEMENT event arriving after the order is already paid or beyond is a
-  // late, out-of-order redelivery, not a new settlement. Whop guarantees no
-  // ordering and retries a delivery up to 12 times under DISTINCT `webhook-id`s
-  // the dedupe table cannot collapse, and `applyPaid` enqueues the fulfilment job
-  // in the SAME transaction that marks the order PAID — so the order can
-  // legitimately be FULFILLING (or beyond) by the time a redelivery lands.
-  // Without this clause `assertTransition("SHIPPED", "PAID")` throws (SHIPPED has
-  // no edge back to PAID), the webhook 500s, and because the transaction rolls
-  // the `provider_event` row back with it, the provider replays the identical 500
-  // forever. For FULFILLING the clause matters MORE, not less: FULFILLING -> PAID
-  // IS a legal edge (a cancelled Sendcloud label walks it back), so without this
-  // a replayed settlement would silently un-fulfil an order with a label on it. `current === "PAID"` is already caught above by the identity check;
-  // the states this adds are FULFILLING / SHIPPED / DELIVERED.
+  // late, out-of-order redelivery, not a new settlement: staff can move a paid
+  // order on to FULFILLING (or beyond) before the last copy of its settlement
+  // arrives. Without this clause `assertTransition("SHIPPED", "PAID")` throws
+  // (SHIPPED has no edge back to PAID), the webhook 500s, and because the
+  // transaction rolls the `provider_event` row back with it, Wompi replays the
+  // identical 500. For FULFILLING the clause matters MORE, not less: if
+  // FULFILLING -> PAID is a legal (operator) edge, a replayed settlement would
+  // silently walk a fulfilling order back. `current === "PAID"` is already
+  // caught above by the identity check; the states this adds are FULFILLING /
+  // SHIPPED / DELIVERED.
   if (target === "PAID" && PAID_OR_BEYOND.includes(current)) {
     return true;
   }

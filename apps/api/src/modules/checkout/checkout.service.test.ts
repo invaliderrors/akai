@@ -195,7 +195,7 @@ class FakePayments implements CheckoutPaymentsPort {
     this.calls.push(orderId);
     return {
       orderNumber: "AK-2026-000123",
-      checkoutUrl: "https://whop.com/checkout/ch_test_123/",
+      checkoutUrl: "https://checkout.wompi.co/p/?reference=AK-2026-000123-1",
     };
   }
 }
@@ -256,7 +256,7 @@ describe("CheckoutService.startCheckout", () => {
 
     expect(result).toEqual({
       orderNumber: "AK-2026-000123",
-      checkoutUrl: "https://whop.com/checkout/ch_test_123/",
+      checkoutUrl: "https://checkout.wompi.co/p/?reference=AK-2026-000123-1",
     });
 
     // One reservation per line, each against the caller's cart, held with a TTL

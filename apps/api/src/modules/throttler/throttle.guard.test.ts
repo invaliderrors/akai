@@ -165,6 +165,10 @@ describe("THROTTLE_RULES", () => {
     expect(THROTTLE_RULES.cartWrite.limit).toBeLessThan(
       THROTTLE_RULES.catalogRead.limit,
     );
+    // Each return-page confirmation can cost a Wompi lookup: never looser than checkout.
+    expect(THROTTLE_RULES.paymentConfirm.limit).toBeLessThanOrEqual(
+      THROTTLE_RULES.checkout.limit,
+    );
   });
 
   it("keeps the outbound-email route the tightest bucket of all", () => {

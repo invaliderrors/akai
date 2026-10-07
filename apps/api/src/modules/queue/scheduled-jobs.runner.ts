@@ -44,8 +44,18 @@ export interface CartSweeper {
   expireStaleCarts(): Promise<number>;
 }
 
+/** The narrow slice of the payments service this runner drives. */
+export interface PaymentReconciler {
+  /**
+   * Ask Wompi again about transactions it last reported PENDING whose webhook
+   * has not settled them. Returns how many it looked at.
+   */
+  reconcileStalledPayments(now?: Date): Promise<number>;
+}
+
 export const RESERVATION_SWEEPER = Symbol("RESERVATION_SWEEPER");
 export const CART_SWEEPER = Symbol("CART_SWEEPER");
+export const PAYMENT_RECONCILER = Symbol("PAYMENT_RECONCILER");
 
 /** Injection token + default for the sweep cadences. */
 export const SCHEDULED_JOBS_INTERVALS = Symbol("SCHEDULED_JOBS_INTERVALS");
@@ -55,11 +65,18 @@ export interface ScheduledJobsIntervals {
   readonly reservationExpiryMs: number;
   /** Cart reaping is housekeeping, not time-critical (expiry is enforced on read too). */
   readonly cartExpiryMs: number;
+  /**
+   * Payment reconciliation is a BACKSTOP for a delayed Wompi event — the
+   * webhook and the return page settle almost every order first — so a few
+   * minutes is plenty, and each tick costs at most a small batch of lookups.
+   */
+  readonly paymentReconciliationMs: number;
 }
 
 export const DEFAULT_SCHEDULED_JOBS_INTERVALS: ScheduledJobsIntervals = {
   reservationExpiryMs: 60_000,
   cartExpiryMs: 6 * 60 * 60 * 1000,
+  paymentReconciliationMs: 5 * 60 * 1000,
 };
 
 /** One recurring job: its cadence and the unit of work it runs. */
@@ -85,6 +102,7 @@ export class ScheduledJobsRunner implements OnApplicationShutdown {
   constructor(
     @Inject(RESERVATION_SWEEPER) reservations: ReservationSweeper,
     @Inject(CART_SWEEPER) carts: CartSweeper,
+    @Inject(PAYMENT_RECONCILER) payments: PaymentReconciler,
     @Inject(SCHEDULED_JOBS_INTERVALS) intervals: ScheduledJobsIntervals,
     @Inject(LOGGER) private readonly logger: Logger,
   ) {
@@ -98,6 +116,11 @@ export class ScheduledJobsRunner implements OnApplicationShutdown {
         name: "cart-expiry",
         intervalMs: intervals.cartExpiryMs,
         run: () => carts.expireStaleCarts(),
+      },
+      {
+        name: "payment-reconciliation",
+        intervalMs: intervals.paymentReconciliationMs,
+        run: () => payments.reconcileStalledPayments(),
       },
     ];
 

@@ -5,7 +5,7 @@ import { localeSchema, type Locale } from "@akai/contracts";
  *
  * WHY THIS LIVES IN A SHARED LIB AND NOT IN THE STOREFRONT. Two processes have
  * to agree on what a storefront URL looks like: the storefront, which serves it,
- * and the API, which mints the Whop `redirect_url` a paying customer is sent
+ * and the API, which mints the Wompi `redirect-url` a paying customer is sent
  * back to. When the rule was implicit in `apps/storefront/src/i18n/routing.ts`
  * the API guessed, and guessed wrong — it built
  * `${STOREFRONT_URL}/checkout/processing` with no locale segment at all, a shape

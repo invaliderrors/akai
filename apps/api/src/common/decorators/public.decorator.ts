@@ -11,7 +11,7 @@ export const IS_PUBLIC_KEY = "akai:isPublic";
  * exposes it, whereas forgetting to mark a new public endpoint merely makes it
  * 401 in an obvious way during development.
  *
- * Applied today to health checks and the Whop webhook (which authenticates via
+ * Applied today to health checks and the webhooks (which authenticate via
  * signature verification, not a session).
  */
 export const Public = (): CustomDecorator<string> => SetMetadata(IS_PUBLIC_KEY, true);

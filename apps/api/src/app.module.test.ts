@@ -3,17 +3,15 @@ import { Test } from "@nestjs/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { resetServerConfigCache } from "@akai/config";
 import { AppModule } from "./app.module";
-import {
-  RESEND_WEBHOOK_PATH,
-  WHOP_WEBHOOK_PATH,
-} from "./common/api-paths";
+import { RESEND_WEBHOOK_PATH, WOMPI_WEBHOOK_PATH } from "./common/api-paths";
 import { PAYMENTS_REPOSITORY } from "./modules/payments/repository/payments.repository";
-import { WHOP_GATEWAY } from "./modules/payments/whop/whop.gateway";
+import { WOMPI_GATEWAY } from "./modules/payments/wompi/wompi.gateway";
 import {
-  WHOP_WEBHOOK_ROUTE,
-  WhopWebhookController,
-} from "./modules/payments/webhook/whop-webhook.controller";
-import { WhopWebhookService } from "./modules/payments/webhook/whop-webhook.service";
+  WOMPI_WEBHOOK_ROUTE,
+  WompiWebhookController,
+} from "./modules/payments/webhook/wompi-webhook.controller";
+import { WompiSettlementService } from "./modules/payments/wompi-settlement.service";
+import { ScheduledJobsRunner } from "./modules/queue/scheduled-jobs.runner";
 import { PaymentsService } from "./modules/payments/payments.service";
 import { PrismaService } from "./modules/prisma/prisma.service";
 import { SERVER_CONFIG } from "./modules/config/config.module";
@@ -32,15 +30,11 @@ const TEST_ENV: NodeJS.ProcessEnv = {
   DATABASE_URL: "postgresql://akai:akai@localhost:5432/akai",
   DIRECT_DATABASE_URL: "postgresql://akai:akai@localhost:5432/akai",
   JWT_ACCESS_SECRET: "a".repeat(32),
-  WHOP_API_KEY: "whop_test_abc123def456ghi789",
-  WHOP_ACCOUNT_ID: "biz_test_1",
-  WHOP_PRODUCT_ID: "prod_test_1",
-  WHOP_API_VERSION_DATE: "2026-08-14",
-  // PINNED, as every real deployment does. NODE_ENV="test" is not production, so
-  // an unset value resolves to SANDBOX and the schema then demands a sandbox
-  // credential set — the parse throws and takes the whole suite with it.
-  WHOP_ENVIRONMENT: "live",
-  WHOP_WEBHOOK_SECRET: `ws_${"c".repeat(32)}`,
+  WOMPI_ENVIRONMENT: "sandbox",
+  WOMPI_PUBLIC_KEY: "pub_test_unit",
+  WOMPI_PRIVATE_KEY: "prv_test_unit",
+  WOMPI_INTEGRITY_SECRET: "test_integrity_unit",
+  WOMPI_EVENTS_SECRET: "test_events_unit",
   EMAIL_TRANSPORT: "smtp",
   SMTP_URL: "smtp://localhost:1025",
   EMAIL_FROM: "no-reply@example.com",
@@ -124,9 +118,11 @@ describe("payments wiring", () => {
     const moduleRef = await compile();
 
     // If any of these throws, every inbound payment notification 500s.
-    expect(moduleRef.get(WhopWebhookController)).toBeDefined();
-    expect(moduleRef.get(WhopWebhookService)).toBeDefined();
-    expect(moduleRef.get(WHOP_GATEWAY, { strict: false })).toBeDefined();
+    expect(moduleRef.get(WompiWebhookController)).toBeDefined();
+    expect(moduleRef.get(WompiSettlementService)).toBeDefined();
+    expect(moduleRef.get(WOMPI_GATEWAY, { strict: false })).toBeDefined();
+    // The reconciliation sweep reaches PaymentsService through the queue module.
+    expect(moduleRef.get(ScheduledJobsRunner, { strict: false })).toBeDefined();
     expect(moduleRef.get(PAYMENTS_REPOSITORY, { strict: false })).toBeDefined();
     expect(moduleRef.get(PaymentsService, { strict: false })).toBeDefined();
 
@@ -136,22 +132,19 @@ describe("payments wiring", () => {
   it("binds exactly ONE payment gateway", async () => {
     const moduleRef = await compile();
 
-    // The Stripe adapter and its token are deleted. Two live payment adapters in
-    // one container is a routing decision nobody made, and the way it fails is
-    // that a refund goes to the provider that did not take the money.
+    // The Stripe and Whop adapters and their tokens are deleted. Two live
+    // payment adapters in one container is a routing decision nobody made.
     expect(() => moduleRef.get<unknown>("STRIPE_GATEWAY", { strict: false })).toThrow();
+    expect(() => moduleRef.get<unknown>("WHOP_GATEWAY", { strict: false })).toThrow();
 
     await moduleRef.close();
   });
 
-  it("mounts the raw-body middleware on the SAME path the controller answers on", () => {
-    // `setGlobalPrefix` rewrites Nest's router but NOT raw Express mounts, so
-    // these two are reconciled by hand in main.ts. If they drift, the middleware
-    // silently never runs, the controller is still reached with no raw body, and
-    // every delivery fails closed with RAW_BODY_UNAVAILABLE — a failure mode no
-    // type-checker can see.
-    expect(WHOP_WEBHOOK_PATH).toBe(`/v1/${WHOP_WEBHOOK_ROUTE}`);
-    expect(WHOP_WEBHOOK_PATH).toBe("/v1/webhooks/whop");
+  it("derives the webhook paths from the routes the controllers answer on", () => {
+    // The Wompi path is what goes in the Wompi dashboard ("URL de Eventos");
+    // the Resend path is where main.ts mounts the raw-body middleware.
+    expect(WOMPI_WEBHOOK_PATH).toBe(`/v1/${WOMPI_WEBHOOK_ROUTE}`);
+    expect(WOMPI_WEBHOOK_PATH).toBe("/v1/webhooks/wompi");
     expect(RESEND_WEBHOOK_PATH).toBe("/v1/webhooks/resend");
   });
 });

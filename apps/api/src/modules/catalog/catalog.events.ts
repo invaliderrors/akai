@@ -8,7 +8,7 @@ import { idSchema } from "@akai/contracts";
  * They were domain events on the transactional outbox with exactly one consumer
  * — the TagadaPay catalog mirror — because a hosted checkout there could
  * reference a mirrored variant and no amount, so an unmirrored variant could not
- * be sold and every catalog write was a sync obligation. Whop accepts our
+ * be sold and every catalog write was a sync obligation. Wompi takes our
  * computed amount directly on the checkout call, so the mirror, its consumer and
  * those rows are gone; an outbox row whose only handler was deleted does not sit
  * harmlessly, it dead-letters into /admin/jobs on every product edit.
@@ -39,7 +39,7 @@ export const CATALOG_TOPICS = {
    * Distinct from variantUpdated, and it survives both provider migrations for a
    * reason that has changed each time. Under Stripe a Price was immutable and had
    * to be re-created; under TagadaPay a mirrored variant had no reprice path at
-   * all. Under Whop neither problem exists — the price rides on the checkout
+   * all. Under Wompi neither problem exists — the price rides on the checkout
    * call — so what it buys now is legibility: an operator reading a purge can
    * tell a price change from any other variant edit, which is the one catalog
    * change with financial consequences.

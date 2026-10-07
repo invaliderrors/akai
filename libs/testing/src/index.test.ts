@@ -1,12 +1,12 @@
-import { unwrapWebhook } from "@whop/sdk/helpers";
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { FakeEmailPort } from "./fake-email";
 import {
-  TEST_WHOP_WEBHOOK_SECRET,
-  buildForgedWhopEvent,
-  buildSignedWhopEvent,
-  buildStaleWhopEvent,
-} from "./whop-webhook";
+  TEST_WOMPI_EVENTS_SECRET,
+  buildForgedWompiEvent,
+  buildSignedWompiEvent,
+  wompiChecksum,
+} from "./wompi-webhook";
 import { buildOrder, buildPrice } from "./builders";
 
 describe("FakeEmailPort", () => {
@@ -48,88 +48,50 @@ describe("FakeEmailPort", () => {
   });
 });
 
-describe("Whop webhook signing", () => {
-  /**
-   * Verified against `unwrapWebhook` — THE ACTUAL PRODUCTION VERIFIER.
-   *
-   * The TagadaPay version of this suite checked the builder against an
-   * independent reimplementation of the algorithm, because production's verifier
-   * was also ours and checking one against the other would only have proved both
-   * were deterministic. Here the verifier is the vendor's, so asserting directly
-   * against it is strictly stronger: it proves these bytes are bytes the shipped
-   * code accepts, including the `ws_` base64 handling that is easy to get wrong
-   * in a way no reimplementation would catch.
-   */
-  function verify(signed: { payload: string; headers: Record<string, string> }): unknown {
-    return unwrapWebhook(signed.payload, {
-      headers: signed.headers,
-      key: TEST_WHOP_WEBHOOK_SECRET,
-    });
-  }
+describe("Wompi event signing", () => {
+  const transaction = {
+    id: "1234-1610641025-49201",
+    status: "APPROVED",
+    amount_in_cents: 4490000,
+    reference: "AK-2026-000123-1",
+    currency: "COP",
+  };
 
-  it("produces a delivery the real verifier accepts", () => {
-    const signed = buildSignedWhopEvent({
-      id: "msg_1",
-      type: "payment.succeeded",
-      data: { id: "pay_1", total: 49.99, currency: "eur" },
-    });
+  it("follows the documented manifest: values in order, then timestamp, then secret", () => {
+    // docs.wompi.co "Eventos", steps 1-4, with our own secret.
+    const expected = createHash("sha256")
+      .update(`1234-1610641025-49201APPROVED44900001530291411${TEST_WOMPI_EVENTS_SECRET}`)
+      .digest("hex");
 
-    expect(verify(signed)).toMatchObject({ type: "payment.succeeded" });
+    const signed = buildSignedWompiEvent(transaction, { timestamp: 1530291411 });
+
+    expect(signed.signature.checksum).toBe(expected);
+    expect(signed.signature.properties).toEqual([
+      "transaction.id",
+      "transaction.status",
+      "transaction.amount_in_cents",
+    ]);
   });
 
-  it("emits all three Standard Webhooks headers", () => {
-    const { headers, deliveryId } = buildSignedWhopEvent({ type: "payment.succeeded" });
-
-    expect(headers["webhook-id"]).toBe(deliveryId);
-    expect(headers["webhook-signature"]).toMatch(/^v1,/);
-    expect(Number(headers["webhook-timestamp"])).toBeGreaterThan(0);
+  it("is plain SHA-256 — the secret is hashed material, not an HMAC key", () => {
+    expect(wompiChecksum({ a: { b: "x" } }, ["a.b"], 1, "s")).toBe(
+      createHash("sha256").update("x1s").digest("hex"),
+    );
   });
 
-  it("REJECTS a signature computed with the wrong secret", () => {
-    // The whole security boundary: Whop presents no session and no other
-    // credential, so an endpoint that accepts this lets anyone mark orders paid.
-    const forged = buildForgedWhopEvent({ type: "payment.succeeded" });
+  it("produces a transaction.updated envelope stamped for sandbox", () => {
+    const signed = buildSignedWompiEvent(transaction);
 
-    expect(() => verify(forged)).toThrow();
+    expect(signed.event).toBe("transaction.updated");
+    expect(signed.environment).toBe("test");
+    expect(signed.data.transaction).toEqual(transaction);
   });
 
-  it("REJECTS a tampered body under an authentic signature", () => {
-    const signed = buildSignedWhopEvent({
-      type: "payment.succeeded",
-      data: { total: 49.99 },
-    });
+  it("signs a forged event with a different secret", () => {
+    const genuine = buildSignedWompiEvent(transaction, { timestamp: 1 });
+    const forged = { ...buildForgedWompiEvent(transaction), timestamp: 1 };
 
-    const tampered = { ...signed, payload: signed.payload.replace("49.99", "0.01") };
-
-    expect(() => verify(tampered)).toThrow();
-  });
-
-  it("REJECTS a re-serialised body — the single most common integration defect", () => {
-    // The signature covers the exact bytes sent. A body that has been through
-    // JSON.parse/JSON.stringify has different whitespace and key order, so a
-    // controller that reads `request.body` instead of the raw buffer fails every
-    // real delivery while passing any test that re-serialises.
-    const signed = buildSignedWhopEvent({ type: "payment.succeeded", data: { id: "pay_1" } });
-    const reSerialised = JSON.stringify(JSON.parse(signed.payload), null, 2);
-
-    expect(() => verify({ ...signed, payload: reSerialised })).toThrow();
-  });
-
-  it("REJECTS an authentic delivery outside the replay window", () => {
-    // A test the TagadaPay scheme could not support at all: its HMAC covered the
-    // raw body alone, so the transport had no notion of when a delivery
-    // happened. Here the timestamp is inside the signed material, so this
-    // payload is genuinely authentic and must still be refused.
-    const stale = buildStaleWhopEvent({ type: "payment.succeeded" });
-
-    expect(() => verify(stale)).toThrow();
-  });
-
-  it("repeats the delivery id on demand, so redelivery is testable", () => {
-    const first = buildSignedWhopEvent({ type: "payment.succeeded" }, { deliveryId: "msg_fixed" });
-    const second = buildSignedWhopEvent({ type: "payment.succeeded" }, { deliveryId: "msg_fixed" });
-
-    expect(second.deliveryId).toBe(first.deliveryId);
+    expect(forged.signature.checksum).not.toBe(genuine.signature.checksum);
   });
 });
 

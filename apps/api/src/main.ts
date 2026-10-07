@@ -8,11 +8,7 @@ import { ConfigValidationError, loadServerConfig } from "@akai/config";
 import { createLogger } from "@akai/observability";
 
 import { AppModule } from "./app.module";
-import {
-  API_GLOBAL_PREFIX,
-  RESEND_WEBHOOK_PATH,
-  WHOP_WEBHOOK_PATH,
-} from "./common/api-paths";
+import { API_GLOBAL_PREFIX, RESEND_WEBHOOK_PATH } from "./common/api-paths";
 import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
 import { createRawBodyMiddleware } from "./common/middleware/raw-body";
 import { buildCorsOptions } from "./common/cors-options";
@@ -65,32 +61,27 @@ async function bootstrap(): Promise<void> {
   // ---------------------------------------------------------------------------
   // Raw body — ONE ROUTE, and the mounting order is the whole trick.
   //
-  // Whop signs the exact octets it transmitted, so the signature can only be
-  // checked against bytes that were never parsed and re-serialised. This must run
-  // BEFORE Nest registers its JSON body-parser, and it does: `app.use()` binds on
-  // the Express instance immediately, whereas the parsers are registered inside
-  // `app.init()`, which `app.listen()` triggers further down. Move this call
-  // below `listen()` and every webhook 400s with RAW_BODY_UNAVAILABLE.
-  //
-  // The path carries the `v1` prefix explicitly. `setGlobalPrefix` rewrites
-  // Nest's ROUTER, not raw Express middleware mounts, so `/webhooks/whop`
-  // alone would silently match nothing — the controller would still be reached,
-  // with no raw body attached, and the endpoint would fail closed on every
-  // delivery. It is asserted by a test rather than trusted.
-  // ---------------------------------------------------------------------------
-  app.use(WHOP_WEBHOOK_PATH, createRawBodyMiddleware());
   // Resend signs `${svix-id}.${svix-timestamp}.${body}` over the EXACT bytes it
-  // sent, so this path needs the same treatment: a body that has been through
-  // JSON.parse/stringify has different key order and whitespace and can never
-  // verify.
+  // sent, so its signature can only be checked against bytes that were never
+  // parsed and re-serialised. This must run BEFORE Nest registers its JSON
+  // body-parser, and it does: `app.use()` binds on the Express instance
+  // immediately, whereas the parsers are registered inside `app.init()`, which
+  // `app.listen()` triggers further down.
+  //
+  // The path carries the `v1` prefix explicitly: `setGlobalPrefix` rewrites
+  // Nest's ROUTER, not raw Express middleware mounts.
+  //
+  // The Wompi event route is deliberately NOT here: its checksum covers fields
+  // of the parsed body, so the ordinary JSON parser is what it needs.
+  // ---------------------------------------------------------------------------
   app.use(RESEND_WEBHOOK_PATH, createRawBodyMiddleware());
 
   // ---------------------------------------------------------------------------
   // 2. Validation.
   //
   // ts-rest + zod validates the contract routes, but this pipe still guards the
-  // two routes that are deliberately outside ts-rest (the Whop webhook and
-  // health). `forbidNonWhitelisted` rejects unknown keys rather than stripping
+  // routes that are deliberately outside ts-rest (the webhooks and health).
+  // `forbidNonWhitelisted` rejects unknown keys rather than stripping
   // them, so a client cannot smuggle a field toward a Prisma `data:` spread.
   // ---------------------------------------------------------------------------
   app.useGlobalPipes(
@@ -154,15 +145,16 @@ async function bootstrap(): Promise<void> {
 
   await app.listen(config.PORT);
 
-  // Drain the transactional outbox: deliver order/auth emails, drive the
-  // Whop catalog mirror, and everything else producers commit to
+  // Drain the transactional outbox: deliver order/auth emails and everything
+  // else producers commit to
   // `outbox_message`. Started AFTER listen and only from this entrypoint, so
   // integration tests (which never run main.ts) do not open a background
   // poller. Shutdown is handled by the runner's OnApplicationShutdown hook,
   // wired by enableShutdownHooks above.
   app.get(OutboxRunner).start();
 
-  // Start the recurring background sweeps (reservation-expiry, cart-expiry).
+  // Start the recurring background sweeps (reservation-expiry, cart-expiry,
+  // payment-reconciliation).
   // Same lifecycle as the outbox runner: after listen, only from this
   // entrypoint, stopped via OnApplicationShutdown. Without this, expired stock
   // reservations are never released and abandoned carts never reaped.

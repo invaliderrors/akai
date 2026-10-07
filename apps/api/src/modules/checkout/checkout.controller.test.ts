@@ -11,7 +11,7 @@ import type { CreateCheckoutSession } from "@akai/contracts";
 
 const RESPONSE: CheckoutSessionResponse = {
   orderNumber: "AK-2026-000123",
-  checkoutUrl: "https://whop.com/checkout/ch_test_abc/",
+  checkoutUrl: "https://checkout.wompi.co/p/?reference=AK-2026-000123-1",
 };
 
 const BODY = {

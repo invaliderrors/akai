@@ -4,9 +4,12 @@ import { CartService } from "../cart/cart.service";
 import { CartModule } from "../cart/cart.module";
 import { CatalogModule } from "../catalog/catalog.module";
 import { ProductInventoryService } from "../catalog/product-inventory.service";
+import { PaymentsModule } from "../payments/payments.module";
+import { PaymentsService } from "../payments/payments.service";
 import {
   CART_SWEEPER,
   DEFAULT_SCHEDULED_JOBS_INTERVALS,
+  PAYMENT_RECONCILER,
   RESERVATION_SWEEPER,
   SCHEDULED_JOBS_INTERVALS,
   ScheduledJobsRunner,
@@ -15,9 +18,10 @@ import {
 /**
  * QueueModule — background job orchestration.
  *
- * OWNS: the recurring cron-style sweeps (spec §5). It imports CatalogModule and
- * CartModule for their already-tested sweep services and binds them to the
- * runner's narrow ports (`RESERVATION_SWEEPER`, `CART_SWEEPER`) so the runner
+ * OWNS: the recurring cron-style sweeps (spec §5). It imports CatalogModule,
+ * CartModule and PaymentsModule for their already-tested sweep services and
+ * binds them to the runner's narrow ports (`RESERVATION_SWEEPER`,
+ * `CART_SWEEPER`, `PAYMENT_RECONCILER`) so the runner
  * depends on interfaces, not concrete services — the same seam every other
  * module in this codebase uses.
  *
@@ -31,10 +35,11 @@ import {
  * this module is the scheduler.
  */
 @Module({
-  imports: [CatalogModule, CartModule],
+  imports: [CatalogModule, CartModule, PaymentsModule],
   providers: [
     { provide: RESERVATION_SWEEPER, useExisting: ProductInventoryService },
     { provide: CART_SWEEPER, useExisting: CartService },
+    { provide: PAYMENT_RECONCILER, useExisting: PaymentsService },
     { provide: SCHEDULED_JOBS_INTERVALS, useValue: DEFAULT_SCHEDULED_JOBS_INTERVALS },
     ScheduledJobsRunner,
   ],

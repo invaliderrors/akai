@@ -29,7 +29,7 @@ export const DEFAULT_OUTBOX_POLL_INTERVAL_MS = 1_000;
  * forbids apps/worker importing apps/api by a relative path, and the consumers
  * (EmailOutboxHandler and friends) live in apps/api. Extracting them into a
  * server lib is the clean path to a separate process and is left as a followUp.
- * Crucially, running here does NOT slow the Whop webhook: the webhook still
+ * Crucially, running here does NOT slow the Wompi webhook: the webhook still
  * only writes an outbox row and ACKs; this loop drains it out of band on its own
  * schedule (spec §9's <1s ACK is preserved).
  */

@@ -8,9 +8,9 @@ import { RawBodyTooLargeError, createRawBodyMiddleware } from "./raw-body";
 /**
  * The raw-body middleware is the load-bearing half of webhook authentication.
  *
- * Whop signs the exact octets it sent. If these bytes are wrong — parsed
+ * Resend signs the exact octets it sent. If these bytes are wrong — parsed
  * and re-serialised, truncated, or simply absent — every authentic delivery
- * fails verification and every order stalls in AWAITING_PAYMENT. That failure
+ * fails verification and delivery events are never recorded. That failure
  * mode is invisible to the type-checker and to every test that stubs
  * verification, which is why it is tested here directly.
  */

@@ -12,8 +12,10 @@ import { PrismaService } from "../prisma/prisma.service";
 import { CartService } from "../cart/cart.service";
 import { ProductInventoryService } from "../catalog/product-inventory.service";
 import { QueueModule } from "./queue.module";
+import { PaymentsService } from "../payments/payments.service";
 import {
   CART_SWEEPER,
+  PAYMENT_RECONCILER,
   RESERVATION_SWEEPER,
   ScheduledJobsRunner,
 } from "./scheduled-jobs.runner";
@@ -23,7 +25,8 @@ import {
  *
  * Nest resolves constructor dependencies from emitted decorator metadata; a
  * token mismatch or a missing provider is a RUNTIME failure the type-checker
- * cannot see. This proves that QueueModule → CatalogModule / CartModule wires,
+ * cannot see. This proves that QueueModule → CatalogModule / CartModule /
+ * PaymentsModule wires,
  * that the `useExisting` port bindings alias the real sweep services, and that
  * the runner constructs — all without a live database (PrismaService is
  * overridden; the fakes are only stored, never called, during `compile()`).
@@ -35,11 +38,13 @@ const FAKE_CONFIG = {
   STOREFRONT_URL: "https://shop.akai.test",
   LOG_LEVEL: "info",
   NODE_ENV: "test",
-  WHOP_API_KEY: "whop_test_abc123def456ghi789",
-  WHOP_ACCOUNT_ID: "biz_test_1",
-  WHOP_PRODUCT_ID: "prod_test_1",
-  WHOP_WEBHOOK_SECRET: `ws_${"c".repeat(32)}`,
-  WHOP_API_VERSION_DATE: "2026-08-14",
+  WOMPI_ENVIRONMENT: "sandbox",
+  WOMPI_PUBLIC_KEY: "pub_test_unit",
+  WOMPI_PRIVATE_KEY: "prv_test_unit",
+  WOMPI_INTEGRITY_SECRET: "test_integrity_unit",
+  WOMPI_EVENTS_SECRET: "test_events_unit",
+  PAYMENTS_ENABLED: true,
+  wompi: null,
 } as unknown as ServerEnv;
 
 const FAKE_LOGGER = {
@@ -77,6 +82,7 @@ describe("QueueModule — dependency injection", () => {
     // what turns "the sweeps exist" into "the sweeps actually get called".
     expect(moduleRef.get(RESERVATION_SWEEPER)).toBeInstanceOf(ProductInventoryService);
     expect(moduleRef.get(CART_SWEEPER)).toBeInstanceOf(CartService);
+    expect(moduleRef.get(PAYMENT_RECONCILER)).toBeInstanceOf(PaymentsService);
 
     await moduleRef.close();
   });

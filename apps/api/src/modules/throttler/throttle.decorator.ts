@@ -62,6 +62,13 @@ export const THROTTLE_RULES = {
   checkout: { name: "checkout", limit: 10, windowMs: MINUTE_MS },
 
   /**
+   * The return page's payment confirmation. Public, and each call can cost one
+   * Wompi lookup, so it is bounded — but a shopper returns once per attempt, so
+   * a handful a minute is already generous. Exactly as tight as checkout.
+   */
+  paymentConfirm: { name: "payment-confirm", limit: 10, windowMs: MINUTE_MS },
+
+  /**
    * Contact form. Tightest of all: it turns an anonymous HTTP request into an
    * outbound email, which is the classic spam-relay shape.
    */

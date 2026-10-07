@@ -70,15 +70,7 @@ export async function settleOrderPaid(
     locale: "es",
   });
 
-  // NOT ENQUEUED HERE: `invoice-pdf` and `order-fulfilment` — for DIFFERENT
-  // reasons now.
-  //
-  // `order-fulfilment` HAS a consumer (Sendcloud labels, `fulfilment/labels`),
-  // and it is deliberately NOT produced on payment. A label is billed the
-  // moment it is bought, and a paid order is sometimes refunded or corrected
-  // before it ships — so labels are bought only when staff click "Generar
-  // etiquetas" (Sendcloud spec §12, decision D3), and the admin endpoint is the
-  // topic's only producer. Do not add a producer here without reversing D3.
+  // NOT ENQUEUED HERE: `invoice-pdf`.
   //
   // `invoice-pdf` still has NO handler — `invoices` is an empty module — and
   // the dispatcher treats an UNROUTED topic as a FAILURE, not as work waiting

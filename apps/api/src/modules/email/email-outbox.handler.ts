@@ -42,7 +42,7 @@ const hydratedEnvelopeSchema = z.object({
 /**
  * A reference-only email row: the producer named the template and the order but
  * left the payload to be assembled from the live order aggregate at send time.
- * This is what OrdersModule / the Whop webhook emit — deliberately, so a
+ * This is what OrdersModule / the Wompi settlement emit — deliberately, so a
  * confirmation reflects the order as it stands when the mail is actually sent,
  * not a snapshot frozen into the queue.
  *

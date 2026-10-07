@@ -412,7 +412,7 @@ describe("ProductsService.create", () => {
    *
    * THE `catalog.*` DOMAIN EVENTS ARE NO LONGER EMITTED. They existed for one
    * consumer, the TagadaPay catalog mirror, because a checkout there could
-   * reference a mirrored variant and nothing else. Whop takes our computed
+   * reference a mirrored variant and nothing else. Wompi takes our computed
    * amount on the checkout call, so the mirror is gone — and a row whose only
    * handler is gone does not sit harmlessly, it dead-letters into /admin/jobs on
    * every product edit. The topic survives only as the purge's `reason`.

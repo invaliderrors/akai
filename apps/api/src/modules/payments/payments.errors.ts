@@ -3,7 +3,6 @@ import {
   InternalServerErrorException,
   NotFoundException,
   ServiceUnavailableException,
-  UnprocessableEntityException,
 } from "@nestjs/common";
 import type { Minor, OrderStatus } from "@akai/contracts";
 
@@ -39,53 +38,6 @@ export class OrderNotPayableError extends ConflictException {
   }
 }
 
-export class OrderNotRefundableError extends ConflictException {
-  constructor(
-    readonly orderStatus: OrderStatus,
-    readonly orderNumber: string,
-  ) {
-    super({
-      code: "ORDER_NOT_REFUNDABLE",
-      message: `Order ${orderNumber} is ${orderStatus}; only a paid order can be refunded`,
-    });
-  }
-}
-
-export class NoRefundablePaymentError extends ConflictException {
-  constructor(readonly orderNumber: string) {
-    super({
-      code: "NO_REFUNDABLE_PAYMENT",
-      message: `Order ${orderNumber} has no succeeded payment to refund against`,
-    });
-  }
-}
-
-/**
- * The refund ceiling. This is the check that makes a client-proposed amount
- * safe: whatever the caller asks for, the server independently computes
- * `grandTotal - refundedTotal` from the order row and refuses anything above it.
- */
-export class RefundExceedsRefundableError extends UnprocessableEntityException {
-  constructor(
-    readonly requested: Minor,
-    readonly refundable: Minor,
-  ) {
-    super({
-      code: "REFUND_EXCEEDS_REFUNDABLE",
-      message: `Requested refund of ${requested} exceeds the remaining refundable balance of ${refundable}`,
-    });
-  }
-}
-
-export class RefundAmountInvalidError extends UnprocessableEntityException {
-  constructor(readonly requested: Minor) {
-    super({
-      code: "REFUND_AMOUNT_INVALID",
-      message: `A refund must be greater than zero; got ${requested}`,
-    });
-  }
-}
-
 /**
  * An INTERNAL invariant breach, not a client error: the order's own line items
  * do not sum to its stored grand total. Refusing to open a Checkout session is
@@ -106,76 +58,55 @@ export class CheckoutTotalMismatchError extends InternalServerErrorException {
 }
 
 /**
- * Whop created the checkout configuration but handed back no URL to send the
- * customer to.
+ * The order is not in a currency Wompi can charge.
  *
- * `purchase_url` is typed `string | null` on the create response, so this is a
- * real production outcome rather than a defensive nicety. Persisting an order in
- * that state would mean an order that has been moved to AWAITING_PAYMENT with
- * nowhere for the customer to pay and no page to return from.
- *
- * 500, not a 4xx — nothing the client sent caused this.
+ * Wompi Colombia settles COP only, and every order here is COP — so reaching
+ * this means a row was written by something other than checkout. Refusing is
+ * the only safe answer: the alternative is a checkout URL for a figure in the
+ * wrong unit. 500, because nothing the client sent caused it.
  */
-export class CheckoutUrlMissingError extends InternalServerErrorException {
-  constructor(readonly orderNumber: string) {
+export class UnsupportedCurrencyError extends InternalServerErrorException {
+  constructor(
+    readonly currency: string,
+    readonly orderNumber: string,
+  ) {
     super({
-      code: "CHECKOUT_URL_MISSING",
-      message: `The payment provider returned no purchase URL for order ${orderNumber}; refusing to move the order to AWAITING_PAYMENT with nowhere to pay`,
+      code: "UNSUPPORTED_CURRENCY",
+      message: `Order ${orderNumber} is in ${currency}; Wompi charges COP only`,
     });
   }
 }
 
-/** The webhook request did not carry verifiable raw bytes. */
-export class WebhookSignatureError extends Error {
-  constructor(reason: string) {
-    super(reason);
-    this.name = "WebhookSignatureError";
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Whop gateway failures
-//
-// The split is the only thing a caller actually needs to decide: is this worth
-// retrying, or is it a request we should never send again? `WhopTimeoutError`,
-// a transport failure with no status code, and any 5xx or 429 are the first;
-// every other status — auth, permission, not-found, validation — is the second.
-// Two named errors, not eight, because eight would be eight `catch` arms that
-// all do one of two things.
-//
-// The SDK ships a THIN taxonomy: `WhopError` (with an optional `statusCode`,
-// `body` and `requestId`) and `WhopTimeoutError`. There are no per-condition
-// subclasses to narrow on, so `live-whop.gateway.ts` classifies on the status
-// code instead — which is why that classification lives in exactly one helper
-// there rather than being repeated at each call site.
-// ---------------------------------------------------------------------------
-
 /**
- * The Whop account could not be reached at boot.
+ * Payments are engaged but no Wompi keys are configured.
  *
- * A plain `Error`, deliberately: this is thrown from `onModuleInit`, where
- * there is no request to render a status code onto. Its whole purpose is to
- * kill the process, so an HTTP shape would be theatre.
+ * `libs/config` refuses `PAYMENTS_ENABLED=true` without the four keys, so this
+ * is reachable only when something calls the provider with payments disabled —
+ * a programming fault, surfaced loudly instead of as a URL signed with nothing.
  */
-export class WhopBootCheckFailedError extends Error {
-  constructor(
-    readonly accountId: string,
-    readonly reason: string,
-  ) {
-    super(
-      `Whop account ${accountId} was unreachable at boot: ${reason}. ` +
-        `Refusing to start — a misconfigured key must fail here, not at the first customer's checkout.`,
-    );
-    this.name = "WhopBootCheckFailedError";
+export class PaymentsNotConfiguredError extends InternalServerErrorException {
+  constructor() {
+    super({
+      code: "PAYMENTS_NOT_CONFIGURED",
+      message: "No Wompi keys are configured; set the WOMPI_* variables or PAYMENTS_ENABLED=false",
+    });
   }
 }
 
+// ---------------------------------------------------------------------------
+// Wompi gateway failures
+//
+// The split is the only thing a caller needs to decide: is this worth
+// retrying, or is it a request we should never send again? Transport failures,
+// timeouts, 429 and 5xx are the first; every other status is the second. The
+// classification lives in `live-wompi.gateway.ts`, once.
+// ---------------------------------------------------------------------------
+
 /**
- * Whop was momentarily unreachable: connection, timeout or rate limit.
+ * Wompi was momentarily unreachable: connection, timeout, rate limit or 5xx.
  *
- * RETRY IS SAFE and that is not an assumption — the gateway performs no local
- * writes, so a failure here happens before any state of ours has changed, and
- * every mutating call it makes carries an `idempotencyKey`.
+ * RETRY IS SAFE: the only call is a read (`GET /v1/transactions/{id}`), made
+ * before any state of ours changes.
  *
  * 503 rather than 500 because it is genuinely transient and the caller (or the
  * outbox) should try again.
@@ -193,8 +124,8 @@ export class PaymentProviderUnavailableError extends ServiceUnavailableException
 }
 
 /**
- * Whop rejected the request itself — a bad key, a missing permission, an
- * unknown id, a validation failure.
+ * Wompi rejected the request itself — a bad key, a missing permission, a
+ * validation failure — or answered 2xx with a body that is not a transaction.
  *
  * Retrying an identical request produces an identical rejection, so this is
  * NOT a transient condition and must not be routed to a retry queue.

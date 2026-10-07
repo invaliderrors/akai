@@ -3,18 +3,17 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 /**
  * Resend webhook signature verification.
  *
- * Resend signs with SVIX, which is the same FAMILY as the Whop webhook (both are
- * Standard Webhooks: `${id}.${timestamp}.${rawBody}`, HMAC-SHA256, base64, a
- * five-minute tolerance) — but the two are verified by different code for two
- * concrete reasons, and this is ours because Resend ships no verifier we can call.
+ * Resend signs with SVIX (Standard Webhooks: `${id}.${timestamp}.${rawBody}`,
+ * HMAC-SHA256, base64, a five-minute tolerance). This is ours because Resend
+ * ships no verifier we can call. (Wompi's event checksum is a different scheme
+ * altogether — plain SHA-256 over parsed fields — and lives in the payments
+ * module.)
  *
- * THREE DETAILS THAT ARE NOT SHARED, each of which silently breaks verification:
+ * THREE DETAILS, each of which silently breaks verification:
  *
  *  - The secret is base64 behind a `whsec_` prefix and the HMAC key is the
- *    DECODED bytes. Whop is the mirror image: it signs with the LITERAL bytes of
- *    its `ws_` secret, so the SDK helper base64-ENCODES before handing the key to
- *    the same library. Applying either convention to the other provider produces
- *    a key that verifies nothing.
+ *    DECODED bytes. Using the literal bytes of the secret produces a key that
+ *    verifies nothing.
  *  - `svix-signature` carries a SPACE-SEPARATED LIST of `v1,<base64>` entries,
  *    because Svix supports key rotation — during a rotation two signatures are
  *    sent and only one matches. Reading the header as a single value breaks

@@ -282,9 +282,9 @@ describe("toDecimalString", () => {
 });
 
 describe("fromDecimalString", () => {
-  it("reads the major-unit decimals Whop's REST bodies carry", () => {
-    // `Whop.Money.amount` is an exact decimal STRING in major units — the SDK's
-    // own comment says "a string so no float rounds it in transit".
+  it("reads exact major-unit decimal strings", () => {
+    // A provider that speaks major units sends an exact decimal STRING so no
+    // float rounds it in transit.
     expect(fromDecimalString("1234.56", "EUR")).toBe(123_456);
     expect(fromDecimalString("0.05", "EUR")).toBe(5);
     expect(fromDecimalString("0.00", "EUR")).toBe(0);
@@ -296,7 +296,7 @@ describe("fromDecimalString", () => {
   });
 
   it("accepts a bare integer for a currency that has minor units", () => {
-    // Whop emits "10" as readily as "10.00" for a round amount.
+    // A provider may emit "10" as readily as "10.00" for a round amount.
     expect(fromDecimalString("10", "EUR")).toBe(1000);
   });
 

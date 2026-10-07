@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ScheduledJobsRunner,
   type CartSweeper,
+  type PaymentReconciler,
   type ReservationSweeper,
   type ScheduledJobsIntervals,
 } from "./scheduled-jobs.runner";
@@ -16,10 +17,17 @@ const logger = createLogger({ level: "silent", nodeEnv: "test", serviceName: "ap
 const INTERVALS: ScheduledJobsIntervals = {
   reservationExpiryMs: 1_000,
   cartExpiryMs: 3_000,
+  paymentReconciliationMs: 7_000,
 };
 
-function makeRunner(reservations: ReservationSweeper, carts: CartSweeper): ScheduledJobsRunner {
-  return new ScheduledJobsRunner(reservations, carts, INTERVALS, logger);
+const IDLE_PAYMENTS: PaymentReconciler = { reconcileStalledPayments: () => Promise.resolve(0) };
+
+function makeRunner(
+  reservations: ReservationSweeper,
+  carts: CartSweeper,
+  payments: PaymentReconciler = IDLE_PAYMENTS,
+): ScheduledJobsRunner {
+  return new ScheduledJobsRunner(reservations, carts, payments, INTERVALS, logger);
 }
 
 describe("ScheduledJobsRunner", () => {
@@ -51,6 +59,24 @@ describe("ScheduledJobsRunner", () => {
     // reservation-expiry (1s) has fired three times by t=3s; cart-expiry (3s) once.
     expect(releaseExpired).toHaveBeenCalledTimes(3);
     expect(expireStaleCarts).toHaveBeenCalledTimes(1);
+
+    await runner.onApplicationShutdown();
+  });
+
+  it("runs the payment reconciliation on its own cadence", async () => {
+    const reconcileStalledPayments = vi.fn(() => Promise.resolve(0));
+    const runner = makeRunner(
+      { releaseExpired: () => Promise.resolve(0) },
+      { expireStaleCarts: () => Promise.resolve(0) },
+      { reconcileStalledPayments },
+    );
+
+    runner.start();
+
+    await vi.advanceTimersByTimeAsync(6_999);
+    expect(reconcileStalledPayments).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(reconcileStalledPayments).toHaveBeenCalledTimes(1);
 
     await runner.onApplicationShutdown();
   });

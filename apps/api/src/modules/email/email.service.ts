@@ -137,7 +137,7 @@ function describeError(error: unknown): string {
  *    that triggered it, and the control flow says so.
  *
  * 2. IT NEVER DOUBLE-SENDS AN ORDER MAIL. Idempotency is a DB unique constraint
- *    on `(orderId, templateKey)`, claimed BEFORE the provider call. Whop
+ *    on `(orderId, templateKey)`, claimed BEFORE the provider call. Wompi
  *    retries webhooks aggressively; a check-then-send would race and mail three
  *    confirmations for one order.
  *

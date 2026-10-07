@@ -54,7 +54,7 @@ function describeError(error: unknown): string {
  *
  * It is deliberately NOT started here. The API imports OutboxModule so the
  * concern is composed and reviewable, but only the worker registers handlers
- * and ticks `dispatchDue` — the API must stay free to ACK a Whop webhook in
+ * and ticks `dispatchDue` — the API must stay free to ACK a Wompi event in
  * under a second (spec §3/§9) instead of doing the heavy work inline.
  */
 @Injectable()
