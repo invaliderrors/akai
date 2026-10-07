@@ -5,7 +5,6 @@ import type { NestExpressApplication } from "@nestjs/platform-express";
 import { ExpressAdapter } from "@nestjs/platform-express";
 import { resetServerConfigCache } from "@akai/config";
 import { paginatedSchema, publicProductSchema } from "@akai/contracts";
-import { TEST_WHOP_WEBHOOK_SECRET } from "@akai/testing";
 import { createLogger } from "@akai/observability";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -13,8 +12,6 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { AppModule } from "../../api/src/app.module";
 import { API_GLOBAL_PREFIX } from "../../api/src/common/api-paths";
 import { AllExceptionsFilter } from "../../api/src/common/filters/all-exceptions.filter";
-import { WHOP_GATEWAY } from "../../api/src/modules/payments/whop/whop.gateway";
-import { FakeWhopGateway } from "../../api/src/modules/payments/testing/fake-whop.gateway";
 import { isDockerAvailable, startTestDatabase, type TestDatabase } from "./harness";
 
 /**
@@ -30,12 +27,11 @@ import { isDockerAvailable, startTestDatabase, type TestDatabase } from "./harne
 const TEST_ENV: NodeJS.ProcessEnv = {
   NODE_ENV: "test",
   JWT_ACCESS_SECRET: "a".repeat(32),
-  WHOP_ENVIRONMENT: "live",
-  WHOP_API_KEY: "whop_test_abc123def456ghi789",
-  WHOP_ACCOUNT_ID: "biz_test_1",
-  WHOP_PRODUCT_ID: "prod_test_1",
-  WHOP_WEBHOOK_SECRET: TEST_WHOP_WEBHOOK_SECRET,
-  WHOP_API_VERSION_DATE: "2026-08-14",
+  WOMPI_ENVIRONMENT: "sandbox",
+  WOMPI_PUBLIC_KEY: "pub_test_unit",
+  WOMPI_PRIVATE_KEY: "prv_test_unit",
+  WOMPI_INTEGRITY_SECRET: "test_integrity_unit",
+  WOMPI_EVENTS_SECRET: "test_events_unit",
   EMAIL_TRANSPORT: "smtp",
   SMTP_URL: "smtp://localhost:1025",
   EMAIL_FROM: "no-reply@example.com",
@@ -145,10 +141,7 @@ describe.skipIf(!isDockerAvailable())("Catalog search — ranking, word starts, 
     process.env = { ...TEST_ENV, DATABASE_URL: db.databaseUrl, DIRECT_DATABASE_URL: db.databaseUrl };
     resetServerConfigCache();
 
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
-      .overrideProvider(WHOP_GATEWAY)
-      .useValue(new FakeWhopGateway())
-      .compile();
+    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
 
     app = moduleRef.createNestApplication<NestExpressApplication>(new ExpressAdapter());
     app.setGlobalPrefix(API_GLOBAL_PREFIX);

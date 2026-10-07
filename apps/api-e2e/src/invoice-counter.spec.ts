@@ -4,27 +4,24 @@ import { Test } from "@nestjs/testing";
 import type { NestExpressApplication } from "@nestjs/platform-express";
 import { ExpressAdapter } from "@nestjs/platform-express";
 import { resetServerConfigCache } from "@akai/config";
-import { TEST_WHOP_WEBHOOK_SECRET, buildSignedWhopEvent } from "@akai/testing";
+import { TEST_WOMPI_EVENTS_SECRET, buildSignedWompiEvent } from "@akai/testing";
 import request from "supertest";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { AppModule } from "../../api/src/app.module";
-import { API_GLOBAL_PREFIX, WHOP_WEBHOOK_PATH } from "../../api/src/common/api-paths";
-import { createRawBodyMiddleware } from "../../api/src/common/middleware/raw-body";
+import { API_GLOBAL_PREFIX, WOMPI_WEBHOOK_PATH } from "../../api/src/common/api-paths";
 import {
   PAYMENTS_REPOSITORY,
   type PaymentsRepository,
 } from "../../api/src/modules/payments/repository/payments.repository";
-import { WHOP_GATEWAY } from "../../api/src/modules/payments/whop/whop.gateway";
-import { FakeWhopGateway } from "../../api/src/modules/payments/testing/fake-whop.gateway";
 import { isDockerAvailable, startTestDatabase, type TestDatabase } from "./harness";
 
 /**
  * THE GAP-FREE INVOICE NUMBER, PROVEN AGAINST REAL POSTGRES.
  *
  * The platform's invariants migration states the requirement in its own
- * words: "INVOICE numbers may NOT have gaps — that is a legal requirement in most
- * EU member states". The implementation it shipped could not keep that promise,
+ * words: "INVOICE numbers may NOT have gaps" — Colombia's DIAN numbering ranges
+ * are no more forgiving. The implementation it shipped could not keep that promise,
  * because `next_invoice_number()` is `nextval` underneath and NEXTVAL IS NOT
  * TRANSACTIONAL. Measured on postgres:16-alpine before this change:
  *
@@ -52,21 +49,14 @@ import { isDockerAvailable, startTestDatabase, type TestDatabase } from "./harne
  * stays honest if the mechanism is ever replaced again.
  */
 
-const SECRET = TEST_WHOP_WEBHOOK_SECRET;
-
 const TEST_ENV: NodeJS.ProcessEnv = {
   NODE_ENV: "test",
   JWT_ACCESS_SECRET: "a".repeat(32),
-  // PINNED, exactly as the deployment pins it: the Whop environment DEFAULTS
-  // from NODE_ENV, and "test" is not "production", so without this the schema
-  // resolves to sandbox and demands the WHOP_SANDBOX_* set this suite has no
-  // reason to carry.
-  WHOP_ENVIRONMENT: "live",
-  WHOP_API_KEY: "whop_test_abc123def456ghi789",
-  WHOP_ACCOUNT_ID: "biz_test_1",
-  WHOP_PRODUCT_ID: "prod_test_1",
-  WHOP_WEBHOOK_SECRET: SECRET,
-  WHOP_API_VERSION_DATE: "2026-08-14",
+  WOMPI_ENVIRONMENT: "sandbox",
+  WOMPI_PUBLIC_KEY: "pub_test_unit",
+  WOMPI_PRIVATE_KEY: "prv_test_unit",
+  WOMPI_INTEGRITY_SECRET: "test_integrity_unit",
+  WOMPI_EVENTS_SECRET: TEST_WOMPI_EVENTS_SECRET,
   EMAIL_TRANSPORT: "smtp",
   SMTP_URL: "smtp://localhost:1025",
   EMAIL_FROM: "no-reply@example.com",
@@ -95,8 +85,10 @@ const ORDER_A = "11111111-1111-4111-8111-111111111111";
  */
 const ORDER_B = "44444444-4444-4444-8444-444444444444";
 
-const CHECKOUT_A = "chk_invoice_a";
-const GRAND_TOTAL = 4999;
+/** The Wompi reference order A's checkout attempt was sent with. */
+const REFERENCE_A = "AK-2026-000001-1";
+/** $ 89.000 in centavos — Wompi's `amount_in_cents` is the same unit. */
+const GRAND_TOTAL = 8_900_000;
 
 /** `INV-YYYY-NNNNNN` — the format `next_invoice_number()` established. */
 const INVOICE_FORMAT = /^INV-\d{4}-\d{6}$/;
@@ -118,17 +110,11 @@ describe.skipIf(!isDockerAvailable())("Invoice numbering — gap-free under roll
     };
     resetServerConfigCache();
 
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
-      // `LiveWhopGateway.onModuleInit` calls the real Whop API, and `app.init()`
-      // fires module-init hooks. Nothing on the settlement path touches the
-      // gateway, so the fake costs no fidelity — it only keeps the suite off the
-      // network.
-      .overrideProvider(WHOP_GATEWAY)
-      .useValue(new FakeWhopGateway())
-      .compile();
+    // Nothing on the event path calls Wompi, so the live gateway stays wired —
+    // it is never invoked.
+    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
 
     app = moduleRef.createNestApplication<NestExpressApplication>(new ExpressAdapter());
-    app.use(WHOP_WEBHOOK_PATH, createRawBodyMiddleware());
     app.setGlobalPrefix(API_GLOBAL_PREFIX);
     await app.init();
 
@@ -148,7 +134,7 @@ describe.skipIf(!isDockerAvailable())("Invoice numbering — gap-free under roll
   beforeEach(async () => {
     await db.reset();
     await seedCatalog();
-    await seedOrder(ORDER_A, "AK-2026-000001", CHECKOUT_A);
+    await seedOrder(ORDER_A, "AK-2026-000001", REFERENCE_A);
     await seedOrder(ORDER_B, "AK-2026-000002", null);
   });
 
@@ -166,11 +152,11 @@ describe.skipIf(!isDockerAvailable())("Invoice numbering — gap-free under roll
         id: VARIANT_ID,
         productId: PRODUCT_ID,
         sku: "AK-TEE-BLK-L",
-        currency: "EUR",
-        priceNet: 4131,
-        priceTax: 868,
+        currency: "COP",
+        priceNet: 7_478_992,
+        priceTax: 1_421_008,
         priceGross: GRAND_TOTAL,
-        taxRateBps: 2100,
+        taxRateBps: 1900,
       },
     });
 
@@ -182,7 +168,7 @@ describe.skipIf(!isDockerAvailable())("Invoice numbering — gap-free under roll
   async function seedOrder(
     id: string,
     orderNumber: string,
-    checkoutId: string | null,
+    reference: string | null,
   ): Promise<void> {
     await db.prisma.order.create({
       data: {
@@ -191,11 +177,10 @@ describe.skipIf(!isDockerAvailable())("Invoice numbering — gap-free under roll
         email: "customer@example.com",
         status: "AWAITING_PAYMENT",
         locale: "es",
-        currency: "EUR",
-        subtotal: 4131,
-        taxTotal: 868,
+        currency: "COP",
+        subtotal: 7_478_992,
+        taxTotal: 1_421_008,
         grandTotal: GRAND_TOTAL,
-        providerCheckoutId: checkoutId,
         shipFirstName: "Valentina",
         shipLastName: "Restrepo",
         shipLine1: "Calle 10 # 43-21",
@@ -213,6 +198,19 @@ describe.skipIf(!isDockerAvailable())("Invoice numbering — gap-free under roll
         documentNumber: "1020304050",
       },
     });
+
+    // The checkout attempt `startCheckout` would have written before the
+    // redirect — what a Wompi reference correlates through.
+    if (reference !== null) {
+      await db.prisma.payment.create({
+        data: {
+          orderId: id,
+          amount: GRAND_TOTAL,
+          currency: "COP",
+          providerReference: reference,
+        },
+      });
+    }
   }
 
   /** The invoice number currently on an order, or null. */
@@ -229,31 +227,19 @@ describe.skipIf(!isDockerAvailable())("Invoice numbering — gap-free under roll
   it("gives a settled order a number in the INV-YYYY-NNNNNN format, starting at one", async () => {
     // Through the REAL webhook: signature verification, correlation, the
     // transaction boundary and `settleOrderPaid` — not just the repository call.
-    const signed = buildSignedWhopEvent(
-      {
-        id: "evt_invoice_first",
-        type: "payment.succeeded",
-        timestamp: new Date().toISOString(),
-        data: {
-          id: "pay_invoice_first",
-          checkout_configuration_id: CHECKOUT_A,
-          metadata: { order_id: ORDER_A, order_number: "AK-2026-000001" },
-          status: "paid",
-          substatus: "succeeded",
-          // Whop's webhook plane speaks MAJOR units.
-          total: GRAND_TOTAL / 100,
-          currency: "eur",
-          paid_at: new Date().toISOString(),
-        },
-      },
-      { secret: SECRET },
-    );
+    const signed = buildSignedWompiEvent({
+      id: "1234-1700000000-00001",
+      status: "APPROVED",
+      reference: REFERENCE_A,
+      amount_in_cents: GRAND_TOTAL,
+      currency: "COP",
+      finalized_at: new Date().toISOString(),
+    });
 
     const response = await request(app.getHttpServer())
-      .post(WHOP_WEBHOOK_PATH)
-      .set("Content-Type", "application/json")
-      .set(signed.headers)
-      .send(signed.payload);
+      .post(WOMPI_WEBHOOK_PATH)
+      .set("X-Event-Checksum", signed.signature.checksum)
+      .send(signed);
 
     expect(response.status).toBe(200);
 
@@ -295,8 +281,9 @@ describe.skipIf(!isDockerAvailable())("Invoice numbering — gap-free under roll
   });
 
   it("allocates exactly ONE number when two settlements of the same order race", async () => {
-    // Whop does not guarantee delivery order and retries up to 12 times, so two
-    // transactions really can be inside `markOrderPaid` for one order at once.
+    // The webhook, the return-page confirmation and the sweep can all carry a
+    // settlement, so two transactions really can be inside `markOrderPaid` for
+    // one order at once.
     const [first, second] = await Promise.allSettled([settle(ORDER_A), settle(ORDER_A)]);
 
     // Neither is allowed to fail: a 5xx on an authentic delivery puts the

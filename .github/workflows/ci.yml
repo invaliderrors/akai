@@ -130,7 +130,7 @@ jobs:
       - name: Integration tests
         # `e2e`, not `test`: api-e2e defines only an `e2e` target (its suites need a real
         # Postgres via testcontainers and must stay out of the unit `test` run-many). This
-        # is the job that actually runs whop-webhook-dedupe.spec.ts — the sole proof of
+        # is the job that actually runs wompi-webhook.spec.ts — the sole proof of
         # the provider_event transaction boundary. `api-e2e:test` does not exist and exits 1
         # with "Cannot find configuration for task api-e2e:test", so this deliverable was
         # never executed in CI before.
