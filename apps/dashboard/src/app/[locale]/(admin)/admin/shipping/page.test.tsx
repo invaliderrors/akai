@@ -35,7 +35,6 @@ vi.mock("@/lib/admin/actions", () => ({
   createShippingRateAction: vi.fn(),
   updateShippingRateAction: vi.fn(),
   deleteShippingRateAction: vi.fn(),
-  listSendcloudOptionsAction: vi.fn(),
 }));
 
 const { default: AdminShippingPage } = await import("./page");
@@ -55,8 +54,8 @@ describe("AdminShippingPage", () => {
       zones: [
         {
           id: "11111111-1111-4111-8111-111111111111",
-          name: "Irlanda",
-          countryCodes: ["IE"],
+          name: "Colombia",
+          countryCodes: ["CO"],
           sortOrder: 2,
           createdAt: "2026-09-24T10:00:00.000Z",
           updatedAt: "2026-09-24T10:00:00.000Z",
@@ -68,9 +67,9 @@ describe("AdminShippingPage", () => {
     await renderPage();
 
     expect(listShippingZones).toHaveBeenCalledWith(expect.anything());
-    expect(screen.getByRole("heading", { name: "Irlanda" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Colombia" })).toBeInTheDocument();
     // The country name was resolved on the server, in the operator's locale.
-    expect(screen.getByTitle("Irlanda")).toHaveTextContent("IE");
+    expect(screen.getByTitle("Colombia")).toHaveTextContent("CO");
   });
 
   it("renders the shared error state, not an unhandled rejection, when the read fails", async () => {

@@ -287,7 +287,7 @@ export default async function AdminCustomersPage({
  * English, matching the grouped figures beside them in the money column.
  */
 function formatCount(value: number, locale: Locale): string {
-  return new Intl.NumberFormat(locale === "es" ? "es-ES" : "en-IE").format(value);
+  return new Intl.NumberFormat(locale === "es" ? "es-CO" : "en-US").format(value);
 }
 
 function asRole(value: string | undefined): Role | undefined {

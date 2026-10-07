@@ -92,8 +92,8 @@ describe("OrderList", () => {
     expect(row.getByText("AK-2026-000123")).toBeInTheDocument();
     expect(row.getByText("Entregado")).toBeInTheDocument();
     expect(row.getByText("2 artículos")).toBeInTheDocument();
-    // 12098 minor units in es-ES: "120,98 €".
-    expect(row.getByText(/120,98/)).toBeInTheDocument();
+    // 12_098_000 centavos in es-CO: "$ 120.980" — whole pesos, dot grouping.
+    expect(row.getByText(/120\.980/)).toBeInTheDocument();
   });
 
   it("formats money for the active locale", () => {
@@ -101,7 +101,7 @@ describe("OrderList", () => {
 
     // en-IE leads with the symbol, es-ES trails it. This is precisely the
     // defect @akai/money was written to fix, so it is worth pinning.
-    expect(table().getByText(/€120\.98/)).toBeInTheDocument();
+    expect(table().getByText(/\$120,980/)).toBeInTheDocument();
     expect(table().getByText("Delivered")).toBeInTheDocument();
   });
 
@@ -133,7 +133,7 @@ describe("OrderList", () => {
     // total all read out.
     expect(row).toHaveAccessibleName(/AK-2026-000123/);
     expect(within(row).getByText("Entregado")).toBeInTheDocument();
-    expect(within(row).getByText(/120,98/)).toBeInTheDocument();
+    expect(within(row).getByText(/120\.980/)).toBeInTheDocument();
   });
 
   it("renders one row per order in both renderings", () => {

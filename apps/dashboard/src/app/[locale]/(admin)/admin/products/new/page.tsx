@@ -21,8 +21,8 @@ import { createServerApiClient } from "@/lib/api/client";
  * THE STORE'S BASE CURRENCY comes from `DEFAULT_CURRENCY`, which is where the
  * assumption and its TODO now live in exactly ONE place: that constant's own
  * note says it belongs in a settings endpoint, and it named this page's former
- * `"EUR" as CurrencyCode` cast as the last duplicate of it. EUR is correct for
- * every current market; a wrong assumption threaded through the form in two
+ * `"EUR" as CurrencyCode` cast as the last duplicate of it. COP is correct for
+ * the one market (Colombia); a wrong assumption threaded through the form in two
  * spellings would not be.
  *
  * `?kind=PACK` PRE-SELECTS THE PACK KIND, so the "New pack" link on

@@ -42,14 +42,13 @@ const {
   createShippingRateAction,
   createShippingZoneAction,
   deleteShippingRateAction,
-  listSendcloudOptionsAction,
   updateShippingRateAction,
 } = await import("./actions");
 
 const zoneBody = {
   id: ZONE_ID,
-  name: "Irlanda",
-  countryCodes: ["IE"],
+  name: "Colombia",
+  countryCodes: ["CO"],
   sortOrder: 2,
   createdAt: T0,
   updatedAt: T0,
@@ -59,19 +58,16 @@ const zoneBody = {
 const rateBody = {
   id: RATE_ID,
   zoneId: ZONE_ID,
-  name: { es: "UPS Access Point" },
+  name: { es: "Envío nacional" },
   strategy: "FLAT",
   minValue: null,
   maxValue: null,
-  priceGross: 1_410,
-  currency: "EUR",
-  freeOverSubtotal: 25_000,
+  priceGross: 1_500_000,
+  currency: "COP",
+  freeOverSubtotal: 30_000_000,
   isActive: true,
-  deliveryType: "SERVICE_POINT",
-  carrierCode: "ups",
-  sendcloudOptionCode: "ups:standard/service_point",
   transitDaysMin: 2,
-  transitDaysMax: 4,
+  transitDaysMax: 5,
   createdAt: T0,
   updatedAt: T0,
 };
@@ -86,13 +82,13 @@ describe("shipping actions", () => {
   it("creates a zone, parsing the body and the response, and refreshes only the shipping screen", async () => {
     respond = () => ({ status: 201, body: zoneBody });
 
-    const result = await createShippingZoneAction({ name: "Irlanda", countryCodes: ["IE"], sortOrder: 2 });
+    const result = await createShippingZoneAction({ name: "Colombia", countryCodes: ["CO"], sortOrder: 2 });
 
     expect(result).toEqual({ ok: true, data: zoneBody });
     expect(calls[0]).toMatchObject({
       method: "POST",
       path: "/admin/shipping/zones",
-      body: { name: "Irlanda", countryCodes: ["IE"], sortOrder: 2 },
+      body: { name: "Colombia", countryCodes: ["CO"], sortOrder: 2 },
     });
     expect(revalidatePath.mock.calls).toEqual([["/admin/shipping"]]);
   });
@@ -111,7 +107,7 @@ describe("shipping actions", () => {
       },
     });
 
-    const result = await createShippingZoneAction({ name: "Irlanda", countryCodes: ["IE"], sortOrder: 2 });
+    const result = await createShippingZoneAction({ name: "Colombia", countryCodes: ["CO"], sortOrder: 2 });
 
     expect(result).toMatchObject({ ok: false, code: "CONFLICT", reason: "COUNTRY_IN_OTHER_ZONE" });
     expect(revalidatePath).not.toHaveBeenCalled();
@@ -127,11 +123,9 @@ describe("shipping actions", () => {
   it("creates and updates rates under their zone's path", async () => {
     respond = () => ({ status: 201, body: rateBody });
     await createShippingRateAction(ZONE_ID, {
-      name: { es: "UPS Access Point" },
+      name: { es: "Envío nacional" },
       strategy: "FLAT",
-      priceGross: 1_410,
-      deliveryType: "SERVICE_POINT",
-      carrierCode: "ups",
+      priceGross: 1_500_000,
     });
     respond = () => ({ status: 200, body: { ...rateBody, isActive: false } });
     const updated = await updateShippingRateAction(ZONE_ID, RATE_ID, { isActive: false });
@@ -144,12 +138,11 @@ describe("shipping actions", () => {
     expect(updated.ok && updated.data.isActive).toBe(false);
   });
 
-  it("refuses a SERVICE_POINT rate without a carrier before any request", async () => {
+  it("refuses a rate with a blank Spanish name before any request", async () => {
     const result = await createShippingRateAction(ZONE_ID, {
-      name: { es: "Punto" },
+      name: { es: "  " },
       strategy: "FLAT",
-      priceGross: 899,
-      deliveryType: "SERVICE_POINT",
+      priceGross: 1_500_000,
     });
 
     expect(result.ok).toBe(false);
@@ -161,18 +154,5 @@ describe("shipping actions", () => {
 
     expect(result.ok).toBe(false);
     expect(calls).toHaveLength(0);
-  });
-
-  it("reads the Sendcloud options for one country", async () => {
-    respond = () => ({ status: 200, body: { country: "IE", options: [] } });
-
-    const result = await listSendcloudOptionsAction("IE");
-
-    expect(result).toEqual({ ok: true, data: { country: "IE", options: [] } });
-    expect(calls[0]).toMatchObject({
-      method: "GET",
-      path: "/admin/shipping/sendcloud-options",
-      query: { country: "IE" },
-    });
   });
 });

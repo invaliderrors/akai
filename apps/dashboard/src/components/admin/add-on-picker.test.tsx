@@ -159,7 +159,7 @@ describe("<AddOnPicker /> — the pre-selected variant", () => {
     // `getByText` hides this because its default normalizer collapses NBSP;
     // accessible-name computation keeps it, so the exact-string form fails
     // against markup that is entirely correct.
-    expect(screen.getByRole("option", { name: /Standard · 8,45/ })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /Standard · .*8,45/ })).toBeInTheDocument();
   });
 
   it("will not offer an INACTIVE variant as a default", () => {

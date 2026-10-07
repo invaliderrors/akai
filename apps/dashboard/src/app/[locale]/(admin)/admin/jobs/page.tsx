@@ -467,7 +467,7 @@ function formatWhen(iso: string, locale: Locale): string {
 
 /** es-ES and en-IE: the euro-area English the storefront and the API already use. */
 function intlTag(locale: Locale): string {
-  return locale === "es" ? "es-ES" : "en-IE";
+  return locale === "es" ? "es-CO" : "en-US";
 }
 
 /**

@@ -7,7 +7,6 @@ import {
   type AdminShippingRate,
   type AdminShippingZoneDetail,
   type Locale,
-  type SendcloudOptionsResponse,
 } from "@akai/contracts";
 import { formatMoney } from "@akai/money";
 
@@ -38,7 +37,8 @@ import { TypeToConfirmButton } from "./type-to-confirm-button";
 
 /**
  * `/admin/shipping` — every zone, its countries and its rates, all editable
- * (Sendcloud spec §7a, client decision D8: "fully editable in the dashboard").
+ * ("fully editable in the dashboard"). Akai ships within Colombia only, so in
+ * practice this is one zone with a rate or two.
  *
  * ONE SCREEN, THE CATEGORY-MANAGER SHAPE. A store has a handful of zones and a
  * few rates each, so the whole configuration fits on one page, and an operator
@@ -75,7 +75,6 @@ export interface ShippingManagerProps {
     input: UpdateShippingRateInput,
   ) => Promise<ActionResult<AdminShippingRate>>;
   readonly onDeleteRate: (zoneId: string, rateId: string) => Promise<ActionResult<null>>;
-  readonly loadSendcloudOptions: (country: string) => Promise<ActionResult<SendcloudOptionsResponse>>;
 }
 
 /**
@@ -127,7 +126,6 @@ export function ShippingManager({
   onCreateRate,
   onUpdateRate,
   onDeleteRate,
-  loadSendcloudOptions,
 }: ShippingManagerProps) {
   const t = useTranslations("admin.shipping");
   const locale: Locale = useLocale() === "en" ? "en" : "es";
@@ -146,7 +144,6 @@ export function ShippingManager({
   function failureMessage(result: { readonly code: ActionErrorCode | null; readonly reason: string | null }): string {
     const reason = shippingFailureReason(result.reason);
     if (reason !== null) return t(`reasons.${reason}`);
-    if (result.reason === "FULFILMENT_NOT_CONFIGURED") return t("rate.optionsNotConfigured");
     return t(result.code === null ? "errors.UNKNOWN" : ACTION_ERROR_KEYS[result.code]);
   }
 
@@ -166,7 +163,6 @@ export function ShippingManager({
   }
 
   const mismatches = freeShippingMismatches(zones, advertisedThreshold);
-  const firstCountry = (zone: AdminShippingZoneDetail): string | null => zone.countryCodes[0] ?? null;
 
   function rateColumns(zone: AdminShippingZoneDetail): readonly Column<AdminShippingRate>[] {
     return [
@@ -192,18 +188,6 @@ export function ShippingManager({
         kind: "numeric",
         cell: (rate) =>
           rate.freeOverSubtotal === null ? t("rate.noThreshold") : money(rate.freeOverSubtotal),
-      },
-      {
-        key: "delivery",
-        header: t("rate.colDelivery"),
-        cell: (rate) => (
-          <span className="grid">
-            <span>{t(`rate.deliveryTypes.${rate.deliveryType}`)}</span>
-            <span className="font-mono text-[11px] text-[var(--label-secondary)]">
-              {rate.sendcloudOptionCode ?? rate.carrierCode ?? t("rate.unmapped")}
-            </span>
-          </span>
-        ),
       },
       {
         key: "transit",
@@ -436,9 +420,6 @@ export function ShippingManager({
                       <ShippingRateEditor
                         key={rate.id}
                         rate={rate}
-                        optionsCountry={firstCountry(zone)}
-                        optionsCountryName={countryName(firstCountry(zone))}
-                        loadOptions={loadSendcloudOptions}
                         onCancel={() => setEditing({ kind: "none" })}
                         onSave={async (payload) => {
                           const result = await onUpdateRate(zone.id, rate.id, payload);
@@ -456,9 +437,6 @@ export function ShippingManager({
 
               {editing.kind === "newRate" && editing.zoneId === zone.id ? (
                 <ShippingRateEditor
-                  optionsCountry={firstCountry(zone)}
-                  optionsCountryName={countryName(firstCountry(zone))}
-                  loadOptions={loadSendcloudOptions}
                   onCancel={() => setEditing({ kind: "none" })}
                   onSave={async (payload) => {
                     const result = await onCreateRate(zone.id, payload);
@@ -513,8 +491,4 @@ export function ShippingManager({
       />
     </div>
   );
-
-  function countryName(code: string | null): string | null {
-    return code === null ? null : (countryNames[code] ?? code);
-  }
 }

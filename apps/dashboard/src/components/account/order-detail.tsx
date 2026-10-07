@@ -506,6 +506,7 @@ function PaymentSection({ order, payment }: PaymentSectionProps) {
 
 function InvoiceSection({ order }: { readonly order: Order }) {
   const t = useTranslations("account.orderDetail");
+  const tDocument = useTranslations("documents");
 
   return (
     <Group id="order-invoice-heading" title={t("invoiceTitle")} className="grid grid-rows-[auto_1fr]">
@@ -524,6 +525,14 @@ function InvoiceSection({ order }: { readonly order: Order }) {
             {t("invoiceNumber", { number: order.invoiceNumber })}
           </p>
         )}
+        {/* The identity document given at checkout: what the invoice is
+            issued to, and what a payment provider identified the buyer by. */}
+        <p className="m-0 mt-2 text-[13px] leading-5 text-[var(--label-secondary)]">
+          {t("document", {
+            type: tDocument(`types.${order.documentType}`),
+            number: order.documentNumber,
+          })}
+        </p>
       </Card>
     </Group>
   );
@@ -601,9 +610,10 @@ function AddressesSection({ order }: { readonly order: Order }) {
  * A snapshotted address, one line per populated field.
  *
  * Null and blank lines are filtered rather than rendered: `company`, `line2`
- * and `region` are legitimately empty on most European addresses, and an empty
- * `<span className="block">` leaves a visible gap in the middle of someone's
- * own address.
+ * and `postalCode` are legitimately empty on most Colombian addresses, and an
+ * empty `<span className="block">` leaves a visible gap in the middle of
+ * someone's own address. Colombian order: street line, then "city,
+ * departamento", then the postal code when there is one.
  *
  * Exported because the account overview and the address book render the same
  * block; it lives here because this is where the snapshot rules are written
@@ -615,8 +625,8 @@ export function AddressBlock({ address }: { readonly address: AddressFields }) {
     address.company,
     address.line1,
     address.line2,
-    `${address.postalCode} ${address.city}`,
-    address.region,
+    `${address.city}, ${address.region}`,
+    address.postalCode,
     address.countryCode,
   ];
 

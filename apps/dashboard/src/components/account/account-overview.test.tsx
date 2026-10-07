@@ -105,7 +105,7 @@ describe("AccountOverview", () => {
         within(section).getByRole("link", { name: /AK-2026-000123/ }),
       ).toHaveAttribute("href", "/orders/AK-2026-000123");
       expect(within(section).getByText("Entregado")).toBeInTheDocument();
-      expect(within(section).getByText(/120,98/)).toBeInTheDocument();
+      expect(within(section).getByText(/120\.980/)).toBeInTheDocument();
     });
 
     it("offers a route to the full history", () => {
@@ -131,7 +131,7 @@ describe("AccountOverview", () => {
       renderOverview();
 
       const section = screen.getByRole("region", { name: "Dirección predeterminada" });
-      expect(within(section).getByText("Calle Mayor 12")).toBeInTheDocument();
+      expect(within(section).getByText("Calle 10 # 43-21")).toBeInTheDocument();
     });
 
     it("says so when there is none", () => {

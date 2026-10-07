@@ -5,19 +5,17 @@ import {
   adminShippingZoneListSchema,
   createShippingRateSchema,
   createShippingZoneSchema,
-  sendcloudOptionsResponseSchema,
   updateShippingRateSchema,
   updateShippingZoneSchema,
   type AdminShippingRate,
   type AdminShippingZoneDetail,
   type AdminShippingZoneList,
-  type SendcloudOptionsResponse,
 } from "@akai/contracts";
 
 import { parseOrThrow, type AdminHttp } from "./http";
 
 /**
- * `/v1/admin/shipping/*` — staff-editable zones and rates (Sendcloud spec §7a).
+ * `/v1/admin/shipping/*` — staff-editable zones and rates.
  *
  * Its own file rather than more of `api.ts`: that file is shared by every
  * admin surface, and this resource needs nothing from it but the `AdminHttp`
@@ -110,16 +108,4 @@ export async function deleteShippingRate(
     path: `/admin/shipping/zones/${encodeURIComponent(zoneId)}/rates/${encodeURIComponent(rateId)}`,
   });
   parseOrThrow(z.unknown(), response);
-}
-
-export async function listSendcloudOptions(
-  http: AdminHttp,
-  country: string,
-): Promise<SendcloudOptionsResponse> {
-  const response = await http.request({
-    method: "GET",
-    path: "/admin/shipping/sendcloud-options",
-    query: { country },
-  });
-  return parseOrThrow(sendcloudOptionsResponseSchema, response);
 }

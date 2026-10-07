@@ -123,7 +123,7 @@ describe("<ProductPreviewDialog /> — volume pricing", () => {
 
     expect(screen.getByText(form.preview.tiersHeading)).toBeInTheDocument();
     // 3999 x 3 = 11997 minor units.
-    expect(screen.getByText("119,97 €")).toBeInTheDocument();
+    expect(screen.getByText("€ 119,97")).toBeInTheDocument();
     // 3999 against a 4999 base is 20 % off.
     expect(screen.getByText(/−20 %/)).toBeInTheDocument();
   });

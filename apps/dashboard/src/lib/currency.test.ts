@@ -4,9 +4,9 @@ import { SUPPORTED_CURRENCIES, currencyFlag, currencyLabel } from "./currency";
 
 describe("SUPPORTED_CURRENCIES", () => {
   it("leads with the store's base currency", () => {
-    // EUR is DEFAULT_CART_CURRENCY. An operator scoping a discount reaches for
-    // it far more often than for the other 83, so it does not sit under E.
-    expect(SUPPORTED_CURRENCIES[0]).toBe("EUR");
+    // COP is DEFAULT_CART_CURRENCY. An operator scoping a discount reaches for
+    // it far more often than for the other 83, so it does not sit under C.
+    expect(SUPPORTED_CURRENCIES[0]).toBe("COP");
   });
 
   it("lists the rest alphabetically, with no duplicates", () => {
@@ -25,7 +25,7 @@ describe("SUPPORTED_CURRENCIES", () => {
   });
 
   it("covers the currencies this business actually charges in", () => {
-    for (const code of ["EUR", "GBP", "USD", "CHF", "SEK", "PLN"]) {
+    for (const code of ["COP", "EUR", "USD"]) {
       expect(SUPPORTED_CURRENCIES).toContain(code);
     }
   });

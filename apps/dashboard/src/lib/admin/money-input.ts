@@ -1,5 +1,5 @@
 import { MINOR_MAX, toMinor, type CurrencyCode, type Minor } from "@akai/contracts";
-import { minorUnitExponent } from "@akai/money";
+import { displayFractionDigits, minorUnitExponent } from "@akai/money";
 
 /**
  * The major-unit ⇄ minor-unit boundary for admin price entry, and the
@@ -30,6 +30,15 @@ import { minorUnitExponent } from "@akai/money";
  * €1,234 product for €1.23. Both `.` and `,` are accepted as the DECIMAL mark,
  * because a Spanish-default store's operators type "49,99" and refusing that
  * would be hostile — that case is unambiguous, so it is allowed.
+ *
+ * WHOLE-UNIT CURRENCIES (COP) ARE THE EXCEPTION TO THE SEPARATOR RULE. A peso
+ * price has no decimals in practice — the store displays "$ 89.000" and an
+ * operator types "89000" or "89.000" — while the stored amount is still in
+ * centavos (ISO exponent 2). For such a currency there is no decimal mark to
+ * confuse a separator with, so `.` and `,` are read as THOUSANDS separators,
+ * but only in well-formed groups of three ("1.234.567"), and anything that
+ * looks like a decimal ("89.5", "89,50") is refused as TOO_MANY_DECIMALS. See
+ * `displayFractionDigits` in @akai/money.
  *
  * WHY AN OVER-LONG FRACTION IS REJECTED RATHER THAN ROUNDED:
  * "49.999" is not a euro price. Rounding it to 50.00 silently overcharges and
@@ -189,10 +198,12 @@ export function parseMajorUnitInput(
   raw: string,
   currency: CurrencyCode,
 ): MoneyInputResult {
-  const parsed = parseScaledDecimal(raw, {
-    exponent: minorUnitExponent(currency),
-    max: MINOR_MAX,
-  });
+  const exponent = minorUnitExponent(currency);
+  const entered = displayFractionDigits(currency);
+  const parsed =
+    entered < exponent
+      ? parseWholeUnits(raw, 10 ** (exponent - entered))
+      : parseScaledDecimal(raw, { exponent, max: MINOR_MAX });
 
   if (!parsed.ok) {
     return parsed;
@@ -213,7 +224,52 @@ export function parseMajorUnitInput(
  * and produces "49,99 €" — a string this parser would reject, as it should.
  */
 export function formatMinorAsInput(amount: Minor, currency: CurrencyCode): string {
-  return formatScaledDecimal(amount, minorUnitExponent(currency));
+  const exponent = minorUnitExponent(currency);
+  const entered = displayFractionDigits(currency);
+  const scale = 10 ** (exponent - entered);
+  // A whole-peso amount renders as whole pesos ("89000"). One with stray
+  // centavos is shown exactly ("89000.50") — which the parser then refuses, so
+  // the operator sees and fixes it rather than having it silently rounded.
+  if (entered < exponent && amount % scale === 0) {
+    return formatScaledDecimal(amount / scale, entered);
+  }
+  return formatScaledDecimal(amount, exponent);
+}
+
+/**
+ * Whole major units with optional thousands grouping ("89000", "89.000",
+ * "1,234,567"), scaled up to minor units. No float at any point: the digits
+ * are joined as a string and multiplied by an integer power of ten.
+ */
+function parseWholeUnits(raw: string, scale: number): ScaledDecimalResult {
+  const compact = raw.replace(WHITESPACE, "");
+  if (compact.length === 0) {
+    return { ok: false, error: "EMPTY" };
+  }
+  if (compact.startsWith("-")) {
+    return { ok: false, error: "NEGATIVE" };
+  }
+
+  let digits: string;
+  if (/^\d+$/.test(compact)) {
+    digits = compact;
+  } else if (/^\d{1,3}(\.\d{3})+$/.test(compact) || /^\d{1,3}(,\d{3})+$/.test(compact)) {
+    digits = compact.replace(/[.,]/g, "");
+  } else if (/^\d+[.,]\d{1,2}$/.test(compact)) {
+    // "89.5", "89,50": a decimal, and this currency is entered without them.
+    return { ok: false, error: "TOO_MANY_DECIMALS" };
+  } else if (/^[\d.,]+$/.test(compact)) {
+    // Digits and separators, but not in groups of three — "1.23.456", "89.0000".
+    return { ok: false, error: "GROUPING_SEPARATOR" };
+  } else {
+    return { ok: false, error: "NOT_A_NUMBER" };
+  }
+
+  const whole = Number(digits.replace(/^0+(?=\d)/, ""));
+  if (!Number.isSafeInteger(whole) || whole > Math.floor(MINOR_MAX / scale)) {
+    return { ok: false, error: "TOO_LARGE" };
+  }
+  return { ok: true, value: whole * scale };
 }
 
 // ---------------------------------------------------------------------------

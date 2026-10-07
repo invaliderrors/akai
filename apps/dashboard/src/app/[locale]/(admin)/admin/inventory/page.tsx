@@ -117,7 +117,7 @@ export default async function AdminInventoryPage({
 
   // es-ES / en-IE, the same tags `@akai/money` formats with, so a count and a
   // euro figure group their thousands the same way across one screen.
-  const counts = new Intl.NumberFormat(locale === "es" ? "es-ES" : "en-IE");
+  const counts = new Intl.NumberFormat(locale === "es" ? "es-CO" : "en-US");
 
   /**
    * A tracked count, or the em-dash an untracked variant has instead.

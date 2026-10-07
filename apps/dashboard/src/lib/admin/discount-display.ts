@@ -82,5 +82,5 @@ export function formatDate(iso: string, locale: Locale): string {
 
 /** es-ES / en-IE, matching @akai/money's own choice so figures agree. */
 export function intlLocale(locale: Locale): string {
-  return locale === "es" ? "es-ES" : "en-IE";
+  return locale === "es" ? "es-CO" : "en-US";
 }

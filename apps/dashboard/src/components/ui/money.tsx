@@ -37,8 +37,8 @@ const BASE_CLASS = "tabular-nums whitespace-nowrap text-[var(--label)]";
 /**
  * U+2212 MINUS SIGN, not U+002D HYPHEN-MINUS.
  *
- * ICU emits the ASCII hyphen for a negative currency figure ("-29,90 €" in
- * es-ES, "-€29.90" in en-IE). In a right-aligned stack of tabular figures that
+ * ICU emits the ASCII hyphen for a negative currency figure ("-$ 29.900" in
+ * es-CO, "-$29,900" in en-US). In a right-aligned stack of tabular figures that
  * hyphen is the one glyph in the string with no tabular width, so the negative
  * row's digits sit a fraction off its neighbours'; U+2212 is drawn to the digit
  * width precisely so a signed column lines up. It is also the character a
@@ -52,9 +52,9 @@ const MINUS_SIGN = "−";
 
 /**
  * Safe as a blanket replacement because the platform's `Locale` union is
- * exactly `es` | `en`: neither es-ES nor en-IE puts a hyphen anywhere else in a
+ * exactly `es` | `en`: neither es-CO nor en-US puts a hyphen anywhere else in a
  * currency figure — the group and decimal separators are "." "," and the symbol
- * is "€". A locale with a hyphen in its number pattern would need
+ * is "$". A locale with a hyphen in its number pattern would need
  * `formatToParts` and a `minusSign` part instead.
  */
 function withTypographicMinus(figure: string): string {

@@ -15,7 +15,6 @@ import { buttonClassName } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
 import { Money } from "@/components/ui/money";
-import { Notice } from "@/components/ui/notice";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { DataTable, type Column } from "@/components/ui/table";
 import { Timeline, type TimelineEntry } from "@/components/ui/timeline";
@@ -26,7 +25,7 @@ import { getOrder } from "@/lib/admin/api";
 import { AdminApiError } from "@/lib/admin/http";
 import { createAdminHttp } from "@/lib/admin/http-adapter";
 import { createServerApiClient } from "@/lib/api/client";
-import { canGenerateLabel, labelErrorKey } from "@/lib/admin/fulfilment-display";
+import { canRecordShipment, unshippedLines } from "@/lib/admin/shipment-display";
 
 /**
  * One order, in full — and, when it is in PAYMENT_MISMATCH, the decision screen
@@ -58,22 +57,15 @@ import { canGenerateLabel, labelErrorKey } from "@/lib/admin/fulfilment-display"
  */
 export default async function AdminOrderDetailPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ locale: string; orderNumber: string }>;
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { locale: rawLocale, orderNumber } = await params;
-  const query = await searchParams;
   const locale = asLocale(rawLocale);
 
   const t = await getTranslations("admin.orderDetail");
   const tOrders = await getTranslations("admin.orders");
-  const tFulfilment = await getTranslations("admin.fulfilment");
-  const tRoot = await getTranslations();
-  // Set by the label-download route when the API refused; narrowed to OUR copy.
-  const rawLabelError = query["labelError"];
-  const labelError = labelErrorKey(typeof rawLabelError === "string" ? rawLabelError : undefined);
+  const tDocument = await getTranslations("documents");
 
   let order: Awaited<ReturnType<typeof getOrder>>;
   try {
@@ -201,9 +193,6 @@ export default async function AdminOrderDetailPage({
       width="admin"
     >
       <div className="grid gap-4">
-        {labelError === null ? null : (
-          <Notice tone="danger">{tFulfilment("labelError", { reason: tRoot(labelError) })}</Notice>
-        )}
         {isMismatch && (
           /*
            * THE ATTENTION TREATMENT, second and last sanctioned appearance on
@@ -312,40 +301,20 @@ export default async function AdminOrderDetailPage({
             </Card>
 
             <OrderShipments
-              orderId={order.id}
               orderNumber={order.orderNumber}
               locale={locale}
               shipments={order.shipments}
-              canGenerate={canGenerateLabel(order)}
+              toShip={canRecordShipment(order) ? unshippedLines(order) : []}
             />
 
-            {order.servicePoint === null ? null : (
-              /*
-               * The pickup point SNAPSHOTTED at checkout (re-verified then with
-               * Sendcloud) — the one on the label. The ids are what a carrier
-               * desk asks for when a customer cannot find their parcel.
-               */
-              <Card title={tFulfilment("servicePoint.title")} titleId="order-service-point" titleAs="h2">
-                <p className="m-0 text-[13px] font-semibold text-[var(--label)]">{order.servicePoint.name}</p>
-                <p className="m-0 mt-0.5 text-[13px] text-[var(--label)]">{order.servicePoint.address}</p>
-                <dl className="m-0 mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[12px]">
-                  <dt className="text-[var(--label-secondary)]">{tFulfilment("servicePoint.id")}</dt>
-                  <dd className="m-0 font-mono">{order.servicePoint.id}</dd>
-                  {order.servicePoint.carrierServicePointId === null ? null : (
-                    <>
-                      <dt className="text-[var(--label-secondary)]">{tFulfilment("servicePoint.carrierId")}</dt>
-                      <dd className="m-0 font-mono">{order.servicePoint.carrierServicePointId}</dd>
-                    </>
-                  )}
-                  {order.servicePoint.postNumber === null ? null : (
-                    <>
-                      <dt className="text-[var(--label-secondary)]">{tFulfilment("servicePoint.postNumber")}</dt>
-                      <dd className="m-0 font-mono">{order.servicePoint.postNumber}</dd>
-                    </>
-                  )}
-                </dl>
-              </Card>
-            )}
+            <Card title={t("customerDocument")} titleId="order-customer-document" titleAs="h2">
+              <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[13px]">
+                <dt className="text-[var(--label-secondary)]">{t("documentType")}</dt>
+                <dd className="m-0">{tDocument(`types.${order.documentType}`)}</dd>
+                <dt className="text-[var(--label-secondary)]">{t("documentNumber")}</dt>
+                <dd className="m-0 font-mono text-[12px]">{order.documentNumber}</dd>
+              </dl>
+            </Card>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <AddressPanel
@@ -443,10 +412,16 @@ function AddressPanel({ id, title, address }: AddressPanelProps) {
           </>
         )}
         <br />
-        {address.postalCode} {address.city}
-        {address.region === null ? "" : `, ${address.region}`}
+        {address.city}, {address.region}
+        {address.postalCode === null ? "" : ` ${address.postalCode}`}
         <br />
         {address.countryCode}
+        {address.phone === null ? null : (
+          <>
+            <br />
+            <span className="font-mono text-[12px]">{address.phone}</span>
+          </>
+        )}
       </address>
     </Card>
   );

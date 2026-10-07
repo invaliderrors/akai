@@ -239,7 +239,7 @@ describe("createAccountApi", () => {
       expect(result.ok).toBe(true);
       if (!result.ok) throw new Error("expected success");
       expect(result.data.shipments).toHaveLength(1);
-      expect(result.data.shipments[0]?.trackingNumber).toBe("SEUR-9981234");
+      expect(result.data.shipments[0]?.trackingNumber).toBe("SV-9981234");
       expect(result.data.payment?.cardLast4).toBe("4242");
     });
 
@@ -265,7 +265,7 @@ describe("createAccountApi", () => {
 
       expect(result.ok).toBe(true);
       if (!result.ok) throw new Error("expected success");
-      expect(result.data[0]?.city).toBe("Madrid");
+      expect(result.data[0]?.city).toBe("Medellín");
     });
 
     it("deletes an address and tolerates a 204 with no body", async () => {
@@ -300,12 +300,12 @@ describe("createAccountApi", () => {
         firstName: "Elena",
         lastName: "Ruiz",
         company: null,
-        line1: "Calle Mayor 12",
+        line1: "Calle 10 # 43-21",
         line2: null,
-        city: "Madrid",
-        region: null,
-        postalCode: "X",
-        countryCode: "ES",
+        city: "Medellín",
+        region: "Antioquia",
+        postalCode: "050021",
+        countryCode: "CO",
         phone: null,
         isDefault: false,
       });

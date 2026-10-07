@@ -10,16 +10,16 @@ import type { CurrencyCode } from "@akai/contracts";
  * `Currency` const), uppercased: Whop speaks lowercase ISO-4217 and this system
  * speaks uppercase, and `whop.gateway.ts` owns that conversion.
  *
- * EUR is first because it is the store's base currency (`DEFAULT_CART_CURRENCY`),
+ * COP is first because it is the store's base currency (`DEFAULT_CART_CURRENCY`),
  * not because of its code. The rest are alphabetical.
  *
  * Regenerate rather than hand-edit if the SDK is upgraded.
  */
 export const SUPPORTED_CURRENCIES: readonly CurrencyCode[] = [
-  "EUR", "AED", "ALL", "AMD", "ARS", "AUD", "AWG", "BAM",
+  "COP", "AED", "ALL", "AMD", "ARS", "AUD", "AWG", "BAM",
   "BGN", "BHD", "BOB", "BRL", "BSD", "CAD", "CHF", "CLP",
-  "CNY", "COP", "CRC", "CZK", "DKK", "DOP", "DZD", "EGP",
-  "ETB", "GBP", "GHS", "GMD", "GTQ", "GYD", "HKD", "HUF",
+  "CNY", "CRC", "CZK", "DKK", "DOP", "DZD", "EGP", "ETB",
+  "EUR", "GBP", "GHS", "GMD", "GTQ", "GYD", "HKD", "HUF",
   "IDR", "ILS", "INR", "JMD", "JOD", "JPY", "KES", "KHR",
   "KRW", "KWD", "KZT", "LKR", "MAD", "MDL", "MGA", "MKD",
   "MNT", "MOP", "MUR", "MXN", "MYR", "NAD", "NGN", "NOK",

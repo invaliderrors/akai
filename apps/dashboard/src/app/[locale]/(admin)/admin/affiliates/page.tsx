@@ -75,7 +75,7 @@ export default async function AdminAffiliatesPage({
     );
   }
 
-  const counts = new Intl.NumberFormat(locale === "es" ? "es-ES" : "en-IE");
+  const counts = new Intl.NumberFormat(locale === "es" ? "es-CO" : "en-US");
 
   const fields: readonly FilterField[] = [
     {

@@ -89,7 +89,7 @@ function customer(overrides: Partial<AdminCustomer> = {}): AdminCustomer {
     createdAt: "2025-03-14T10:00:00.000Z",
     updatedAt: "2025-03-14T10:00:00.000Z",
     orderCount: 12,
-    lifetimeValueMinor: 96_420,
+    lifetimeValueMinor: 96_420_000,
     lastOrderAt: "2026-08-28T09:00:00.000Z",
     marketingConsentAt: "2025-03-14T10:00:00.000Z",
     ...overrides,
@@ -106,7 +106,7 @@ function order(overrides: Partial<OrderSummary> = {}): unknown {
     id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
     orderNumber: "AK-2026-00412",
     status: "PAID",
-    currency: "EUR",
+    currency: "COP",
     grandTotal: 5_490,
     itemCount: 2,
     placedAt: "2026-08-28T09:00:00.000Z",
@@ -160,7 +160,7 @@ describe("AdminCustomerDetailPage", () => {
 
     // The figures the agent opened the page for survive the scoped failure.
     expect(screen.getByText("Valor total")).toBeInTheDocument();
-    expect(screen.getByText(/964,20/)).toBeInTheDocument();
+    expect(screen.getByText(/964\.200/)).toBeInTheDocument();
     // …and the failure is announced, without the API's own English.
     expect(screen.getByRole("alert")).toBeInTheDocument();
     expect(screen.getByText("No hemos podido cargar el historial")).toBeInTheDocument();
@@ -210,7 +210,7 @@ describe("AdminCustomerDetailPage", () => {
 
     await renderPage();
 
-    expect(screen.getByText(/24\.000\.000,00/)).toBeInTheDocument();
+    expect(screen.getByText(/24\.000\.000/)).toBeInTheDocument();
     expect(screen.queryByText("2400000000")).toBeNull();
   });
 

@@ -7,8 +7,8 @@ import {
   type AdminShippingZoneDetail,
   type Locale,
   type ShippingAdminFailureReason,
-  type ShippingDeliveryType,
   type ShippingStrategy,
+  SHIPPING_RATE_CURRENCY,
 } from "@akai/contracts";
 
 import {
@@ -30,13 +30,13 @@ import type {
  * failure mode cannot ship without copy.
  *
  * MONEY GOES THROUGH `money-input.ts` ONLY — the same string-arithmetic parser
- * the product and discount forms use. Grams and days go through the same
- * `parseScaledDecimal` at exponent 0, so "1.000" (a Spanish thousands
- * separator) is refused rather than read as one gram.
+ * the product and discount forms use, in whole pesos for COP ("15000" or
+ * "15.000"). Grams and days go through `parseScaledDecimal` at exponent 0, so
+ * "1.000" (a thousands separator) is refused rather than read as one gram.
  */
 
-/** The store sells, and charges shipping, in euros only. */
-export const SHIPPING_CURRENCY = "EUR";
+/** The store sells, and charges shipping, in Colombian pesos only. */
+export const SHIPPING_CURRENCY = SHIPPING_RATE_CURRENCY;
 
 export type RateFormError =
   | ScaledDecimalError
@@ -44,9 +44,7 @@ export type RateFormError =
   | "TOO_LONG"
   | "BOUNDS_ORDER"
   | "NOT_POSITIVE"
-  | "TRANSIT_ORDER"
-  | "CARRIER_REQUIRED"
-  | "INVALID_CARRIER";
+  | "TRANSIT_ORDER";
 
 export type RateField =
   | "nameEs"
@@ -55,8 +53,6 @@ export type RateField =
   | "maxValue"
   | "priceGross"
   | "freeOverSubtotal"
-  | "carrierCode"
-  | "sendcloudOptionCode"
   | "transitDaysMin"
   | "transitDaysMax";
 
@@ -67,16 +63,13 @@ export interface RateFormValues {
   readonly nameEs: string;
   readonly nameEn: string;
   readonly strategy: ShippingStrategy;
-  /** WEIGHT: whole grams. PRICE: euros ("49,99"). Ignored for FLAT. */
+  /** WEIGHT: whole grams. PRICE: whole pesos ("300000" / "300.000"). Ignored for FLAT. */
   readonly minValue: string;
   readonly maxValue: string;
   readonly priceGross: string;
   /** "" disables the threshold. */
   readonly freeOverSubtotal: string;
   readonly isActive: boolean;
-  readonly deliveryType: ShippingDeliveryType;
-  readonly carrierCode: string;
-  readonly sendcloudOptionCode: string;
   readonly transitDaysMin: string;
   readonly transitDaysMax: string;
 }
@@ -86,8 +79,6 @@ export type RateBuildResult =
   | { readonly ok: false; readonly errors: RateFieldErrors };
 
 const NAME_MAX = 120;
-const OPTION_CODE_MAX = 128;
-const CARRIER_CODE = /^[a-z0-9_]{1,64}$/;
 const WEIGHT_MAX_GRAMS = 1_000_000;
 const TRANSIT_MAX_DAYS = 60;
 
@@ -101,9 +92,6 @@ export function emptyRateValues(): RateFormValues {
     priceGross: "",
     freeOverSubtotal: "",
     isActive: true,
-    deliveryType: "SERVICE_POINT",
-    carrierCode: "",
-    sendcloudOptionCode: "",
     transitDaysMin: "",
     transitDaysMax: "",
   };
@@ -128,9 +116,6 @@ export function rateToValues(rate: AdminShippingRate): RateFormValues {
         ? ""
         : formatMinorAsInput(rate.freeOverSubtotal, SHIPPING_CURRENCY),
     isActive: rate.isActive,
-    deliveryType: rate.deliveryType,
-    carrierCode: rate.carrierCode ?? "",
-    sendcloudOptionCode: rate.sendcloudOptionCode ?? "",
     transitDaysMin: rate.transitDaysMin === null ? "" : String(rate.transitDaysMin),
     transitDaysMax: rate.transitDaysMax === null ? "" : String(rate.transitDaysMax),
   };
@@ -206,17 +191,6 @@ export function buildRatePayload(values: RateFormValues): RateBuildResult {
     errors.transitDaysMax = "TRANSIT_ORDER";
   }
 
-  const carrier = values.carrierCode.trim();
-  if (carrier === "") {
-    // Checkout searches pickup points BY CARRIER; without one it cannot.
-    if (values.deliveryType === "SERVICE_POINT") errors.carrierCode = "CARRIER_REQUIRED";
-  } else if (!CARRIER_CODE.test(carrier)) {
-    errors.carrierCode = "INVALID_CARRIER";
-  }
-
-  const optionCode = values.sendcloudOptionCode.trim();
-  if (optionCode.length > OPTION_CODE_MAX) errors.sendcloudOptionCode = "TOO_LONG";
-
   if (
     Object.keys(errors).length > 0 ||
     !price.ok ||
@@ -240,9 +214,6 @@ export function buildRatePayload(values: RateFormValues): RateBuildResult {
       currency: SHIPPING_CURRENCY,
       freeOverSubtotal: freeOver.value,
       isActive: values.isActive,
-      deliveryType: values.deliveryType,
-      carrierCode: carrier === "" ? null : carrier,
-      sendcloudOptionCode: optionCode === "" ? null : optionCode,
       transitDaysMin: transitMin.value,
       transitDaysMax: transitMax.value,
     },
@@ -347,7 +318,7 @@ export interface ThresholdMismatch {
 }
 
 /**
- * Spec §7a: once the threshold is editable, the marquee's "250 €" is a PROMISE
+ * Once the threshold is editable, the marquee's "$ 300.000" is a PROMISE
  * the rates may stop keeping. Informational only — nothing is blocked; a store
  * running a different threshold on purpose just gets told the copy disagrees.
  */

@@ -13,7 +13,6 @@ import {
   createShippingZoneAction,
   deleteShippingRateAction,
   deleteShippingZoneAction,
-  listSendcloudOptionsAction,
   updateShippingRateAction,
   updateShippingZoneAction,
 } from "@/lib/admin/actions";
@@ -22,7 +21,7 @@ import { listShippingZones } from "@/lib/admin/shipping-api";
 import { createServerApiClient } from "@/lib/api/client";
 
 /**
- * Shipping zones and rates — staff-editable (Sendcloud spec §7a, decision D8).
+ * Shipping zones and rates — staff-editable.
  *
  * A server component that reads `GET /admin/shipping/zones` once and hands the
  * list to ONE client boundary, the category-manager shape: a store has a
@@ -77,7 +76,6 @@ export default async function AdminShippingPage({
         onCreateRate={createShippingRateAction}
         onUpdateRate={updateShippingRateAction}
         onDeleteRate={deleteShippingRateAction}
-        loadSendcloudOptions={listSendcloudOptionsAction}
       />
     </PageTemplate>
   );

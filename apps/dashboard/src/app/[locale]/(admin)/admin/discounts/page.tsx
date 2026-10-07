@@ -132,7 +132,7 @@ export default async function AdminDiscountsPage({
     ? undefined
     : page.items.find((discount) => discount.id === selectedId);
 
-  const counts = new Intl.NumberFormat(locale === "es" ? "es-ES" : "en-IE");
+  const counts = new Intl.NumberFormat(locale === "es" ? "es-CO" : "en-US");
 
   /**
    * Defined here rather than at module scope so it closes over `t`: next-intl's

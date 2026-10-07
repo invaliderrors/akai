@@ -11,12 +11,12 @@ import { TotalsList, type TotalsListProps } from "./totals-list";
  * there, which is the default this component has to get right.
  */
 const BASE: TotalsListProps = {
-  currency: "EUR",
+  currency: "COP",
   locale: "es",
-  subtotal: { label: "Subtotal", amount: toMinor(7980) },
-  shipping: { label: "Envío", amount: toMinor(495) },
-  taxIncluded: { label: "IVA incluido", amount: toMinor(1558) },
-  total: { label: "Total", amount: toMinor(8980) },
+  subtotal: { label: "Subtotal", amount: toMinor(7_980_000) },
+  shipping: { label: "Envío", amount: toMinor(1_500_000) },
+  taxIncluded: { label: "IVA incluido", amount: toMinor(1_514_622) },
+  total: { label: "Total", amount: toMinor(9_480_000) },
 };
 
 function renderTotals(props: Partial<TotalsListProps> = {}): HTMLElement {
@@ -73,10 +73,10 @@ describe("<TotalsList />", () => {
   it("renders each figure against its own label", () => {
     renderTotals();
 
-    expect(text(valueFor(screen.getByText("Subtotal")))).toBe("79,80 €");
-    expect(text(valueFor(screen.getByText("Envío")))).toBe("4,95 €");
-    expect(text(valueFor(screen.getByText("IVA incluido")))).toBe("15,58 €");
-    expect(text(valueFor(screen.getByText("Total")))).toBe("89,80 €");
+    expect(text(valueFor(screen.getByText("Subtotal")))).toBe("$ 79.800");
+    expect(text(valueFor(screen.getByText("Envío")))).toBe("$ 15.000");
+    expect(text(valueFor(screen.getByText("IVA incluido")))).toBe("$ 15.146");
+    expect(text(valueFor(screen.getByText("Total")))).toBe("$ 94.800");
   });
 
   it("omits a zero discount and a zero refund entirely", () => {
@@ -99,29 +99,29 @@ describe("<TotalsList />", () => {
 
     // Free delivery is information the customer wants; its absence would read
     // as a missing line rather than a waived charge.
-    expect(text(valueFor(screen.getByText("Envío")))).toBe("0,00 €");
+    expect(text(valueFor(screen.getByText("Envío")))).toBe("$ 0");
   });
 
   it("renders a discount and a refund as deductions when they are non-zero", () => {
     renderTotals({
-      discount: { label: "Descuento", amount: toMinor(1200) },
-      refunded: { label: "Reembolsado", amount: toMinor(2990) },
+      discount: { label: "Descuento", amount: toMinor(1_200_000) },
+      refunded: { label: "Reembolsado", amount: toMinor(2_990_000) },
     });
 
-    expect(text(valueFor(screen.getByText("Descuento")))).toBe("−12,00 €");
-    expect(text(valueFor(screen.getByText("Reembolsado")))).toBe("−29,90 €");
+    expect(text(valueFor(screen.getByText("Descuento")))).toBe("−$ 12.000");
+    expect(text(valueFor(screen.getByText("Reembolsado")))).toBe("−$ 29.900");
   });
 
   it("normalises a deduction that arrives already negated", () => {
     // The API returns non-negative magnitudes, but a consumer that had negated
     // one itself must not end up with a discount that ADDS to the bill.
-    renderTotals({ discount: { label: "Descuento", amount: toMinor(-1200) } });
+    renderTotals({ discount: { label: "Descuento", amount: toMinor(-1_200_000) } });
 
-    expect(text(valueFor(screen.getByText("Descuento")))).toBe("−12,00 €");
+    expect(text(valueFor(screen.getByText("Descuento")))).toBe("−$ 12.000");
   });
 
   it("puts the refund after the total, where it reads as 'of which'", () => {
-    const list = renderTotals({ refunded: { label: "Reembolsado", amount: toMinor(2990) } });
+    const list = renderTotals({ refunded: { label: "Reembolsado", amount: toMinor(2_990_000) } });
     const terms = Array.from(list.querySelectorAll("dt"), (term) => term.textContent);
 
     expect(terms).toEqual(["Subtotal", "Envío", "IVA incluido", "Total", "Reembolsado"]);
@@ -166,9 +166,9 @@ describe("<TotalsList />", () => {
   it("renders the figures in the same locale it is given", () => {
     renderTotals({
       locale: "en",
-      subtotal: { label: "Subtotal", amount: toMinor(4821490) },
+      subtotal: { label: "Subtotal", amount: toMinor(482_149_000) },
     });
 
-    expect(text(valueFor(screen.getByText("Subtotal")))).toBe("€48,214.90");
+    expect(text(valueFor(screen.getByText("Subtotal")))).toBe("$4,821,490");
   });
 });

@@ -28,7 +28,7 @@ import esMessages from "../../../../../messages/es.json";
  *     spellings failed on exactly those values — `toMinor` THROWS above the cap
  *     (this page branded five aggregates that way) and the deleted metrics
  *     route's `isMinor(x) ? formatMoney(x) : String(x)` printed a bare
- *     `2400000000`. The cap is €20m; a shop that reaches it is a shop whose
+ *     `2400000000`. The cap is $20m COP; a shop that reaches it is a shop whose
  *     dashboard used to break.
  *  2. The attention tile appears only when an order actually needs a decision.
  *     The treatment is rationed to two uses in the whole product, and one spent
@@ -80,7 +80,7 @@ vi.mock("@/lib/admin/api", () => ({
 
 const { default: AdminOverviewPage } = await import("./page");
 
-/** €20m is `MINOR_MAX`; €24m is the figure both superseded code paths broke on. */
+/** $20m COP is `MINOR_MAX`; $24m is the figure both superseded code paths broke on. */
 const OVER_CAP_MINOR = 2_400_000_000;
 
 function revenue(overrides: Partial<MetricsOverview["revenue"]> = {}): MetricsOverview["revenue"] {
@@ -90,7 +90,7 @@ function revenue(overrides: Partial<MetricsOverview["revenue"]> = {}): MetricsOv
     netTotal: OVER_CAP_MINOR,
     orderCount: 614,
     averageOrderValue: 8_454,
-    currency: "EUR",
+    currency: "COP",
     from: "2026-08-11T00:00:00.000Z",
     to: "2026-09-10T00:00:00.000Z",
     ...overrides,
@@ -101,7 +101,7 @@ const RECENT_ORDER: RecentOrder = {
   orderNumber: "AK-2026-000412",
   status: "PAYMENT_MISMATCH",
   grandTotal: 5_985,
-  currency: "EUR",
+  currency: "COP",
   placedAt: "2026-09-09T10:15:00.000Z",
   customerId: null,
 };
@@ -185,9 +185,9 @@ describe("AdminOverviewPage", () => {
   it("renders an over-cap aggregate as a currency figure, never a bare integer", async () => {
     const { container } = await renderOverview();
 
-    // €24,000,000.00 — above MINOR_MAX, which is precisely where `toMinor`
+    // $ 24.000.000 COP — above MINOR_MAX, which is precisely where `toMinor`
     // threw and where the `isMinor` fallback printed the raw minor units.
-    expect(text(container)).toContain("24.000.000,00 €");
+    expect(text(container)).toContain("$ 24.000.000");
     expect(text(container)).not.toContain(String(OVER_CAP_MINOR));
   });
 
@@ -229,7 +229,7 @@ describe("AdminOverviewPage", () => {
     const { container } = await renderOverview();
 
     // The whole point of Promise.allSettled: one dead query, the rest live.
-    expect(text(container)).toContain("24.000.000,00 €");
+    expect(text(container)).toContain("$ 24.000.000");
     expect(screen.getAllByRole("alert").length).toBeGreaterThan(0);
     // And the failure is the panel's own, not the page's: the other two tables
     // are still on screen with their headings.
@@ -381,7 +381,7 @@ describe("AdminOverviewPage", () => {
 
       const { container } = await renderOverview();
 
-      expect(text(container)).toContain("24.000.000,00 €");
+      expect(text(container)).toContain("$ 24.000.000");
       expect(screen.getByText("dailyRevenueErrorTitle")).toBeInTheDocument();
     });
   });
@@ -396,7 +396,7 @@ describe("AdminOverviewPage", () => {
 
       await renderOverview();
 
-      expect(screen.getByText("33,3 %")).toBeInTheDocument();
+      expect(screen.getByText("33,3%")).toBeInTheDocument();
     });
 
     it("fails independently of the revenue tiles", async () => {
@@ -406,7 +406,7 @@ describe("AdminOverviewPage", () => {
 
       const { container } = await renderOverview();
 
-      expect(text(container)).toContain("24.000.000,00 €");
+      expect(text(container)).toContain("$ 24.000.000");
       expect(screen.getByText("repeatRateErrorTitle")).toBeInTheDocument();
     });
 

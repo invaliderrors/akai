@@ -93,7 +93,7 @@ describe("ReturnRequestForm", () => {
       expect.stringContaining("AK-2026-000124"),
     ]);
     // Minor units formatted through `@akai/money`, never a raw 12098.
-    expect(options[0]?.textContent).toContain("120,98");
+    expect(options[0]?.textContent).toContain("120.980");
     expect(options[0]?.textContent).not.toContain("12098");
   });
 

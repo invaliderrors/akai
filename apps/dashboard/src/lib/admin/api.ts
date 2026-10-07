@@ -30,6 +30,9 @@ import {
   type UpdateSiteSettings,
   adminCustomerSchema,
   adminOrderSchema,
+  shipmentSchema,
+  type CreateShipment,
+  type Shipment,
   categoryListResponseSchema,
   categorySchema,
   emailEventSchema,
@@ -482,7 +485,7 @@ export interface AdminOrderListParams {
   readonly status?: string;
   readonly email?: string;
   readonly orderNumber?: string;
-  /** Fulfilment state (`orderShippingFilterSchema`): NO_LABEL / LABEL_CREATED / IN_TRANSIT / ISSUE. */
+  /** Fulfilment state (`orderShippingFilterSchema`): NOT_SHIPPED / IN_TRANSIT / ISSUE. */
   readonly shipping?: string;
   readonly cursor?: string;
   readonly limit?: number;
@@ -517,8 +520,8 @@ export async function getOrder(
     path: `/admin/orders/${orderNumber}`,
   });
   // `adminOrderSchema`, not `orderSchema`: the admin endpoints send the
-  // staff-only fulfilment fields (shipment provider, label, failure detail),
-  // which the strict customer shape would reject.
+  // staff-only fields (shipment timestamps, the chosen rate id), which the
+  // strict customer shape would reject.
   return parseOrThrow(adminOrderSchema, response);
 }
 
@@ -533,8 +536,8 @@ export async function transitionOrder(
     body,
   });
   // `adminOrderSchema`, not `orderSchema`: the admin endpoints send the
-  // staff-only fulfilment fields (shipment provider, label, failure detail),
-  // which the strict customer shape would reject.
+  // staff-only fields (shipment timestamps, the chosen rate id), which the
+  // strict customer shape would reject.
   return parseOrThrow(adminOrderSchema, response);
 }
 
@@ -560,6 +563,33 @@ export async function requestRefund(
     idempotencyKey,
   });
   return parseOrThrow(refundSchema, response);
+}
+
+/**
+ * Record a parcel by hand: carrier and tracking number as typed, the lines it
+ * carries. No Idempotency-Key: the API refuses shipping more units than remain,
+ * so a double submit is a 409, not a second parcel.
+ */
+export async function createShipment(
+  http: AdminHttp,
+  orderNumber: string,
+  body: CreateShipment,
+): Promise<Shipment> {
+  const response = await http.request({
+    method: "POST",
+    path: `/admin/orders/${orderNumber}/shipments`,
+    body,
+  });
+  return parseOrThrow(shipmentSchema, response);
+}
+
+/** Mark one parcel delivered. Idempotent server-side: a delivered parcel stays delivered. */
+export async function markShipmentDelivered(http: AdminHttp, shipmentId: string): Promise<Shipment> {
+  const response = await http.request({
+    method: "POST",
+    path: `/admin/orders/shipments/${shipmentId}/delivered`,
+  });
+  return parseOrThrow(shipmentSchema, response);
 }
 
 // ---------------------------------------------------------------------------

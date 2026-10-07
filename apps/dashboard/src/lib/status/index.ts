@@ -147,23 +147,10 @@ export const STATUS_TONE: StatusVocabulary = {
   },
   shipment: {
     PENDING: "neutral",
-    // Sendcloud states (spec 2026-09-24-sendcloud-shipping §3.7). A bought
-    // label the carrier has not scanned is still waiting on us: neutral.
-    LABEL_CREATED: "neutral",
     IN_TRANSIT: "progress",
-    // At the pickup point — moving, but now waiting on the CUSTOMER.
-    AWAITING_PICKUP: "progress",
     DELIVERED: "success",
     RETURNED: "warning",
-    // A carrier problem an operator should look at, but not the solid-red
-    // `attention` tone: that is capped at two entries (see above), and a
-    // parcel exception is recoverable in the ordinary course.
-    EXCEPTION: "warning",
-    // Label announcement refused — no parcel exists; retry or ship by hand.
-    FAILED: "danger",
     LOST: "danger",
-    // A cancelled (credited) label — routine, like payment.CANCELLED.
-    CANCELLED: "neutral",
   },
   return: {
     // The operator, not the customer, owes the next move — but nothing is wrong

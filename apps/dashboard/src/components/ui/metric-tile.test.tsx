@@ -127,7 +127,7 @@ describe("<MetricTile />", () => {
     const { container } = renderTile(
       <MetricTile
         label="Ingresos netos"
-        value={{ kind: "money", amountMinor: 4_821_490, currency: "EUR", locale: "es" }}
+        value={{ kind: "money", amountMinor: 4_821_490, currency: "COP", locale: "es" }}
         delta={{ value: "8,2 %", direction: "up", sentiment: "positive", directionLabel: "sube" }}
         footnote="Bruto menos reembolsos."
       />,
@@ -148,11 +148,11 @@ describe("<MetricTile />", () => {
     const { container } = renderTile(
       <MetricTile
         label="Ingresos totales"
-        value={{ kind: "money", amountMinor: 2_400_000_000, currency: "EUR", locale: "es" }}
+        value={{ kind: "money", amountMinor: 2_400_000_000, currency: "COP", locale: "es" }}
       />,
     );
 
-    expect(text(container)).toContain("24.000.000,00 €");
+    expect(text(container)).toContain("$ 24.000.000");
     expect(container.textContent).not.toContain("2400000000");
   });
 

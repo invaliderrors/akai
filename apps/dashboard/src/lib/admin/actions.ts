@@ -18,13 +18,12 @@ import {
   type OfferEverywhereResult,
   type OrderStatus,
   type UpdateSiteSettings,
-  countryCodeSchema,
+  createShipmentSchema,
   idSchema,
   type AdminShippingRate,
   type AdminShippingZoneDetail,
-  type SendcloudOptionsResponse,
-  type BulkLabelResult,
-  type CancelLabelResult,
+  type CreateShipment,
+  type ShipmentStatus,
 } from "@akai/contracts";
 import { apiBaseUrl, createApiClient } from "../api/client";
 import { refresh as refreshTokens } from "../api/auth";
@@ -34,7 +33,6 @@ import { createAdminHttp } from "./http-adapter";
 import { AdminApiError, type AdminHttp, type AdminHttpRequest } from "./http";
 import * as api from "./api";
 import * as shippingApi from "./shipping-api";
-import * as fulfilmentApi from "./fulfilment-api";
 import {
   mergeBlogTranslations,
   toBlogTranslationTexts,
@@ -1101,124 +1099,40 @@ export async function deleteShippingRateAction(
   });
 }
 
-/**
- * The rate editor's Sendcloud option picker, read on demand from the client —
- * an action rather than a page-level fetch because it depends on which zone's
- * editor is open, and only that one is worth a vendor call.
- */
-export async function listSendcloudOptionsAction(
-  country: string,
-): Promise<ActionResult<SendcloudOptionsResponse>> {
-  return run(async () => {
-    const code = countryCodeSchema.parse(country);
-    const http = await adminHttp();
-    return shippingApi.listSendcloudOptions(http, code);
-  });
-}
-
 // ---------------------------------------------------------------------------
-// Fulfilment — Sendcloud labels (spec 2026-09-24-sendcloud-shipping §3.6, §7)
+// Shipments — recorded by hand (carrier and tracking number as free text)
 // ---------------------------------------------------------------------------
 
 /**
- * The raw (non-JSON) admin transport, with the same single refresh-and-retry
- * on a 401 that `adminHttp` gives JSON calls. For the two label endpoints that
- * answer a PDF or a redirect.
+ * "Marcar como enviado": record a parcel for the given lines. The API refuses
+ * shipping more units than remain, so two operators on one order cannot
+ * double-ship it, and walks the order PAID → FULFILLING → SHIPPED.
  */
-async function adminRawHttp(): Promise<fulfilmentApi.AdminRawHttp> {
-  const session = await getSession();
-  const raw = fulfilmentApi.createAdminRawHttp(apiBaseUrl(), session?.accessToken ?? null);
-  if (session === null) {
-    return raw;
-  }
-  return {
-    async request(input) {
-      const response = await raw.request(input);
-      if (response.status !== 401) {
-        return response;
-      }
-      const refreshed = await refreshSession(session);
-      if (refreshed === null) {
-        return response;
-      }
-      return fulfilmentApi.createAdminRawHttp(apiBaseUrl(), refreshed.accessToken).request(input);
-    },
-  };
-}
-
-/**
- * "Generar etiquetas" — one call for one or many orders. Answers at once with
- * the accepted / skipped split; the labels are bought by the outbox job.
- * The Idempotency-Key is the CLIENT's (one click = one key across retries).
- */
-export async function generateLabelsAction(
-  orderIds: readonly string[],
-  idempotencyKey: string,
-): Promise<ActionResult<BulkLabelResult>> {
-  return run(async () => {
-    const ids = fulfilmentApi.parseGenerateOrderIds(orderIds);
-    const key = fulfilmentApi.parseIdempotencyKey(idempotencyKey);
-    const http = await adminHttp();
-    const result = await fulfilmentApi.generateLabels(http, ids, key);
-    revalidatePath("/admin/orders");
-    return result;
-  });
-}
-
-/** What the print action hands the browser: the PDF as base64, plus the tally. */
-export interface PrintedLabelsPayload {
-  readonly pdfBase64: string;
-  readonly count: number;
-  readonly skippedOrderIds: readonly string[];
-}
-
-/**
- * "Imprimir etiquetas" — the merged PDF of the stored labels, in the order
- * given. Read-only, so no Idempotency-Key. Base64 because an action's result
- * crosses the wire as React's serialisation, and a string is the form every
- * version of it carries intact.
- */
-export async function printLabelsAction(
-  orderIds: readonly string[],
-): Promise<ActionResult<PrintedLabelsPayload>> {
-  return run(async () => {
-    const ids = fulfilmentApi.parsePrintOrderIds(orderIds);
-    const printed = await fulfilmentApi.printLabels(await adminRawHttp(), ids);
-    return {
-      pdfBase64: Buffer.from(printed.pdf).toString("base64"),
-      count: printed.count,
-      skippedOrderIds: printed.skippedOrderIds,
-    };
-  });
-}
-
-export async function cancelLabelAction(
-  shipmentId: string,
+export async function createShipmentAction(
   orderNumber: string,
-  idempotencyKey: string,
-): Promise<ActionResult<CancelLabelResult>> {
+  input: CreateShipment,
+): Promise<ActionResult<{ shipmentId: string }>> {
   return run(async () => {
-    const id = fulfilmentApi.parseShipmentId(shipmentId);
-    const key = fulfilmentApi.parseIdempotencyKey(idempotencyKey);
+    const body = createShipmentSchema.parse(input);
     const http = await adminHttp();
-    const result = await fulfilmentApi.cancelLabel(http, id, key);
+    const shipment = await api.createShipment(http, orderNumber, body);
     revalidatePath("/admin/orders");
     revalidatePath(`/admin/orders/${orderNumber}`);
-    return result;
+    return { shipmentId: shipment.id };
   });
 }
 
-export async function retryLabelAction(
+/** Mark one parcel delivered; the API completes the order once every parcel is. */
+export async function markShipmentDeliveredAction(
   shipmentId: string,
   orderNumber: string,
-  idempotencyKey: string,
-): Promise<ActionResult<BulkLabelResult>> {
+): Promise<ActionResult<{ status: ShipmentStatus }>> {
   return run(async () => {
-    const id = fulfilmentApi.parseShipmentId(shipmentId);
-    const key = fulfilmentApi.parseIdempotencyKey(idempotencyKey);
+    const id = idSchema.parse(shipmentId);
     const http = await adminHttp();
-    const result = await fulfilmentApi.retryLabel(http, id, key);
+    const shipment = await api.markShipmentDelivered(http, id);
+    revalidatePath("/admin/orders");
     revalidatePath(`/admin/orders/${orderNumber}`);
-    return result;
+    return { status: shipment.status };
   });
 }

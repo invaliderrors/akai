@@ -76,28 +76,28 @@ describe("buildDiscountPayload — the type-overloaded value", () => {
     expect(Number.isInteger(result.value.value)).toBe(true);
   });
 
-  it("converts a fixed amount into MINOR UNITS", () => {
+  it("converts a fixed amount in whole pesos into MINOR UNITS (centavos)", () => {
     const result = buildDiscountPayload(
-      validValues({ type: "FIXED_AMOUNT", value: "5.00" }),
+      validValues({ type: "FIXED_AMOUNT", value: "5000" }),
       "create",
     );
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value.value).toBe(500);
+    expect(result.value.value).toBe(500_000);
   });
 
-  it("pads a short fraction rather than truncating it", () => {
-    // "5.5" read as 55 would take €0.55 off instead of €5.50 — a tenfold error
-    // from a single missing zero, in the direction the customer notices least.
+  it("reads a dot as the thousands separator in pesos, never as a decimal", () => {
+    // "5.000" read as 5 pesos would take $5 off instead of $5.000 — a
+    // thousandfold error, in the direction the customer notices least.
     const result = buildDiscountPayload(
-      validValues({ type: "FIXED_AMOUNT", value: "5.5" }),
+      validValues({ type: "FIXED_AMOUNT", value: "5.000" }),
       "create",
     );
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value.value).toBe(550);
+    expect(result.value.value).toBe(500_000);
   });
 
   it("sends zero for FREE_SHIPPING, whatever is in the value box", () => {

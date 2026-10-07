@@ -38,7 +38,7 @@ export function formatAmount(
  * visibly changes after the page loads.
  */
 export function formatDate(isoDateTime: string, locale: Locale): string {
-  return new Intl.DateTimeFormat(locale === "es" ? "es-ES" : "en-IE", {
+  return new Intl.DateTimeFormat(locale === "es" ? "es-CO" : "en-US", {
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -47,7 +47,7 @@ export function formatDate(isoDateTime: string, locale: Locale): string {
 }
 
 export function formatDateTime(isoDateTime: string, locale: Locale): string {
-  return new Intl.DateTimeFormat(locale === "es" ? "es-ES" : "en-IE", {
+  return new Intl.DateTimeFormat(locale === "es" ? "es-CO" : "en-US", {
     day: "2-digit",
     month: "short",
     year: "numeric",

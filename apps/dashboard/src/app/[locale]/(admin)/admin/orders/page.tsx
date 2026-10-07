@@ -3,7 +3,6 @@ import type { AdminOrderSummary, OrderStatus } from "@akai/contracts";
 import { orderStatusSchema } from "@akai/contracts";
 
 import { AdminErrorState } from "@/components/admin/admin-error-state";
-import { OrderBulkActions } from "@/components/admin/order-bulk-actions";
 import { buttonClassName } from "@/components/ui/button";
 import { FilterBar, single, type FilterField } from "@/components/ui/filter-bar";
 import { Money } from "@/components/ui/money";
@@ -17,10 +16,7 @@ import { Link } from "@/i18n/navigation";
 import { listOrders } from "@/lib/admin/api";
 import { createAdminHttp } from "@/lib/admin/http-adapter";
 import { createServerApiClient } from "@/lib/api/client";
-import { SHIPPING_FILTERS, asShippingFilter } from "@/lib/admin/fulfilment-display";
-
-/** The form the row checkboxes submit with — `OrderBulkActions` renders it. */
-const SELECTION_FORM = "orders-label-selection";
+import { SHIPPING_FILTERS, asShippingFilter } from "@/lib/admin/shipment-display";
 
 /**
  * The operator order list.
@@ -34,15 +30,13 @@ const SELECTION_FORM = "orders-label-selection";
  *
  * FOUR FILTERS, BECAUSE THE API SERVES FOUR. `adminOrderSummarySchema` is
  * `.strict()` — id, orderNumber, status, currency, grandTotal, itemCount,
- * placedAt and the newest `shipment` (Sendcloud spec §7, which also added the
- * `shipping` filter and the Envío column) — so the artboard's Cliente (email)
+ * placedAt and the newest `shipment` (which backs the `shipping` filter and the
+ * Envío column) — so the artboard's Cliente (email)
  * column, its separate Pago column, its Desde/Hasta range and its CSV export
  * are all drawn against data that does not arrive here.
  *
- * ROW SELECTION + LABEL ACTIONS. The checkboxes are server-rendered form
- * controls bound to `OrderBulkActions`' form (see `ui/table-selection.tsx`),
- * so the table stays a server component; only the action bar is a client
- * island. Email stays as a FILTER, which
+ * NO ROW SELECTION: shipping is recorded per order, by hand, on the detail
+ * page — there is no bulk label action any more. Email stays as a FILTER, which
  * it genuinely is server-side: support conversations start from an address far
  * more often than from an order number, and forcing staff through a UUID is
  * what drives people to query the database by hand.
@@ -133,8 +127,8 @@ export default async function AdminOrdersPage({
       width: "lg",
     },
     {
-      // Sendcloud spec §3.6: "Sin etiqueta" is the to-do list for the label
-      // printer; "Incidencia" is the one for a human.
+      // "Sin enviar" is the packing to-do list; "Incidencia" is the one for a
+      // human (a returned or lost parcel).
       kind: "select",
       name: "shipping",
       label: tFulfilment("shippingLabel"),
@@ -172,7 +166,7 @@ export default async function AdminOrdersPage({
       // The NEWEST parcel only — the detail page has the history.
       cell: (order) =>
         order.shipment === null ? (
-          <span className="text-[var(--label-secondary)]" aria-label={tFulfilment("shippingFilter.NO_LABEL")}>
+          <span className="text-[var(--label-secondary)]" aria-label={tFulfilment("shippingFilter.NOT_SHIPPED")}>
             —
           </span>
         ) : (
@@ -242,7 +236,6 @@ export default async function AdminOrdersPage({
   // position to report and no page to step to, so it would be a row of dead
   // controls under a "nothing matches" message.
   const showPagination = page.items.length > 0 || cursorStack(query["cursor"]).length > 0;
-  const orderNumbers = Object.fromEntries(page.items.map((order) => [order.id, order.orderNumber]));
 
   return (
     <PageTemplate
@@ -264,21 +257,11 @@ export default async function AdminOrdersPage({
         />
       }
     >
-      {page.items.length === 0 ? null : (
-        <div className="mb-3">
-          <OrderBulkActions formId={SELECTION_FORM} orderNumbers={orderNumbers} />
-        </div>
-      )}
       <DataTable
         caption={t("tableLabel")}
         columns={columns}
         rows={page.items}
         rowKey={(order) => order.id}
-        selection={{
-          form: SELECTION_FORM,
-          header: tFulfilment("selectAll"),
-          label: (order) => tFulfilment("selectOrder", { orderNumber: order.orderNumber }),
-        }}
         /*
          * ONE OF EXACTLY TWO SANCTIONED USES of the attention treatment in the
          * whole product (the other is zero-available stock on an ACTIVE

@@ -44,8 +44,8 @@ describe("OrderDetailView", () => {
       // Both fixture lines have quantity 1, so unit price and line total are the
       // same figure and legitimately appear twice per row. Asserting "at least
       // one" would pass even if the line-total column stopped rendering.
-      expect(screen.getAllByText(/89,99/)).toHaveLength(2);
-      expect(screen.getAllByText(/24,99/)).toHaveLength(2);
+      expect(screen.getAllByText(/89\.990/)).toHaveLength(2);
+      expect(screen.getAllByText(/24\.990/)).toHaveLength(2);
     });
   });
 
@@ -54,15 +54,15 @@ describe("OrderDetailView", () => {
       renderDetail();
 
       const summary = screen.getByRole("region", { name: "Resumen" });
-      expect(within(summary).getByText(/114,98/)).toBeInTheDocument(); // subtotal
-      expect(within(summary).getByText(/−4,00/)).toBeInTheDocument(); // discount
-      expect(within(summary).getByText(/10,00/)).toBeInTheDocument(); // shipping
-      expect(within(summary).getByText(/19,96/)).toBeInTheDocument(); // tax
-      expect(within(summary).getByText(/120,98/)).toBeInTheDocument(); // grand total
+      expect(within(summary).getByText(/114\.980/)).toBeInTheDocument(); // subtotal
+      expect(within(summary).getByText(/−\$\s4\.000/)).toBeInTheDocument(); // discount
+      expect(within(summary).getByText(/10\.000/)).toBeInTheDocument(); // shipping
+      expect(within(summary).getByText(/18\.358/)).toBeInTheDocument(); // tax (IVA)
+      expect(within(summary).getByText(/120\.980/)).toBeInTheDocument(); // grand total
     });
 
     it("hides the discount row when nothing was discounted", () => {
-      // A "−0,00 €" line is noise that makes customers wonder what they lost.
+      // A "−$ 0" line is noise that makes customers wonder what they lost.
       renderDetail({ order: buildOrder({ discountTotal: 0 }) });
 
       const summary = screen.getByRole("region", { name: "Resumen" });
@@ -71,14 +71,14 @@ describe("OrderDetailView", () => {
 
     it("shows a refunded row only once money has actually gone back", () => {
       renderDetail({
-        order: buildOrder({ refundedTotal: 2_499, status: "PARTIALLY_REFUNDED" }),
+        order: buildOrder({ refundedTotal: 2_499_000, status: "PARTIALLY_REFUNDED" }),
       });
 
       const summary = screen.getByRole("region", { name: "Resumen" });
       expect(within(summary).getByText("Reembolsado")).toBeInTheDocument();
       // U+2212 MINUS, not a hyphen: the figures are a tabular column and the
       // hyphen is the one glyph in it with no tabular width.
-      expect(within(summary).getByText(/−24,99/)).toBeInTheDocument();
+      expect(within(summary).getByText(/−\$\s24\.990/)).toBeInTheDocument();
     });
   });
 
@@ -180,13 +180,13 @@ describe("OrderDetailView", () => {
       renderDetail({ shipments: [buildShipment()] });
 
       const shipments = screen.getByRole("region", { name: "Envíos" });
-      // Exact match: /SEUR/ also matches the tracking number "SEUR-9981234",
+      // Exact match: a regex on the carrier could also match the tracking number,
       // so a loose regex here would pass with the carrier name missing.
-      expect(within(shipments).getByText("SEUR")).toBeInTheDocument();
-      expect(within(shipments).getByText(/SEUR-9981234/)).toBeInTheDocument();
+      expect(within(shipments).getByText("Servientrega")).toBeInTheDocument();
+      expect(within(shipments).getByText(/SV-9981234/)).toBeInTheDocument();
 
       const link = within(shipments).getByRole("link", { name: "Seguir el envío" });
-      expect(link).toHaveAttribute("href", "https://www.seur.com/track/SEUR-9981234");
+      expect(link).toHaveAttribute("href", "https://www.servientrega.com/rastreo/SV-9981234");
       // Carrier sites are third-party: never hand them window.opener.
       expect(link).toHaveAttribute("rel", expect.stringContaining("noopener"));
     });
@@ -221,6 +221,13 @@ describe("OrderDetailView", () => {
       expect(within(invoice).getByText("Factura INV-2026-000045")).toBeInTheDocument();
     });
 
+    it("shows the identity document the buyer gave at checkout", () => {
+      renderDetail({ order: buildOrder({ documentType: "NIT", documentNumber: "800197268-4" }) });
+
+      const invoice = screen.getByRole("region", { name: "Factura" });
+      expect(within(invoice).getByText("Documento: NIT 800197268-4")).toBeInTheDocument();
+    });
+
     it("offers no download, because the invoices module ships no file", () => {
       renderDetail();
 
@@ -249,8 +256,8 @@ describe("OrderDetailView", () => {
       renderDetail();
 
       const addresses = screen.getByRole("region", { name: "Direcciones" });
-      expect(within(addresses).getByText("Calle Mayor 12")).toBeInTheDocument();
-      expect(within(addresses).getByText("28013 Madrid")).toBeInTheDocument();
+      expect(within(addresses).getByText("Calle 10 # 43-21")).toBeInTheDocument();
+      expect(within(addresses).getByText("Medellín, Antioquia")).toBeInTheDocument();
     });
 
     it("says the billing address is the shipping one instead of printing it twice", () => {
@@ -260,7 +267,7 @@ describe("OrderDetailView", () => {
 
       const addresses = screen.getByRole("region", { name: "Direcciones" });
       expect(within(addresses).getByText("La misma que la de envío")).toBeInTheDocument();
-      expect(within(addresses).getAllByText("Calle Mayor 12")).toHaveLength(1);
+      expect(within(addresses).getAllByText("Calle 10 # 43-21")).toHaveLength(1);
     });
 
     it("prints both addresses when they actually differ", () => {
@@ -269,21 +276,21 @@ describe("OrderDetailView", () => {
           billingAddress: {
             firstName: "Elena",
             lastName: "Ruiz",
-            company: "Akai SL",
-            line1: "Gran Vía 3",
+            company: "Akai SAS",
+            line1: "Carrera 43A # 1-50",
             line2: null,
-            city: "Madrid",
-            region: null,
-            postalCode: "28013",
-            countryCode: "ES",
+            city: "Medellín",
+            region: "Antioquia",
+            postalCode: "050021",
+            countryCode: "CO",
             phone: null,
           },
         }),
       });
 
       const addresses = screen.getByRole("region", { name: "Direcciones" });
-      expect(within(addresses).getByText("Gran Vía 3")).toBeInTheDocument();
-      expect(within(addresses).getByText("Calle Mayor 12")).toBeInTheDocument();
+      expect(within(addresses).getByText("Carrera 43A # 1-50")).toBeInTheDocument();
+      expect(within(addresses).getByText("Calle 10 # 43-21")).toBeInTheDocument();
       expect(within(addresses).queryByText("La misma que la de envío")).not.toBeInTheDocument();
     });
 

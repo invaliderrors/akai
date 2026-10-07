@@ -153,6 +153,60 @@ describe("formatMinorAsInput", () => {
   });
 });
 
+describe("Colombian pesos — entered in whole pesos, stored in centavos", () => {
+  const COP = "COP" as CurrencyCode;
+
+  it("reads a plain whole-peso amount and stores it ×100", () => {
+    // $89.000 is 8_900_000 centavos — exactly what amount_in_cents expects.
+    expect(expectMinor("89000", COP)).toBe(8_900_000);
+    expect(expectMinor("0", COP)).toBe(0);
+    expect(expectMinor(" 15 000 ", COP)).toBe(1_500_000);
+  });
+
+  it("accepts the dot (Colombian) or comma grouping, in groups of three", () => {
+    expect(expectMinor("89.000", COP)).toBe(8_900_000);
+    expect(expectMinor("1.234.567", COP)).toBe(123_456_700);
+    expect(expectMinor("219,000", COP)).toBe(21_900_000);
+  });
+
+  it("refuses a decimal: pesos are entered without centavos", () => {
+    expect(expectError("89.5", COP)).toBe("TOO_MANY_DECIMALS");
+    expect(expectError("89,50", COP)).toBe("TOO_MANY_DECIMALS");
+  });
+
+  it("refuses malformed grouping rather than guessing", () => {
+    expect(expectError("1.23.456", COP)).toBe("GROUPING_SEPARATOR");
+    expect(expectError("89.0000", COP)).toBe("GROUPING_SEPARATOR");
+    expect(expectError("1.234,567", COP)).toBe("GROUPING_SEPARATOR");
+  });
+
+  it("keeps the money parser's other refusals", () => {
+    expect(expectError("", COP)).toBe("EMPTY");
+    expect(expectError("-5000", COP)).toBe("NEGATIVE");
+    expect(expectError("1e3", COP)).toBe("NOT_A_NUMBER");
+    expect(expectError("$89.000", COP)).toBe("NOT_A_NUMBER");
+  });
+
+  it("caps at the platform maximum, in pesos", () => {
+    // MINOR_MAX centavos is $20.000.000.
+    expect(expectMinor("20.000.000", COP)).toBe(MINOR_MAX);
+    expect(expectError("20.000.001", COP)).toBe("TOO_LARGE");
+  });
+
+  it("renders whole pesos back into the input, and round-trips", () => {
+    expect(formatMinorAsInput(toMinor(8_900_000), COP)).toBe("89000");
+    for (const amount of [0, 100, 1_500_000, 8_900_000, 30_000_000, MINOR_MAX]) {
+      expect(expectMinor(formatMinorAsInput(toMinor(amount), COP), COP)).toBe(amount);
+    }
+  });
+
+  it("shows stray centavos exactly, so the parser refuses them instead of rounding", () => {
+    const rendered = formatMinorAsInput(toMinor(8_900_050), COP);
+    expect(rendered).toBe("89000.50");
+    expect(expectError(rendered, COP)).toBe("TOO_MANY_DECIMALS");
+  });
+});
+
 describe("parsePercentageInput", () => {
   /** Unwraps a success, failing with the error code if it is not one. */
   function expectBps(raw: string): number {

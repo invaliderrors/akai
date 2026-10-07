@@ -333,7 +333,7 @@ function EmailDetail({
 /** Sent time when there is one, otherwise when the row was created. */
 function formatWhen(event: EmailEvent, locale: Locale): string {
   const iso = event.sentAt ?? event.createdAt;
-  return new Intl.DateTimeFormat(locale === "es" ? "es-ES" : "en-IE", {
+  return new Intl.DateTimeFormat(locale === "es" ? "es-CO" : "en-US", {
     dateStyle: "short",
     timeStyle: "short",
   }).format(new Date(iso));

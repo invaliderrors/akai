@@ -46,7 +46,7 @@ export const paginatedProductsSchema = paginatedSchema(productSchema);
 export type PaginatedProducts = z.infer<typeof paginatedProductsSchema>;
 
 // `adminOrderSummarySchema`: the admin list also carries each order's newest
-// shipment (Sendcloud spec §7), defaulted to null for an API that predates it.
+// shipment.
 export const paginatedOrdersSchema = paginatedSchema(adminOrderSummarySchema);
 export const paginatedCustomersSchema = paginatedSchema(adminCustomerSchema);
 
@@ -366,7 +366,7 @@ export {
 /**
  * The store's base currency, defined ONCE.
  *
- * `currencyCodeSchema.parse` rather than `"EUR" as CurrencyCode`: the cast
+ * `currencyCodeSchema.parse` rather than `"COP" as CurrencyCode`: the cast
  * asserts the brand, this earns it, and the schema is the thing that would catch
  * a typo the day someone changes this line. A discount whose `currency` is null
  * applies in any currency, so this is only the exponent used to parse an amount
@@ -376,7 +376,7 @@ export {
  * identical assumption, which still spells it as a cast in
  * `admin/products/new/page.tsx`.
  */
-export const DEFAULT_CURRENCY: CurrencyCode = currencyCodeSchema.parse("EUR");
+export const DEFAULT_CURRENCY: CurrencyCode = currencyCodeSchema.parse("COP");
 
 /**
  * The admin view of one discount code, mirroring the API's `AdminDiscount`

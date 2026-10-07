@@ -24,7 +24,7 @@ import esMessages from "../../../../../../messages/es.json";
  *     landed — pins the operator to page two: the URL changes on Next and the
  *     rows do not.
  *  3. Lifetime value renders through the UNBRANDED aggregate path. `toMinor`
- *     throws above `MINOR_MAX` (2,000,000,000 minor units — €20m), so branding
+ *     throws above `MINOR_MAX` (2,000,000,000 minor units — $20m COP), so branding
  *     it would crash this page for a successful business.
  *
  * Rendered against the REAL Spanish catalogue rather than an identity
@@ -224,7 +224,7 @@ describe("AdminCustomersPage", () => {
   });
 
   it("formats a lifetime value above MINOR_MAX instead of throwing", async () => {
-    // 24.000.000,00 € — twelve times the branded ceiling. `toMinor` would throw
+    // $ 24.000.000 COP — above the branded ceiling. `toMinor` would throw
     // here and `isMinor` would refuse to narrow, printing a bare 2400000000.
     listCustomers.mockResolvedValue(
       pageOf([customer({ lifetimeValueMinor: 2_400_000_000 })]),
@@ -232,7 +232,7 @@ describe("AdminCustomersPage", () => {
 
     await renderPage();
 
-    expect(screen.getByText(/24\.000\.000,00/)).toBeInTheDocument();
+    expect(screen.getByText(/24\.000\.000/)).toBeInTheDocument();
     expect(screen.queryByText("2400000000")).toBeNull();
   });
 

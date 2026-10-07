@@ -101,13 +101,13 @@ export const dynamic = "force-dynamic";
  * default.
  *
  * `/admin/metrics/overview` and `/admin/metrics/top-products` each filter their
- * SQL on `currency = :currency` and default it to EUR independently. Passing the
+ * SQL on `currency = :currency` and default it to COP independently. Passing the
  * same value to both is what guarantees the tiles and the best-seller column are
  * counting the same orders; the tiles themselves still format with the currency
  * the API ECHOES back, which is the authoritative answer for the window it
  * actually ran.
  */
-const REPORTING_CURRENCY = "EUR";
+const REPORTING_CURRENCY = "COP";
 
 /**
  * The one order status that needs a human, and the filter that isolates it.

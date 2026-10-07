@@ -2,7 +2,14 @@
 
 import { useId, useState, type FormEvent } from "react";
 import { useTranslations } from "next-intl";
-import type { Address, AddressType } from "@akai/contracts";
+import {
+  COLOMBIAN_DEPARTAMENTOS,
+  STORE_COUNTRY_CODE,
+  findDepartamento,
+  normaliseColombianMobile,
+  type Address,
+  type AddressType,
+} from "@akai/contracts";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import { Dialog } from "@/components/ui/overlay";
@@ -53,9 +60,9 @@ interface AddressFormState {
   readonly line1: string;
   readonly line2: string;
   readonly city: string;
+  /** A departamento's canonical name, or "" while none is chosen. */
   readonly region: string;
   readonly postalCode: string;
-  readonly countryCode: string;
   readonly phone: string;
   readonly isDefault: boolean;
 }
@@ -69,11 +76,8 @@ function initialState(address: Address | undefined): AddressFormState {
     line1: address?.line1 ?? "",
     line2: address?.line2 ?? "",
     city: address?.city ?? "",
-    region: address?.region ?? "",
+    region: address === undefined ? "" : (findDepartamento(address.region)?.name ?? ""),
     postalCode: address?.postalCode ?? "",
-    // ES rather than blank: this is a Spanish-default EU store, and a required
-    // field that starts empty is one more thing to fill in for most customers.
-    countryCode: address?.countryCode ?? "ES",
     phone: address?.phone ?? "",
     isDefault: address?.isDefault ?? false,
   };
@@ -89,8 +93,8 @@ function orNull(value: string): string | null {
  * A field pair that is two columns on a desktop sheet and two ROWS on a phone.
  *
  * Written as one class string rather than repeated per pair so the breakpoint
- * is decided once: the artboard's 400pt column has no room for a postcode and
- * a city side by side, and a pair that collapses at a different width from its
+ * is decided once: the artboard's 400pt column has no room for a departamento
+ * and a city side by side, and a pair that collapses at a different width from its
  * neighbour reads as a layout bug rather than as a responsive grid.
  */
 const PAIR = "grid gap-3.5";
@@ -122,7 +126,7 @@ export function AddressForm({ address, onSubmit, onCancel }: AddressFormProps) {
       "lastName",
       "line1",
       "city",
-      "postalCode",
+      "region",
     ];
 
     for (const key of required) {
@@ -132,10 +136,13 @@ export function AddressForm({ address, onSubmit, onCancel }: AddressFormProps) {
       }
     }
 
-    // Mirrors the contract's `countryCodeSchema`. Validated here too so the
-    // customer gets an instant answer, but the API remains the authority.
-    if (!/^[A-Za-z]{2}$/.test(form.countryCode.trim())) {
-      errors.countryCode = t("invalidCountry");
+    // Mirror the contract's Colombian rules so the customer gets an instant
+    // answer; the API remains the authority.
+    if (form.postalCode.trim() !== "" && !/^[0-9]{6}$/.test(form.postalCode.trim())) {
+      errors.postalCode = t("invalidPostalCode");
+    }
+    if (form.phone.trim() !== "" && normaliseColombianMobile(form.phone) === null) {
+      errors.phone = t("invalidPhone");
     }
 
     return errors;
@@ -161,11 +168,10 @@ export function AddressForm({ address, onSubmit, onCancel }: AddressFormProps) {
       line1: form.line1.trim(),
       line2: orNull(form.line2),
       city: form.city.trim(),
-      region: orNull(form.region),
-      postalCode: form.postalCode.trim(),
-      // Uppercased at the boundary so the ISO-3166 column and the UI agree on
-      // identity regardless of how the customer typed it.
-      countryCode: form.countryCode.trim().toUpperCase(),
+      region: form.region,
+      postalCode: orNull(form.postalCode),
+      // Colombia is the only country served: fixed, never typed.
+      countryCode: STORE_COUNTRY_CODE,
       phone: orNull(form.phone),
       isDefault: form.isDefault,
     });
@@ -297,22 +303,29 @@ export function AddressForm({ address, onSubmit, onCancel }: AddressFormProps) {
           error={fieldErrors.line2}
         />
 
-        {/* Postcode narrow, city wide — the drawn sub-grid. The postcode column
-            is wider than the artboard's 90px because our label sits ABOVE the
-            box rather than beside it, and 90px clips "Código postal". */}
-        <div className={`${PAIR} sm:grid-cols-[140px_minmax(0,1fr)]`}>
-          <TextField
-            label={t("postalCode")}
-            name="postalCode"
-            value={form.postalCode}
-            onChange={(value) => update("postalCode", value)}
-            autoComplete="postal-code"
-            required
-            disabled={isSaving}
-            maxLength={20}
-            hint={t("postalCodeHint")}
-            error={fieldErrors.postalCode}
-          />
+        {/* Departamento and city (municipio) side by side on a desktop sheet. */}
+        <div className={`${PAIR} sm:grid-cols-2`}>
+          <div className="grid gap-1">
+            <SelectField<string>
+              label={t("region")}
+              name="region"
+              value={form.region}
+              onChange={(value) => update("region", value)}
+              disabled={isSaving}
+              options={[
+                { value: "", label: t("regionPlaceholder") },
+                ...COLOMBIAN_DEPARTAMENTOS.map((departamento) => ({
+                  value: departamento.name,
+                  label: departamento.name,
+                })),
+              ]}
+            />
+            {fieldErrors.region === undefined ? null : (
+              <p role="alert" className="m-0 text-[12px] text-[var(--danger-text)]">
+                {fieldErrors.region}
+              </p>
+            )}
+          </div>
           <TextField
             label={t("city")}
             name="city"
@@ -326,41 +339,33 @@ export function AddressForm({ address, onSubmit, onCancel }: AddressFormProps) {
           />
         </div>
 
-        <TextField
-          label={t("region")}
-          name="region"
-          value={form.region}
-          onChange={(value) => update("region", value)}
-          autoComplete="address-level1"
-          disabled={isSaving}
-          maxLength={120}
-          error={fieldErrors.region}
-        />
-
         <div className={`${PAIR} sm:grid-cols-2`}>
-          <TextField
-            label={t("countryCode")}
-            name="countryCode"
-            value={form.countryCode}
-            onChange={(value) => update("countryCode", value)}
-            autoComplete="country"
-            required
-            disabled={isSaving}
-            maxLength={2}
-            error={fieldErrors.countryCode}
-          />
           <TextField
             label={t("phone")}
             name="phone"
             type="tel"
             value={form.phone}
             onChange={(value) => update("phone", value)}
-            autoComplete="tel"
+            autoComplete="tel-national"
             disabled={isSaving}
             maxLength={32}
+            hint={t("phoneHint")}
             error={fieldErrors.phone}
           />
+          <TextField
+            label={t("postalCode")}
+            name="postalCode"
+            value={form.postalCode}
+            onChange={(value) => update("postalCode", value)}
+            autoComplete="postal-code"
+            disabled={isSaving}
+            maxLength={6}
+            hint={t("postalCodeHint")}
+            error={fieldErrors.postalCode}
+          />
         </div>
+
+        <p className="m-0 text-[12px] text-[var(--label-secondary)]">{t("countryFixed")}</p>
 
         <CheckboxField
           label={t("isDefault")}

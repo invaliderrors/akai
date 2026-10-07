@@ -132,8 +132,8 @@ function addressDetail(address: Address): string {
     `${address.firstName} ${address.lastName}`,
     address.company,
     address.line2,
-    `${address.postalCode} ${address.city}`,
-    address.region,
+    `${address.city}, ${address.region}`,
+    address.postalCode,
     address.countryCode,
     address.phone,
   ]
