@@ -2,6 +2,7 @@ import {
   addCartItemSchema,
   cartSchema,
   checkoutSessionResponseSchema,
+  confirmPaymentRequestSchema,
   createCheckoutSessionSchema,
   orderStatusResponseSchema,
   shippingQuoteRequestSchema,
@@ -102,7 +103,7 @@ export class CartClient {
     return data;
   }
 
-  /** Creates the order and returns the hosted (Whop) checkout URL to go to. */
+  /** Creates the order and returns the signed Wompi Web Checkout URL to go to. */
   async startCheckout(input: z.input<typeof createCheckoutSessionSchema>, idempotencyKey: string) {
     const { data } = await apiRequest({
       baseUrl: this.apiUrl,
@@ -120,6 +121,22 @@ export class CartClient {
       baseUrl: this.apiUrl,
       path: `/payments/orders/${encodeURIComponent(orderNumber)}/status`,
       schema: orderStatusResponseSchema,
+    });
+    return data;
+  }
+
+  /**
+   * Hands back the transaction id Wompi put on the return URL. The API reads
+   * that transaction from Wompi itself and answers with the same status body as
+   * `orderStatus`.
+   */
+  async confirmPayment(orderNumber: string, transactionId: string) {
+    const { data } = await apiRequest({
+      baseUrl: this.apiUrl,
+      method: "POST",
+      path: `/payments/orders/${encodeURIComponent(orderNumber)}/confirm`,
+      schema: orderStatusResponseSchema,
+      body: confirmPaymentRequestSchema.parse({ transactionId }),
     });
     return data;
   }

@@ -114,6 +114,10 @@ const es = {
     waiting: "Estamos confirmando tu pago. No cierres esta página.",
     paid: "¡Pago confirmado! Te hemos enviado un email con los detalles.",
     failed: "El pago no se completó. Tu carrito sigue disponible.",
+    pending:
+      "Tu pago sigue en proceso (puede tardar con PSE, Nequi o transferencia). Te escribiremos por email en cuanto se confirme; puedes cerrar esta página.",
+    review:
+      "Estamos revisando tu pago. No intentes pagar de nuevo: te contactaremos por email en breve.",
     order: "Pedido",
   },
   footer: { tagline: "赤い — streetwear de inspiración japonesa.", rights: "Todos los derechos reservados." },
@@ -218,6 +222,10 @@ const en: Messages = {
     waiting: "We're confirming your payment. Please keep this page open.",
     paid: "Payment confirmed! We've emailed you the details.",
     failed: "The payment didn't go through. Your cart is still available.",
+    pending:
+      "Your payment is still processing (PSE, Nequi or bank transfers can take a while). We'll email you as soon as it's confirmed; you can close this page.",
+    review:
+      "We're reviewing your payment. Please don't pay again — we'll email you shortly.",
     order: "Order",
   },
   footer: { tagline: "赤い — Japanese-inspired streetwear.", rights: "All rights reserved." },
