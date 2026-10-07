@@ -133,7 +133,7 @@ describe.skipIf(!isDockerAvailable())("Cart packs — stored rows, codes and ava
         id: variantId,
         productId: id,
         sku: slug.toUpperCase(),
-        currency: "EUR",
+        currency: "COP",
         taxRateBps: 2100,
         ...prices(gross),
       },

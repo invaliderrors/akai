@@ -55,7 +55,7 @@ describe.skipIf(!isDockerAvailable())("Inventory adjust — expectedOnHand and u
         id: VARIANT_ID,
         productId: PRODUCT_ID,
         sku: "AK-TEE-BLK-L",
-        currency: "EUR",
+        currency: "COP",
         priceNet: 4131,
         priceTax: 868,
         priceGross: 4999,

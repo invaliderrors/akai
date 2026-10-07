@@ -171,7 +171,7 @@ describe.skipIf(!isDockerAvailable())("Catalog search — ranking, word starts, 
         data: {
           productId: created.id,
           sku: product.sku,
-          currency: "EUR",
+          currency: "COP",
           taxRateBps: 2100,
           priceNet: 1000,
           priceTax: 210,
