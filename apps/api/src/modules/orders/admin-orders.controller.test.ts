@@ -106,7 +106,7 @@ function createOrdersServiceStub(): Record<string, ReturnType<typeof vi.fn>> {
     transitionByAdmin: vi.fn(async () => ({ orderNumber: "AK-2026-000123" })),
     createShipment: vi.fn(async () => ({ id: "shipment" })),
     markShipmentDelivered: vi.fn(async () => ({ id: "shipment" })),
-    requestRefund: vi.fn(async () => ({ id: "refund" })),
+    recordRefund: vi.fn(async () => ({ id: "refund" })),
   };
 }
 

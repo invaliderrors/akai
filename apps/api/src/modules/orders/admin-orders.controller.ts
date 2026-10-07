@@ -115,18 +115,19 @@ export class AdminOrdersController {
 
   @Post(":orderNumber/refunds")
   @ApiOperation({
-    summary: "Request a refund against a settled payment",
+    summary: "Record a refund made in the Wompi dashboard",
     description:
-      "Records intent and reserves the amount against the refundable balance. " +
-      "It does NOT move money and does NOT change the order status — the order " +
-      "reaches REFUNDED only when the provider confirms, via settleRefund.",
+      "Wompi has no refund API for Web Checkout payments: staff refund in the " +
+      "Wompi dashboard, then record it here. Writes a SUCCEEDED refund, moves " +
+      "refundedTotal and the order to PARTIALLY_REFUNDED / REFUNDED, and emails " +
+      "the customer. Bounded by what was captured.",
   })
-  async requestRefund(
+  async recordRefund(
     @Param("orderNumber", new ZodValidationPipe(orderNumberParamSchema))
     orderNumber: string,
     @Body(new ZodValidationPipe(createRefundRequestSchema)) body: CreateRefundRequest,
     @CurrentUser() actor: Principal,
   ): Promise<Refund> {
-    return this.orders.requestRefund(orderNumber, body, actor);
+    return this.orders.recordRefund(orderNumber, body, actor);
   }
 }

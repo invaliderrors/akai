@@ -6,7 +6,7 @@ import { ORDER_STATUS_TRANSITIONS, type OrderStatus } from "@akai/contracts";
  *
  * This file is the only place that decides whether a status change is legal.
  * Nothing else in the platform may write `order.status` (spec §13) — not the
- * Whop webhook, not an admin controller, not a fulfilment job. They all route
+ * Wompi settlement, not an admin controller, not a fulfilment job. They all route
  * through `assertTransition`.
  *
  * The transition table itself is deliberately NOT redeclared here: it is
@@ -112,7 +112,7 @@ export function isPaidStatus(status: OrderStatus): boolean {
  * security-relevant part of this file:
  *
  *  - PAID is absent because an order becomes PAID ONLY via a signature-verified
- *    Whop webhook whose reported amount matched. If an operator
+ *    Wompi transaction whose reported amount matched. If an operator
  *    could set PAID by hand, the "did the
  *    money actually arrive" question would have two answers, and the one an
  *    operator can click is forgeable by anyone who gets a staff session.

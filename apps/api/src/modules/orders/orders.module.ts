@@ -11,20 +11,19 @@ import { OrdersService } from "./orders.service";
  * OrdersModule.
  *
  * OWNS: the order state machine. Nothing else in the platform may write
- * `order.status` — not the Whop webhook, not a fulfilment job, not an admin
+ * `order.status` — not the Wompi settlement, not a fulfilment job, not an admin
  * controller. They all call into OrdersService, which is why it is exported.
  *
  * The exported surface is deliberately the SERVICE, not a repository. The
  * methods that other modules need (`createFromCart`, `markPaid`,
- * `settleRefund`) each enforce an invariant on the way through — a legal
+ * `recordRefund`) each enforce an invariant on the way through — a legal
  * transition, a gap-free invoice number, a refund that cannot exceed what was
  * paid. Exporting raw data access instead would let a caller skip every one of
  * them, and "the webhook handler updated status directly, just this once" is how
  * a state machine stops being one.
  *
- * Expected consumers: CheckoutModule (createFromCart), the Whop webhook
- * plane in PaymentsModule (markPaid), RefundsModule (settleRefund),
- * FulfilmentModule (shipments).
+ * Expected consumers: CheckoutModule (createFromCart), the admin refund record
+ * (recordRefund), FulfilmentModule (shipments).
  */
 // PrismaModule is @Global (see its own comment), so it is deliberately NOT
 // imported here — an explicit import would be ceremony that adds no safety.

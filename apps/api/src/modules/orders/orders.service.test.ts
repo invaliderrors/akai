@@ -468,7 +468,7 @@ describe("OrdersService — markPaid", () => {
   });
 
   /**
-   * Whop retries webhooks up to 12 times and guarantees no ordering. A
+   * Wompi retries events and guarantees no ordering. A
    * second `payment/succeeded` for an already-PAID order must be a
    * no-op, not a 409 (which makes the provider retry forever) and above all not a
    * second invoice number — invoice numbering is legally required to be
@@ -589,45 +589,163 @@ describe("OrdersService — markPaid commits reserved stock", () => {
   });
 });
 
-describe("OrdersService — refunds", () => {
+describe("OrdersService — recording a refund made in the Wompi dashboard", () => {
   let harness: ReturnType<typeof createPrismaFake>;
   let service: OrdersService;
 
-  const payment = { id: "ffffffff-0000-4000-8000-000000000001", status: "SUCCEEDED" };
+  const payment = {
+    id: "ffffffff-0000-4000-8000-000000000001",
+    status: "SUCCEEDED",
+    amount: 10_000,
+  };
+
+  function refundRow(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+    return {
+      id: "ffffffff-0000-4000-8000-0000000000aa",
+      paymentId: payment.id,
+      orderId: ORDER_ID,
+      status: "SUCCEEDED",
+      reason: "REQUESTED_BY_CUSTOMER",
+      amount: 10_000,
+      currency: "COP",
+      providerRefundId: null,
+      note: null,
+      createdAt: new Date("2026-07-02T00:00:00.000Z"),
+      completedAt: new Date("2026-07-02T00:00:00.000Z"),
+      ...overrides,
+    };
+  }
+
+  function paidOrder(
+    overrides: OrderRowOverrides = {},
+    refunds: readonly Record<string, unknown>[] = [],
+  ): void {
+    harness.order.findUnique.mockResolvedValue({
+      ...orderRow({ status: "PAID", grandTotal: 10_000, refundedTotal: 0, version: 4, ...overrides }),
+      payments: [payment],
+      refunds,
+    });
+  }
 
   beforeEach(async () => {
     harness = createPrismaFake();
     service = await buildService(harness.fake);
+    harness.refund.findUnique.mockResolvedValue(null);
+    harness.refund.create.mockResolvedValue(refundRow());
   });
 
-  it("refuses to refund more than the order's remaining balance", async () => {
-    harness.order.findUnique.mockResolvedValue({
-      ...orderRow({ status: "PAID", grandTotal: 10_000, refundedTotal: 0 }),
-      payments: [payment],
-      refunds: [],
+  it("records a full refund as SUCCEEDED and moves the order to REFUNDED", async () => {
+    paidOrder();
+
+    const refund = await service.recordRefund(
+      ORDER_NUMBER,
+      { reason: "REQUESTED_BY_CUSTOMER", restockVariantIds: [] },
+      STAFF,
+    );
+
+    expect(refund.status).toBe("SUCCEEDED");
+    expect(harness.refund.create.mock.calls[0]?.[0]).toMatchObject({
+      data: { amount: 10_000, status: "SUCCEEDED", paymentId: payment.id, actorId: STAFF.customerId },
     });
+    expect(harness.order.updateMany.mock.calls[0]?.[0]).toMatchObject({
+      where: { id: ORDER_ID, status: "PAID", version: 4 },
+      data: { status: "REFUNDED", refundedTotal: 10_000 },
+    });
+  });
+
+  it("lands on PARTIALLY_REFUNDED for a partial refund", async () => {
+    paidOrder();
+
+    await service.recordRefund(
+      ORDER_NUMBER,
+      { amount: 2500, reason: "DAMAGED", restockVariantIds: [] },
+      STAFF,
+    );
+
+    expect(harness.order.updateMany.mock.calls[0]?.[0]).toMatchObject({
+      data: { status: "PARTIALLY_REFUNDED", refundedTotal: 2500 },
+    });
+  });
+
+  it("keeps a second partial in PARTIALLY_REFUNDED without a self-transition", async () => {
+    paidOrder({ status: "PARTIALLY_REFUNDED", refundedTotal: 2500 }, [
+      { amount: 2500, status: "SUCCEEDED", paymentId: payment.id },
+    ]);
+
+    await service.recordRefund(
+      ORDER_NUMBER,
+      { amount: 1000, reason: "DAMAGED", restockVariantIds: [] },
+      STAFF,
+    );
+
+    expect(harness.order.updateMany).not.toHaveBeenCalled();
+    expect(harness.order.update.mock.calls[0]?.[0]).toMatchObject({
+      data: { refundedTotal: 3500 },
+    });
+  });
+
+  it("defaults an omitted amount to the remaining refundable balance", async () => {
+    paidOrder({ refundedTotal: 2500 }, [{ amount: 2500, status: "SUCCEEDED", paymentId: payment.id }]);
+
+    await service.recordRefund(
+      ORDER_NUMBER,
+      { reason: "REQUESTED_BY_CUSTOMER", restockVariantIds: [] },
+      STAFF,
+    );
+
+    expect(harness.refund.create.mock.calls[0]?.[0]).toMatchObject({ data: { amount: 7500 } });
+  });
+
+  it("refuses to record more than the order's remaining balance", async () => {
+    paidOrder();
 
     await expect(
-      service.requestRefund(
+      service.recordRefund(
         ORDER_NUMBER,
         { amount: 10_001, reason: "REQUESTED_BY_CUSTOMER", restockVariantIds: [] },
         STAFF,
       ),
     ).rejects.toBeInstanceOf(ConflictException);
-
     expect(harness.refund.create).not.toHaveBeenCalled();
   });
 
-  /** The double-spend guard: two operators refunding the same order at once. */
-  it("counts an in-flight PENDING refund against the balance", async () => {
+  it("refuses to record more than the payment captured", async () => {
     harness.order.findUnique.mockResolvedValue({
-      ...orderRow({ status: "PAID", grandTotal: 10_000, refundedTotal: 0 }),
-      payments: [payment],
-      refunds: [{ amount: 6000, status: "PENDING" }],
+      ...orderRow({ status: "PAYMENT_MISMATCH", grandTotal: 10_000 }),
+      // Wompi captured less than the order total (the mismatch).
+      payments: [{ ...payment, amount: 6000 }],
+      refunds: [],
     });
 
     await expect(
-      service.requestRefund(
+      service.recordRefund(
+        ORDER_NUMBER,
+        { amount: 7000, reason: "OTHER", restockVariantIds: [] },
+        STAFF,
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it("lets an operator resolve a PAYMENT_MISMATCH order by refunding it", async () => {
+    harness.order.findUnique.mockResolvedValue({
+      ...orderRow({ status: "PAYMENT_MISMATCH", grandTotal: 10_000, version: 2 }),
+      payments: [payment],
+      refunds: [],
+    });
+
+    await service.recordRefund(ORDER_NUMBER, { reason: "OTHER", restockVariantIds: [] }, STAFF);
+
+    expect(harness.order.updateMany.mock.calls[0]?.[0]).toMatchObject({
+      where: { status: "PAYMENT_MISMATCH" },
+      data: { status: "REFUNDED" },
+    });
+  });
+
+  it("still counts a legacy PENDING refund against the balance", async () => {
+    paidOrder({}, [{ amount: 6000, status: "PENDING", paymentId: payment.id }]);
+
+    await expect(
+      service.recordRefund(
         ORDER_NUMBER,
         { amount: 5000, reason: "REQUESTED_BY_CUSTOMER", restockVariantIds: [] },
         STAFF,
@@ -635,75 +753,7 @@ describe("OrdersService — refunds", () => {
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
-  it("defaults an omitted amount to the remaining refundable balance", async () => {
-    harness.order.findUnique.mockResolvedValue({
-      ...orderRow({ status: "PAID", grandTotal: 10_000, refundedTotal: 2500 }),
-      payments: [payment],
-      refunds: [],
-    });
-    harness.refund.create.mockResolvedValue({
-      id: "ffffffff-0000-4000-8000-0000000000aa",
-      paymentId: payment.id,
-      orderId: ORDER_ID,
-      status: "PENDING",
-      reason: "REQUESTED_BY_CUSTOMER",
-      amount: 7500,
-      currency: "EUR",
-      providerRefundId: null,
-      note: null,
-      createdAt: new Date("2026-07-02T00:00:00.000Z"),
-      completedAt: null,
-    });
-
-    await service.requestRefund(
-      ORDER_NUMBER,
-      { reason: "REQUESTED_BY_CUSTOMER", restockVariantIds: [] },
-      STAFF,
-    );
-
-    expect(harness.refund.create.mock.calls[0]?.[0]).toMatchObject({
-      data: { amount: 7500, status: "PENDING" },
-    });
-  });
-
-  /**
-   * The request records INTENT. If it also moved refundedTotal or set the order
-   * to REFUNDED, the customer would be told their money was returned before it
-   * left our account — and they act on that: they leave, they chargeback, they
-   * post about it.
-   */
-  it("does not move money or status when a refund is merely requested", async () => {
-    harness.order.findUnique.mockResolvedValue({
-      ...orderRow({ status: "PAID", grandTotal: 10_000 }),
-      payments: [payment],
-      refunds: [],
-    });
-    harness.refund.create.mockResolvedValue({
-      id: "ffffffff-0000-4000-8000-0000000000aa",
-      paymentId: payment.id,
-      orderId: ORDER_ID,
-      status: "PENDING",
-      reason: "DAMAGED",
-      amount: 1000,
-      currency: "EUR",
-      providerRefundId: null,
-      note: null,
-      createdAt: new Date("2026-07-02T00:00:00.000Z"),
-      completedAt: null,
-    });
-
-    const refund = await service.requestRefund(
-      ORDER_NUMBER,
-      { amount: 1000, reason: "DAMAGED", restockVariantIds: [] },
-      STAFF,
-    );
-
-    expect(refund.status).toBe("PENDING");
-    expect(harness.order.updateMany).not.toHaveBeenCalled();
-    expect(harness.order.update).not.toHaveBeenCalled();
-  });
-
-  it("refuses a refund on an order that was never paid", async () => {
+  it("refuses an order that was never paid", async () => {
     harness.order.findUnique.mockResolvedValue({
       ...orderRow({ status: "AWAITING_PAYMENT" }),
       payments: [],
@@ -711,7 +761,7 @@ describe("OrdersService — refunds", () => {
     });
 
     await expect(
-      service.requestRefund(
+      service.recordRefund(
         ORDER_NUMBER,
         { reason: "REQUESTED_BY_CUSTOMER", restockVariantIds: [] },
         STAFF,
@@ -719,7 +769,7 @@ describe("OrdersService — refunds", () => {
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
-  it("refuses a refund with no settled payment behind it", async () => {
+  it("refuses an order with no settled payment behind it", async () => {
     harness.order.findUnique.mockResolvedValue({
       ...orderRow({ status: "PAID" }),
       payments: [],
@@ -727,7 +777,7 @@ describe("OrdersService — refunds", () => {
     });
 
     await expect(
-      service.requestRefund(
+      service.recordRefund(
         ORDER_NUMBER,
         { reason: "REQUESTED_BY_CUSTOMER", restockVariantIds: [] },
         STAFF,
@@ -735,114 +785,46 @@ describe("OrdersService — refunds", () => {
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
-  it("moves the order to REFUNDED only when the refund settles in full", async () => {
-    harness.refund.findUnique.mockResolvedValue({
-      id: "ffffffff-0000-4000-8000-0000000000aa",
-      orderId: ORDER_ID,
-      paymentId: payment.id,
-      status: "PENDING",
-      amount: 10_000,
-      currency: "EUR",
-    });
-    harness.order.findUnique
-      .mockResolvedValueOnce(orderRow({ status: "PAID", grandTotal: 10_000, version: 4 }))
-      .mockResolvedValue(detailRow({ status: "REFUNDED" }));
-    harness.refund.update.mockResolvedValue({
-      id: "ffffffff-0000-4000-8000-0000000000aa",
-      paymentId: payment.id,
-      orderId: ORDER_ID,
-      status: "SUCCEEDED",
-      reason: "REQUESTED_BY_CUSTOMER",
-      amount: 10_000,
-      currency: "EUR",
-      providerRefundId: "re_123",
-      note: null,
-      createdAt: new Date("2026-07-02T00:00:00.000Z"),
-      completedAt: new Date("2026-07-03T00:00:00.000Z"),
+  it("stores the Wompi reference, and refuses one already recorded", async () => {
+    paidOrder();
+
+    await service.recordRefund(
+      ORDER_NUMBER,
+      { amount: 1000, reason: "DAMAGED", providerRefundId: "wompi-ref-1", restockVariantIds: [] },
+      STAFF,
+    );
+    expect(harness.refund.create.mock.calls[0]?.[0]).toMatchObject({
+      data: { providerRefundId: "wompi-ref-1" },
     });
 
-    await service.settleRefund({
-      refundId: "ffffffff-0000-4000-8000-0000000000aa",
-      providerRefundId: "re_123",
-    });
-
-    expect(harness.order.updateMany.mock.calls[0]?.[0]).toMatchObject({
-      where: { id: ORDER_ID, status: "PAID", version: 4 },
-      data: { status: "REFUNDED", refundedTotal: 10_000 },
-    });
+    harness.refund.findUnique.mockResolvedValue({ id: "existing" });
+    await expect(
+      service.recordRefund(
+        ORDER_NUMBER,
+        { amount: 1000, reason: "DAMAGED", providerRefundId: "wompi-ref-1", restockVariantIds: [] },
+        STAFF,
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
   });
 
-  it("lands on PARTIALLY_REFUNDED for a partial settlement", async () => {
-    harness.refund.findUnique.mockResolvedValue({
-      id: "ffffffff-0000-4000-8000-0000000000ab",
-      orderId: ORDER_ID,
-      paymentId: payment.id,
-      status: "PENDING",
-      amount: 2500,
-      currency: "EUR",
-    });
-    harness.order.findUnique
-      .mockResolvedValueOnce(orderRow({ status: "PAID", grandTotal: 10_000, version: 1 }))
-      .mockResolvedValue(detailRow({ status: "PARTIALLY_REFUNDED" }));
-    harness.refund.update.mockResolvedValue({
-      id: "ffffffff-0000-4000-8000-0000000000ab",
-      paymentId: payment.id,
-      orderId: ORDER_ID,
-      status: "SUCCEEDED",
-      reason: "DAMAGED",
-      amount: 2500,
-      currency: "EUR",
-      providerRefundId: null,
-      note: null,
-      createdAt: new Date("2026-07-02T00:00:00.000Z"),
-      completedAt: new Date("2026-07-03T00:00:00.000Z"),
-    });
+  it("writes a customer-visible timeline entry and queues the refund email, in the transaction", async () => {
+    paidOrder();
 
-    await service.settleRefund({ refundId: "ffffffff-0000-4000-8000-0000000000ab" });
-
-    expect(harness.order.updateMany.mock.calls[0]?.[0]).toMatchObject({
-      data: { status: "PARTIALLY_REFUNDED", refundedTotal: 2500 },
-    });
-  });
-
-  it("is idempotent for a refund that already settled", async () => {
-    harness.refund.findUnique.mockResolvedValue({
-      id: "ffffffff-0000-4000-8000-0000000000aa",
-      paymentId: payment.id,
-      orderId: ORDER_ID,
-      status: "SUCCEEDED",
-      reason: "DAMAGED",
-      amount: 2500,
-      currency: "EUR",
-      providerRefundId: "re_123",
-      note: null,
-      createdAt: new Date("2026-07-02T00:00:00.000Z"),
-      completedAt: new Date("2026-07-03T00:00:00.000Z"),
-    });
-
-    await service.settleRefund({ refundId: "ffffffff-0000-4000-8000-0000000000aa" });
-
-    // The provider re-delivers this event; refundedTotal must not double.
-    expect(harness.order.updateMany).not.toHaveBeenCalled();
-    expect(harness.order.update).not.toHaveBeenCalled();
-  });
-
-  it("refuses to settle a refund that would exceed the order total", async () => {
-    harness.refund.findUnique.mockResolvedValue({
-      id: "ffffffff-0000-4000-8000-0000000000ac",
-      orderId: ORDER_ID,
-      paymentId: payment.id,
-      status: "PENDING",
-      amount: 9000,
-      currency: "EUR",
-    });
-    harness.order.findUnique.mockResolvedValue(
-      orderRow({ status: "PARTIALLY_REFUNDED", grandTotal: 10_000, refundedTotal: 5000 }),
+    await service.recordRefund(
+      ORDER_NUMBER,
+      { amount: 2500, reason: "DAMAGED", restockVariantIds: [] },
+      STAFF,
     );
 
-    await expect(
-      service.settleRefund({ refundId: "ffffffff-0000-4000-8000-0000000000ac" }),
-    ).rejects.toBeInstanceOf(ConflictException);
+    expect(harness.orderEvent.create.mock.calls[0]?.[0]).toMatchObject({
+      data: { type: "REFUND_RECORDED", isInternal: false },
+    });
+    expect(harness.outboxMessage.create.mock.calls[0]?.[0]).toMatchObject({
+      data: {
+        topic: "email",
+        payload: { templateKey: "refund-confirmation", amount: 2500, orderNumber: ORDER_NUMBER },
+      },
+    });
   });
 });
 

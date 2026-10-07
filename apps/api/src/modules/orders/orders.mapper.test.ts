@@ -91,7 +91,6 @@ function orderRow(overrides: Partial<OrderWithDetail> = {}): OrderWithDetail {
     documentNumber: "1020304050",
     shippingMethodName: "Envío nacional",
     acceptedTermsVersion: "2026-01",
-    providerCheckoutId: "cs_test_123",
     shippingRateId: null,
     placedAt: PLACED,
     paidAt: new Date("2026-07-01T10:05:00.000Z"),

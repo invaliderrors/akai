@@ -90,10 +90,12 @@ import type { Principal } from "../auth/security/principal";
  *     zero rows and therefore a 404 — never a 403, which would confirm the order
  *     exists and let an attacker enumerate order numbers (they are sequential).
  *
- *  3. MONEY STATE CHANGES ONLY ON CONFIRMATION. An order becomes PAID via
- *     `markPaid` (webhook-driven) and REFUNDED via `settleRefund`
- *     (webhook-driven). The operator-facing endpoints record intent; they never
- *     assert that money moved.
+ *  3. MONEY STATE CHANGES ONLY ON CONFIRMATION. An order becomes PAID only
+ *     through the Wompi settlement (a verified event or a transaction read back
+ *     with the private key). It becomes REFUNDED through `recordRefund`, which
+ *     records a refund an operator ALREADY made in the Wompi dashboard — Wompi
+ *     has no refund API for Web Checkout payments, so the money-moving step is
+ *     a human one and this is its ledger entry.
  */
 
 const ORDER_DETAIL_INCLUDE = {
@@ -187,11 +189,6 @@ export interface MarkPaidInput {
   readonly orderId: string;
   readonly providerCheckoutToken?: string;
   readonly paidAt?: Date;
-}
-
-export interface SettleRefundInput {
-  readonly refundId: string;
-  readonly providerRefundId?: string;
 }
 
 @Injectable()
@@ -794,7 +791,7 @@ export class OrdersService {
   }
 
   /**
-   * The ONLY path to PAID. Called by the Whop webhook handler, never by a
+   * The ONLY path to PAID. Called by a payment settlement, never by a
    * controller.
    *
    * Idempotent by design: providers retry webhooks aggressively and deliver
@@ -1176,11 +1173,29 @@ export class OrdersService {
   // -------------------------------------------------------------------------
 
   /**
-   * Record an INTENT to refund. Deliberately does not touch `refundedTotal` or
-   * the order status — see the DTO comment. The actual gateway call belongs to
-   * RefundsModule, driven off this row through the outbox.
+   * RECORD a refund an operator has ALREADY made in the Wompi dashboard.
+   *
+   * Wompi's public API has no refund endpoint for Web Checkout payments, so
+   * money goes back by hand, there, and this is the ledger catching up — in ONE
+   * transaction: a SUCCEEDED refund row against the settled payment,
+   * `refundedTotal`, the order's move to PARTIALLY_REFUNDED or REFUNDED (derived
+   * from the amounts, never chosen), a timeline entry and the customer's
+   * refund-confirmation email.
+   *
+   * The same ceilings the provider-driven path enforced:
+   *   - only an order whose money settled (or one parked in PAYMENT_MISMATCH,
+   *     which an operator most likely resolves by refunding it);
+   *   - never more than `grandTotal - refundedTotal - pending` (a PENDING row
+   *     from before this change still counts against the balance);
+   *   - never more than the settled payment captured, less what was already
+   *     refunded against it;
+   *   - a Wompi reference recorded once (`providerRefundId` is unique).
+   *
+   * The order row is re-read and the status written under optimistic
+   * concurrency, so two operators recording at once cannot both pass the
+   * ceiling: the loser 409s against fresh state.
    */
-  async requestRefund(
+  async recordRefund(
     orderNumber: string,
     body: CreateRefundRequest,
     actor: Principal,
@@ -1191,13 +1206,13 @@ export class OrdersService {
           where: { orderNumber },
           include: {
             payments: { where: { status: "SUCCEEDED" }, orderBy: { createdAt: "desc" } },
-            refunds: { where: { status: "PENDING" } },
+            refunds: { where: { status: { in: ["PENDING", "SUCCEEDED"] } } },
           },
         }),
         "Order",
       );
 
-      if (!isPaidStatus(order.status)) {
+      if (!isPaidStatus(order.status) && order.status !== "PAYMENT_MISMATCH") {
         throw new ConflictException(
           `Order ${orderNumber} is ${order.status}; there is nothing to refund.`,
         );
@@ -1210,14 +1225,20 @@ export class OrdersService {
         );
       }
 
-      // Pending refunds count against the balance. If they did not, two
-      // operators clicking "refund" in the same minute would each pass an
-      // independent check and together refund more than was ever paid.
-      const pendingTotal = order.refunds.reduce((total, row) => total + row.amount, 0);
-      const remaining = refundableRemaining(
-        toMinor(order.grandTotal),
-        toMinor(order.refundedTotal),
-        toMinor(pendingTotal),
+      const pendingTotal = order.refunds
+        .filter((row) => row.status === "PENDING")
+        .reduce((total, row) => total + row.amount, 0);
+      const refundedAgainstPayment = order.refunds
+        .filter((row) => row.status === "SUCCEEDED" && row.paymentId === payment.id)
+        .reduce((total, row) => total + row.amount, 0);
+
+      const remaining = Math.min(
+        refundableRemaining(
+          toMinor(order.grandTotal),
+          toMinor(order.refundedTotal),
+          toMinor(pendingTotal),
+        ),
+        Math.max(0, payment.amount - refundedAgainstPayment - pendingTotal),
       );
 
       if (remaining <= 0) {
@@ -1233,88 +1254,39 @@ export class OrdersService {
         );
       }
 
+      if (body.providerRefundId !== undefined) {
+        const duplicate = await tx.refund.findUnique({
+          where: { providerRefundId: body.providerRefundId },
+          select: { id: true },
+        });
+        if (duplicate !== null) {
+          throw new ConflictException(
+            `Wompi refund ${body.providerRefundId} is already recorded.`,
+          );
+        }
+      }
+
       const refund = await tx.refund.create({
         data: {
           paymentId: payment.id,
           orderId: order.id,
-          status: "PENDING",
+          status: "SUCCEEDED",
           reason: body.reason,
           amount,
           currency: order.currency,
+          providerRefundId: body.providerRefundId ?? null,
           note: body.note ?? null,
           actorId: actor.customerId,
-        },
-      });
-
-      await tx.orderEvent.create({
-        data: {
-          orderId: order.id,
-          type: "REFUND_REQUESTED",
-          message: `Refund of ${amount} ${order.currency} requested (${body.reason}).`,
-          isInternal: true,
-          actorId: actor.customerId,
-        },
-      });
-
-      return toRefundDto(refund);
-    });
-  }
-
-  /**
-   * Settle a refund once the provider confirms the money moved. Webhook-driven,
-   * never reachable from a controller.
-   *
-   * This is where `refundedTotal` moves and where the order reaches REFUNDED or
-   * PARTIALLY_REFUNDED — derived from the amounts, never chosen by a caller,
-   * which is what keeps the refund ledger and the order status from disagreeing.
-   */
-  async settleRefund(input: SettleRefundInput): Promise<Refund> {
-    return this.prisma.$transaction(async (tx) => {
-      const refund = assertFound(
-        await tx.refund.findUnique({ where: { id: input.refundId } }),
-        "Refund",
-      );
-
-      // Idempotent: the provider will re-deliver this event.
-      if (refund.status === "SUCCEEDED") {
-        return toRefundDto(refund);
-      }
-      if (refund.status !== "PENDING") {
-        throw new ConflictException(
-          `Refund ${refund.id} is ${refund.status} and cannot be settled.`,
-        );
-      }
-
-      const order = assertFound(
-        await tx.order.findUnique({ where: { id: refund.orderId } }),
-        "Order",
-      );
-
-      const refundedTotal = order.refundedTotal + refund.amount;
-      if (refundedTotal > order.grandTotal) {
-        throw new ConflictException(
-          `Settling refund ${refund.id} would refund ${refundedTotal} against a ` +
-            `${order.grandTotal} order.`,
-        );
-      }
-
-      const settled = await tx.refund.update({
-        where: { id: refund.id },
-        data: {
-          status: "SUCCEEDED",
           completedAt: new Date(),
-          ...(input.providerRefundId === undefined
-            ? {}
-            : { providerRefundId: input.providerRefundId }),
         },
       });
 
+      const refundedTotal = order.refundedTotal + amount;
       const nextStatus = statusAfterRefund(refundedTotal, order.grandTotal);
 
       // A second partial refund leaves the order in PARTIALLY_REFUNDED, and
       // PARTIALLY_REFUNDED -> PARTIALLY_REFUNDED is not an edge in the table.
-      // Skip the transition rather than widen the table: a self-edge would make
-      // every other guard in the machine weaker to solve a bookkeeping detail.
+      // Skip the transition rather than widen the table.
       if (nextStatus === order.status) {
         await tx.order.update({
           where: { id: order.id },
@@ -1334,13 +1306,31 @@ export class OrdersService {
       await tx.orderEvent.create({
         data: {
           orderId: order.id,
-          type: "REFUND_SETTLED",
-          message: `Refund of ${refund.amount} ${refund.currency} completed.`,
+          type: "REFUND_RECORDED",
+          message:
+            `Refund of ${amount} ${order.currency} made in the Wompi dashboard (${body.reason})` +
+            (body.providerRefundId === undefined ? "." : `, Wompi reference ${body.providerRefundId}.`),
           isInternal: false,
+          actorId: actor.customerId,
         },
       });
 
-      return toRefundDto(settled);
+      await tx.outboxMessage.create({
+        data: {
+          topic: "email",
+          payload: {
+            templateKey: "refund-confirmation",
+            orderId: order.id,
+            orderNumber: order.orderNumber,
+            locale: order.locale,
+            recipient: order.email,
+            amount,
+            currency: order.currency,
+          },
+        },
+      });
+
+      return toRefundDto(refund);
     });
   }
 

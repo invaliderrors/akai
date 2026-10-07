@@ -169,7 +169,7 @@ describe("statusAfterRefund", () => {
   });
 
   it("treats an over-refund as fully refunded rather than inventing a status", () => {
-    // The amount guard lives in settleRefund, which refuses to over-refund at
+    // The amount guard lives in recordRefund, which refuses to over-refund at
     // all. Should one ever slip through, REFUNDED is the safe reading — the
     // customer has had at least their money back.
     expect(statusAfterRefund(5001, 5000)).toBe("REFUNDED");

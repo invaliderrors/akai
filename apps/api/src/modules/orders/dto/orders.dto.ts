@@ -105,24 +105,24 @@ export const createShipmentRequestSchema = z
 export type CreateShipmentRequest = z.infer<typeof createShipmentRequestSchema>;
 
 /**
- * A refund REQUEST. Note what this does and does not do.
+ * A refund RECORD: money an operator has ALREADY given back in the Wompi
+ * dashboard.
  *
- * It records an intent to refund and reserves the amount against the order's
- * refundable balance. It does NOT move money and does NOT change the order
- * status — that happens in `settleRefund`, driven by a provider webhook, because
- * an order marked REFUNDED before the money left our account is a lie that a
- * customer will act on.
+ * Wompi's public API has no refund endpoint for Web Checkout payments, so the
+ * refund is issued there by hand and this records it — the ledger row
+ * (SUCCEEDED), `refundedTotal`, and the order's move to PARTIALLY_REFUNDED or
+ * REFUNDED, in one transaction. Bounded server-side by what was captured.
  *
  * `amount` omitted means "the full remaining refundable balance", resolved
- * server-side. That is the common case and the one an operator is most likely to
- * mistype.
+ * server-side. `providerRefundId` is the Wompi-side reference, when there is one.
  */
 export const createRefundRequestSchema = z
   .object({
     amount: z.number().int().min(1).optional(),
     reason: refundReasonSchema,
     note: z.string().max(1000).optional(),
-    /** Writes a RETURN movement to the inventory ledger when the refund settles. */
+    providerRefundId: z.string().trim().min(1).max(128).optional(),
+    /** Accepted for the restock decision; restocking is not implemented yet. */
     restockVariantIds: z.array(idSchema).default([]),
   })
   .strict();
