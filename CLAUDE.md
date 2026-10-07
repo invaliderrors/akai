@@ -60,8 +60,12 @@ an older project. `TASKS.md` tracks what is left to build.
   (`America/Bogota`) from `@akai/contracts`: money via `@akai/money`, dates via
   `Intl.DateTimeFormat(STORE_LOCALE, { …, timeZone: STORE_TIME_ZONE })`. A fixed zone
   also keeps a server-rendered date identical to its hydrated twin.
-- **No `/en`.** Every page lives at its bare path. The storefront middleware 301s old
-  `/en/*` (and `/es/*`) links to it.
+- **No `/en`.** Every page lives at its bare path. Both the storefront and the dashboard
+  middleware 301 old `/en/*` (and `/es/*`) links to it.
+- **Dashboard:** no `[locale]` segment (`src/app/layout.tsx` is the root layout).
+  next-intl is kept only as the message reader, without i18n routing: `src/i18n/request.ts`
+  pins `locale: "es"` and `timeZone: STORE_TIME_ZONE`. Navigation comes straight from
+  `next/link` / `next/navigation`.
 - **User-facing copy is Spanish and lives in one catalogue per app** (storefront
   `src/i18n/messages.ts`, dashboard `messages/es.json`); the API's error `message`
   strings stay English — they are for logs and never rendered.
