@@ -94,7 +94,7 @@ const addressListResponseSchema = z.array(addressSchema);
  *
  * `GET /orders/:orderNumber` returns `orderSchema`, which now CARRIES the
  * order's parcels (`order.shipments`, the customer-safe `orderShipmentSchema`
- * shape — Sendcloud spec §5) and defaults them to `[]` for an older API. They
+ * shape) and defaults them to `[]` for an older API. They
  * are read from there; the old `shipments: shipmentSchema[]` override is gone,
  * because the full `shipmentSchema` (order id, line split) is not what the
  * customer endpoint sends and would have rejected it.

@@ -17,7 +17,7 @@ import {
 import type { CreateShippingZoneInput } from "@/lib/admin/shipping-api";
 
 /**
- * Create/edit a shipping zone: name, countries, sort order (spec §7a).
+ * Create/edit a shipping zone: name, countries, sort order.
  *
  * THE COUNTRY PICKER OFFERS EXACTLY `DESTINATION_COUNTRY_CODES` — the list the
  * checkout's country selector offers and the API validates against — so a zone

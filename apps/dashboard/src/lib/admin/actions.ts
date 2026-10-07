@@ -1005,7 +1005,7 @@ export async function translateBlogCopyAction(input: unknown): Promise<ActionRes
 }
 
 // ---------------------------------------------------------------------------
-// Shipping zones and rates — Sendcloud spec §7a (decision D8)
+// Shipping zones and rates
 // ---------------------------------------------------------------------------
 
 /**

@@ -158,9 +158,8 @@ export const CUSTOMER_NAV_GROUP: NavGroup = {
  * `adminSettings` last of all, matching jobs and emails' own placement: not
  * a daily destination. `adminAffiliates` sits beside `adminDiscounts`: every
  * affiliate's earnings are read off the coupons pointing at it, so the two
- * screens are opened together. `adminShipping` (zones and rates, Sendcloud
- * spec §7a) follows them: configuration staff visit when prices or carriers
- * change, not daily.
+ * screens are opened together. `adminShipping` (zones and rates) follows
+ * them: configuration staff visit when prices change, not daily.
  */
 export const ADMIN_NAV_GROUP: NavGroup = {
   id: "adminGroup",

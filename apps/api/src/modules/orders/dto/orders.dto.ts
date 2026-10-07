@@ -52,7 +52,7 @@ export const adminOrderListQuerySchema = paginationQuerySchema
     status: orderStatusSchema.optional(),
     email: z.string().email().max(254).toLowerCase().optional(),
     orderNumber: z.string().max(20).optional(),
-    /** Fulfilment state (Sendcloud spec §3.6): NO_LABEL / LABEL_CREATED / IN_TRANSIT / ISSUE. */
+    /** Fulfilment state: NOT_SHIPPED / IN_TRANSIT / ISSUE. */
     shipping: orderShippingFilterSchema.optional(),
   })
   .strict();

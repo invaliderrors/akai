@@ -146,7 +146,7 @@ describe("selectShippingOptions", () => {
       expect(options[0]?.isFree).toBe(false);
     });
 
-    // The store-wide €250 rule (spec 2026-09-24 §3, D3b): every seeded rate
+    // The store-wide free-shipping rule: every seeded rate
     // carries freeOverSubtotal = 25000, so the boundary is pinned for BOTH of
     // them at one cent below, exactly at, and one cent above the threshold.
     describe("at the store-wide €250.00 threshold", () => {

@@ -31,7 +31,7 @@ import { Roles } from "../../auth/guards/roles.guard";
 import { AdminShippingService } from "./admin-shipping.service";
 
 /**
- * Staff-editable shipping zones and rates (spec §7a, decision D8).
+ * Staff-editable shipping zones and rates.
  *
  * STAFF AND ADMIN, READ AND WRITE — the categories/discounts precedent
  * (`AdminCategoriesController`, `AdminDiscountsController`): the operators who
