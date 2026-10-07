@@ -10,7 +10,7 @@ const UUID = "3f2504e0-4f89-41d3-9a0c-0305e82c3301";
 
 describe("shipping admin", () => {
   const rate = {
-    name: { es: "Envío nacional", en: "National shipping" },
+    name: "Envío nacional",
     strategy: "FLAT",
     priceGross: 1_500_000,
   } as const;
@@ -49,15 +49,13 @@ describe("shipping admin", () => {
     expect(createShippingRateSchema.safeParse({ ...rate, priceGross: 15_000.5 }).success).toBe(false);
   });
 
-  it("requires the Spanish name and lets the English one wait", () => {
-    expect(createShippingRateSchema.safeParse({ ...rate, name: { es: "Envío" } }).success).toBe(true);
-    expect(createShippingRateSchema.safeParse({ ...rate, name: { en: "Shipping" } }).success).toBe(
+  it("trims the name and refuses a blank one or a per-language record", () => {
+    expect(createShippingRateSchema.parse({ ...rate, name: "  Envío  " }).name).toBe("Envío");
+    // A blank name would satisfy "has a name" and render as an empty method line.
+    expect(createShippingRateSchema.safeParse({ ...rate, name: "  " }).success).toBe(false);
+    expect(createShippingRateSchema.safeParse({ ...rate, name: { es: "Envío" } }).success).toBe(
       false,
     );
-    // An empty English name would satisfy "has a name" and render blank.
-    expect(
-      createShippingRateSchema.safeParse({ ...rate, name: { es: "Envío", en: "  " } }).success,
-    ).toBe(false);
   });
 
   it("refuses bounds on a FLAT rate, a zero free-over threshold and a non-peso price", () => {

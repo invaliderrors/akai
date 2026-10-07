@@ -39,10 +39,6 @@ export const countryCodeSchema = z
 
 export type CountryCode = z.infer<typeof countryCodeSchema>;
 
-/** The store's supported locales. Mirrors next-intl routing: es is the default. */
-export const localeSchema = z.enum(["es", "en"]);
-export type Locale = z.infer<typeof localeSchema>;
-
 /** Serialised as an ISO-8601 string on the wire; never a Date across JSON. */
 export const isoDateTimeSchema = z.string().datetime({ offset: true });
 
@@ -135,8 +131,8 @@ export type FieldError = z.infer<typeof fieldErrorSchema>;
  * Exists so a pack refusal can name its short component — "Oversized Tee M: only
  * 3 left" — instead of a generic sold-out sentence about a pack the shopper
  * can see is on sale. Carries an id and a count, never a name or prose: the
- * client resolves the name from data it already holds, in its own locale, and
- * renders its own translated sentence. It is never rendered as sent.
+ * client resolves the name from data it already holds and renders its own
+ * sentence. It is never rendered as sent.
  */
 export const stockShortageSchema = z
   .object({

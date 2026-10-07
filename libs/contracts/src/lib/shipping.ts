@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { countryCodeSchema, idSchema, localeSchema } from "./common";
+import { countryCodeSchema, idSchema } from "./common";
 import { currencyCodeSchema, moneySchema, nonNegativeMinorSchema } from "./money";
 
 /**
@@ -29,18 +29,12 @@ import { currencyCodeSchema, moneySchema, nonNegativeMinorSchema } from "./money
  * shipping — you saved $ 15.000" vs. "Collection"), and the distinction is only
  * knowable server-side, where the threshold lives.
  *
- * `name` IS PER-LOCALE, exactly like `categorySchema.name`, `mediaAssetSchema.alt`
- * and `productVariantSchema.name`. It was a single monolingual string, and the
- * consequence was that a Spanish shopper picked a delivery method labelled
- * "Standard (2-3 days)" on the last page before payment — the one screen where an
- * untranslated string is most expensive. A record makes the untranslated case
- * unrepresentable rather than merely discouraged: there is no single string left
- * for a caller to render verbatim.
+ * `name` is the rate's Spanish display name ("Envío nacional"), rendered as is.
  */
 export const shippingOptionSchema = z
   .object({
     rateId: idSchema,
-    name: z.record(localeSchema, z.string().min(1).max(120)),
+    name: z.string().min(1).max(120),
     currency: currencyCodeSchema,
     /** VAT-inclusive, integer minor units, computed for this cart. */
     priceGross: nonNegativeMinorSchema,

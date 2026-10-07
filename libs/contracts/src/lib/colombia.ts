@@ -11,6 +11,23 @@ import { z } from "zod";
  */
 
 // ---------------------------------------------------------------------------
+// Language and time
+// ---------------------------------------------------------------------------
+
+/**
+ * The shop is Spanish only. This BCP 47 tag is the one every `Intl` formatter
+ * uses — money ("$ 89.000"), numbers and dates — and what `<html lang>` says.
+ */
+export const STORE_LOCALE = "es-CO";
+
+/**
+ * Every displayed date and time is Colombian time. A FIXED zone (rather than the
+ * server's or the browser's) also keeps a server-rendered date identical to its
+ * hydrated twin.
+ */
+export const STORE_TIME_ZONE = "America/Bogota";
+
+// ---------------------------------------------------------------------------
 // Departamentos
 // ---------------------------------------------------------------------------
 

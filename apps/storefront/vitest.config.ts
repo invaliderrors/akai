@@ -11,7 +11,6 @@ export default defineConfig({
       "@akai/contracts": lib("contracts"),
       "@akai/money": lib("money"),
       "@akai/rich-text": lib("rich-text"),
-      "@akai/i18n": lib("i18n"),
       "@akai/session": lib("session"),
     },
   },

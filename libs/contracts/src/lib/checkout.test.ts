@@ -162,7 +162,6 @@ describe("the order carries the identity document", () => {
     customerId: null,
     email: "valentina@example.com",
     status: "PAID",
-    locale: "es",
     currency: "COP",
     items: [
       {

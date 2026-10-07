@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { idSchema, localeSchema, paginatedSchema } from "./common";
+import { idSchema, paginatedSchema } from "./common";
 
 /**
  * The admin inventory list.
@@ -21,12 +21,8 @@ export const inventoryRowSchema = z
     sku: z.string().min(1),
     productId: idSchema,
     productSlug: z.string().min(1),
-    /**
-     * Locale-resolved product name. Null only when a product carries NO
-     * translation in any locale, which is a data defect worth seeing rather than
-     * hiding behind the slug.
-     */
-    productName: z.string().nullable(),
+    /** The product's name. */
+    productName: z.string(),
     /**
      * False when no `inventory_item` row exists. The counts below are then all
      * zero, which is not a lie — the variant genuinely cannot be sold — but the
@@ -72,9 +68,8 @@ export const inventoryListQuerySchema = z
     cursor: z.string().min(1).max(64).optional(),
     limit: z.coerce.number().int().min(1).max(100).default(50),
     filter: inventoryFilterSchema.default("all"),
-    /** Substring match against sku and the translated product name. */
+    /** Substring match against sku and the product name. */
     search: z.string().min(1).max(120).optional(),
-    locale: localeSchema.default("es"),
   })
   .strict();
 

@@ -5,7 +5,7 @@ import {
   inventoryMovementSchema,
   roleSchema,
 } from "./enums";
-import { emailSchema, idSchema, isoDateTimeSchema, localeSchema } from "./common";
+import { emailSchema, idSchema, isoDateTimeSchema } from "./common";
 
 /**
  * Operational records: email log, audit log, inventory ledger, ports.
@@ -23,7 +23,6 @@ export const emailEventSchema = z
     id: idSchema,
     recipient: emailSchema,
     templateKey: emailTemplateKeySchema,
-    locale: localeSchema,
     status: emailStatusSchema,
     /** Provider-side id, needed to correlate bounce/complaint webhooks. */
     providerMessageId: z.string().max(200).nullable(),
@@ -45,7 +44,6 @@ export type EmailEvent = z.infer<typeof emailEventSchema>;
 export interface SendEmailInput {
   readonly to: string;
   readonly templateKey: z.infer<typeof emailTemplateKeySchema>;
-  readonly locale: z.infer<typeof localeSchema>;
   /** Template-specific payload. Validated by each template's own zod schema. */
   readonly data: Readonly<Record<string, unknown>>;
   readonly orderId?: string;

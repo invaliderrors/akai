@@ -14,7 +14,7 @@ import {
   identityDocumentTypeSchema,
   normaliseDocumentNumber,
 } from "./colombia";
-import { emailSchema, idSchema, isoDateTimeSchema, localeSchema } from "./common";
+import { emailSchema, idSchema, isoDateTimeSchema } from "./common";
 import { currencyCodeSchema, nonNegativeMinorSchema } from "./money";
 import { addressFieldsSchema } from "./identity";
 
@@ -239,7 +239,6 @@ export const orderSchema = z
     /** Always present, including for guest orders — it is the claim key. */
     email: emailSchema,
     status: orderStatusSchema,
-    locale: localeSchema,
     currency: currencyCodeSchema,
 
     items: z.array(orderItemSchema).min(1),
@@ -268,7 +267,7 @@ export const orderSchema = z
     documentType: identityDocumentTypeSchema,
     documentNumber: documentNumberSchema,
 
-    /** The chosen method's name, stamped at checkout in the order's locale. */
+    /** The chosen method's name, stamped at checkout. */
     shippingMethodName: z.string().max(120).nullable().default(null),
     /** Oldest first. Empty until staff record a shipment. */
     shipments: z.array(orderShipmentSchema).default([]),
@@ -434,7 +433,6 @@ export const createCheckoutSessionObjectSchema = z
      */
     documentType: identityDocumentTypeSchema,
     documentNumber: documentNumberInputSchema,
-    locale: localeSchema.default("es"),
     acceptedTermsVersion: z.string().max(32),
   })
   .strict();

@@ -23,10 +23,9 @@ describe("contactRequestSchema", () => {
     expect(contactRequestSchema.parse(submission).email).toBe("ana@example.com");
   });
 
-  it("defaults the locale to Spanish and the captcha token to null", () => {
+  it("defaults the captcha token to null", () => {
     const parsed = contactRequestSchema.parse(submission);
 
-    expect(parsed.locale).toBe("es");
     expect(parsed.turnstileToken).toBeNull();
   });
 
@@ -77,10 +76,9 @@ describe("affiliateApplicationSchema", () => {
     expect(affiliateApplicationSchema.parse(application).email).toBe("ana@example.com");
   });
 
-  it("defaults the locale to Spanish and the captcha token to null, same as the contact form", () => {
+  it("defaults the captcha token to null, same as the contact form", () => {
     const parsed = affiliateApplicationSchema.parse(application);
 
-    expect(parsed.locale).toBe("es");
     expect(parsed.turnstileToken).toBeNull();
   });
 

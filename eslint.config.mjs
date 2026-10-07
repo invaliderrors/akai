@@ -12,9 +12,6 @@ const compat = new FlatCompat({ baseDirectory: __dirname });
 /** The Next.js app. Next-specific rules must not leak onto NestJS source. */
 const NEXT_APPS = ["apps/dashboard/**/*.{ts,tsx}"];
 
-/** Everything that participates in locale-aware routing. */
-const WEB_SOURCE = [...NEXT_APPS, "libs/ui/**/*.{ts,tsx}", "libs/i18n/**/*.{ts,tsx}"];
-
 // -----------------------------------------------------------------------------
 // TYPE-AWARE LINTING — what makes the zero-`any` mandate actually hold.
 //
@@ -183,7 +180,7 @@ const eslintConfig = [
               onlyDependOnLibsWithTags: ["scope:shared", "scope:server"],
             },
             {
-              // Shared libs (money, config, i18n, ui) are imported by BOTH Next
+              // Shared libs (money, config, ui) are imported by BOTH Next
               // apps, so they may only depend on other shared libs. This is what
               // stops @akai/money from one day importing @akai/db and dragging
               // Prisma into a browser bundle.
@@ -260,43 +257,6 @@ const eslintConfig = [
     settings: { next: { rootDir: "apps/dashboard" } },
   },
 
-  // ---------------------------------------------------------------------------
-  // Locale-aware routing invariant.
-  // ---------------------------------------------------------------------------
-  {
-    files: WEB_SOURCE,
-    rules: {
-      "no-restricted-imports": [
-        "error",
-        {
-          paths: [
-            {
-              name: "next/link",
-              message: "Import Link from '@/i18n/navigation' for locale-aware routing.",
-            },
-            {
-              name: "next/navigation",
-              importNames: ["redirect", "usePathname", "useRouter", "permanentRedirect"],
-              message: "Import these from '@/i18n/navigation' for locale-aware routing.",
-            },
-          ],
-        },
-      ],
-    },
-  },
-  {
-    // The navigation module itself re-exports from next-intl, not next/* — and
-    // notFound/other non-navigation helpers from next/navigation stay allowed elsewhere.
-    //
-    // MIGRATION NOTE: this glob moved from "src/i18n/navigation.ts". It is a
-    // DETERMINISTIC break if it is ever left pointing at a stale path — the file
-    // instantly violates the very rule it is exempt from.
-    files: [
-      "apps/dashboard/src/i18n/navigation.ts",
-      "libs/i18n/src/**/navigation.ts",
-    ],
-    rules: { "no-restricted-imports": "off" },
-  },
 
   // ---------------------------------------------------------------------------
   // Type-aware `no-unsafe-*`. LAST, so the project-scoped parserOptions win over

@@ -32,5 +32,4 @@ export * from "./lib/destinations";
 export * from "./lib/colombia";
 export * from "./lib/support";
 export * from "./lib/ops";
-export * from "./lib/translation";
 export * from "./lib/blog";

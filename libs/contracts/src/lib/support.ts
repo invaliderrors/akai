@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { countryCodeSchema, emailSchema, localeSchema } from "./common";
+import { countryCodeSchema, emailSchema } from "./common";
 
 /**
  * Support surfaces that are not commerce: the contact form, the affiliate
@@ -30,8 +30,6 @@ export const contactRequestSchema = z
     name: z.string().trim().min(1).max(120),
     email: emailSchema,
     message: z.string().trim().min(1).max(5_000),
-    /** Drives the language of the acknowledgement, not the routing. */
-    locale: localeSchema.default("es"),
     turnstileToken: z.string().max(2_048).nullable().default(null),
   })
   .strict();
@@ -74,8 +72,6 @@ export const affiliateApplicationSchema = z
     country: countryCodeSchema,
     socialHandle: z.string().trim().min(1).max(200),
     email: emailSchema,
-    /** Drives the language of the acknowledgement, not routing — same role as `contactRequestSchema.locale`. */
-    locale: localeSchema.default("es"),
     turnstileToken: z.string().max(2_048).nullable().default(null),
   })
   .strict();

@@ -12,6 +12,5 @@
 
 export * from "./builders";
 export * from "./fake-email";
-export * from "./fake-translation";
 export * from "./http-server";
 export * from "./wompi-webhook";

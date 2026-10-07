@@ -62,7 +62,7 @@ describe("shippingQuoteRequestSchema", () => {
 describe("shippingOptionSchema", () => {
   const option = {
     rateId: "0a5b2c3d-4e5f-4a6b-8c9d-0e1f2a3b4c5d",
-    name: { es: "Estándar (2-3 días)", en: "Standard (2-3 days)" },
+    name: "Estándar (2-3 días)",
     currency: "COP",
     priceGross: 1_500_000,
     isFree: false,
@@ -74,20 +74,10 @@ describe("shippingOptionSchema", () => {
     expect(shippingOptionSchema.parse(option)).toEqual(option);
   });
 
-  it("rejects a bare string name — a delivery method is named PER LOCALE", () => {
-    // The regression this guards: a monolingual `name` put "Standard (2-3 days)"
-    // in front of a Spanish shopper on the last page before payment, and the
-    // same string was then stamped onto the order, the confirmation email and
-    // the invoice. Making the record the only representable shape is what stops
-    // a caller rendering one verbatim.
-    expect(shippingOptionSchema.safeParse({ ...option, name: "Standard" }).success).toBe(
-      false,
-    );
-  });
-
-  it("rejects a name keyed by a locale we do not ship copy in", () => {
+  it("rejects an empty name and a per-language record — the name is one Spanish string", () => {
+    expect(shippingOptionSchema.safeParse({ ...option, name: "" }).success).toBe(false);
     expect(
-      shippingOptionSchema.safeParse({ ...option, name: { fr: "Standard" } }).success,
+      shippingOptionSchema.safeParse({ ...option, name: { es: "Estándar" } }).success,
     ).toBe(false);
   });
 

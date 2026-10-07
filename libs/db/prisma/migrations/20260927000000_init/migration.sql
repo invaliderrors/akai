@@ -59,9 +59,6 @@ CREATE TYPE "EmailStatus" AS ENUM ('QUEUED', 'SENT', 'DELIVERED', 'BOUNCED', 'CO
 CREATE TYPE "ReturnStatus" AS ENUM ('REQUESTED', 'APPROVED', 'REJECTED', 'IN_TRANSIT', 'RECEIVED', 'REFUNDED');
 
 -- CreateEnum
-CREATE TYPE "Locale" AS ENUM ('es', 'en');
-
--- CreateEnum
 CREATE TYPE "BlogPostStatus" AS ENUM ('DRAFT', 'PUBLISHED');
 
 -- CreateEnum
@@ -77,7 +74,6 @@ CREATE TABLE "customer" (
     "lastName" VARCHAR(80),
     "phone" VARCHAR(32),
     "role" "Role" NOT NULL DEFAULT 'CUSTOMER',
-    "preferredLocale" "Locale" NOT NULL DEFAULT 'es',
     "totpSecret" TEXT,
     "totpEnabledAt" TIMESTAMP(3),
     "lastTotpCounter" BIGINT,
@@ -187,6 +183,9 @@ CREATE TABLE "product" (
     "slug" VARCHAR(160) NOT NULL,
     "status" "ProductStatus" NOT NULL DEFAULT 'DRAFT',
     "taxClass" "TaxClass" NOT NULL DEFAULT 'STANDARD',
+    "name" VARCHAR(200) NOT NULL,
+    "shortDescription" VARCHAR(500) NOT NULL DEFAULT '',
+    "description" TEXT NOT NULL DEFAULT '',
     "restrictedCountries" TEXT[] DEFAULT ARRAY[]::TEXT[],
     "hygieneExempt" BOOLEAN NOT NULL DEFAULT false,
     "listed" BOOLEAN NOT NULL DEFAULT true,
@@ -200,18 +199,6 @@ CREATE TABLE "product" (
     "deletedAt" TIMESTAMP(3),
 
     CONSTRAINT "product_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "product_translation" (
-    "id" UUID NOT NULL,
-    "productId" UUID NOT NULL,
-    "locale" "Locale" NOT NULL,
-    "name" VARCHAR(200) NOT NULL,
-    "shortDescription" VARCHAR(500) NOT NULL,
-    "description" TEXT NOT NULL,
-
-    CONSTRAINT "product_translation_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -229,7 +216,7 @@ CREATE TABLE "product_variant" (
     "id" UUID NOT NULL,
     "productId" UUID NOT NULL,
     "sku" VARCHAR(64) NOT NULL,
-    "name" JSONB,
+    "name" VARCHAR(120),
     "options" JSONB NOT NULL DEFAULT '{}',
     "currency" CHAR(3) NOT NULL,
     "priceNet" INTEGER NOT NULL,
@@ -317,7 +304,7 @@ CREATE TABLE "media_asset" (
     "variantId" UUID,
     "objectKey" VARCHAR(512) NOT NULL,
     "url" VARCHAR(1024) NOT NULL,
-    "alt" JSONB NOT NULL DEFAULT '{}',
+    "alt" VARCHAR(300) NOT NULL DEFAULT '',
     "width" INTEGER NOT NULL,
     "height" INTEGER NOT NULL,
     "sortOrder" INTEGER NOT NULL DEFAULT 0,
@@ -330,7 +317,7 @@ CREATE TABLE "media_asset" (
 CREATE TABLE "category" (
     "id" UUID NOT NULL,
     "slug" VARCHAR(160) NOT NULL,
-    "name" JSONB NOT NULL,
+    "name" VARCHAR(120) NOT NULL,
     "sortOrder" INTEGER NOT NULL DEFAULT 0,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "deletedAt" TIMESTAMP(3),
@@ -507,7 +494,7 @@ CREATE TABLE "shipping_zone" (
 CREATE TABLE "shipping_rate" (
     "id" UUID NOT NULL,
     "zoneId" UUID NOT NULL,
-    "name" JSONB NOT NULL,
+    "name" VARCHAR(120) NOT NULL,
     "strategy" VARCHAR(16) NOT NULL,
     "priceGross" INTEGER NOT NULL,
     "currency" CHAR(3) NOT NULL,
@@ -531,7 +518,6 @@ CREATE TABLE "order" (
     "customerId" UUID,
     "email" CITEXT NOT NULL,
     "status" "OrderStatus" NOT NULL DEFAULT 'PENDING',
-    "locale" "Locale" NOT NULL DEFAULT 'es',
     "currency" CHAR(3) NOT NULL,
     "subtotal" INTEGER NOT NULL,
     "discountTotal" INTEGER NOT NULL DEFAULT 0,
@@ -711,7 +697,6 @@ CREATE TABLE "email_event" (
     "id" UUID NOT NULL,
     "recipient" CITEXT NOT NULL,
     "templateKey" VARCHAR(64) NOT NULL,
-    "locale" "Locale" NOT NULL DEFAULT 'es',
     "status" "EmailStatus" NOT NULL DEFAULT 'QUEUED',
     "providerMessageId" VARCHAR(200),
     "orderId" UUID,
@@ -838,26 +823,17 @@ CREATE TABLE "blog_post" (
     "publishedAt" TIMESTAMP(3),
     "coverObjectKey" VARCHAR(512),
     "category" "BlogCategory" NOT NULL,
-    "authorId" UUID,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "blog_post_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "blog_post_translation" (
-    "id" UUID NOT NULL,
-    "postId" UUID NOT NULL,
-    "locale" "Locale" NOT NULL,
     "title" VARCHAR(200) NOT NULL,
     "excerpt" VARCHAR(500) NOT NULL,
     "bodyHtml" TEXT NOT NULL,
     "metaTitle" VARCHAR(200),
     "metaDescription" VARCHAR(320),
     "coverAlt" VARCHAR(300) NOT NULL DEFAULT '',
+    "authorId" UUID,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "blog_post_translation_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "blog_post_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
@@ -919,9 +895,6 @@ CREATE INDEX "product_sortOrder_idx" ON "product"("sortOrder");
 
 -- CreateIndex
 CREATE INDEX "product_kind_idx" ON "product"("kind");
-
--- CreateIndex
-CREATE UNIQUE INDEX "product_translation_productId_locale_key" ON "product_translation"("productId", "locale");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "product_slug_history_slug_key" ON "product_slug_history"("slug");
@@ -1148,12 +1121,6 @@ CREATE INDEX "blog_post_status_publishedAt_idx" ON "blog_post"("status", "publis
 -- CreateIndex
 CREATE INDEX "blog_post_authorId_idx" ON "blog_post"("authorId");
 
--- CreateIndex
-CREATE INDEX "blog_post_translation_locale_idx" ON "blog_post_translation"("locale");
-
--- CreateIndex
-CREATE UNIQUE INDEX "blog_post_translation_postId_locale_key" ON "blog_post_translation"("postId", "locale");
-
 -- AddForeignKey
 ALTER TABLE "recovery_code" ADD CONSTRAINT "recovery_code_customerId_fkey" FOREIGN KEY ("customerId") REFERENCES "customer"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
@@ -1174,9 +1141,6 @@ ALTER TABLE "email_otp" ADD CONSTRAINT "email_otp_customerId_fkey" FOREIGN KEY (
 
 -- AddForeignKey
 ALTER TABLE "address" ADD CONSTRAINT "address_customerId_fkey" FOREIGN KEY ("customerId") REFERENCES "customer"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "product_translation" ADD CONSTRAINT "product_translation_productId_fkey" FOREIGN KEY ("productId") REFERENCES "product"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "product_slug_history" ADD CONSTRAINT "product_slug_history_productId_fkey" FOREIGN KEY ("productId") REFERENCES "product"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -1291,7 +1255,4 @@ ALTER TABLE "return_request" ADD CONSTRAINT "return_request_customerId_fkey" FOR
 
 -- AddForeignKey
 ALTER TABLE "blog_post" ADD CONSTRAINT "blog_post_authorId_fkey" FOREIGN KEY ("authorId") REFERENCES "customer"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "blog_post_translation" ADD CONSTRAINT "blog_post_translation_postId_fkey" FOREIGN KEY ("postId") REFERENCES "blog_post"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 

@@ -219,8 +219,6 @@ importers:
 
   libs/email-templates: {}
 
-  libs/i18n: {}
-
   libs/money: {}
 
   libs/observability: {}

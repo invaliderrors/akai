@@ -55,7 +55,7 @@ import sanitizeHtml from "sanitize-html";
  *   - `script`, `style`, `iframe`, `object`, `embed`, `form`, `input`,
  *     `noscript`: the entire executing/loading/credential-collecting surface.
  *   - `img`: a product's images belong to `product.media`, which is typed,
- *     ordered and carries per-locale alt text. An `<img>` in body copy is an
+ *     ordered and carries its own alt text. An `<img>` in body copy is an
  *     un-alt-texted, un-optimised, third-party-hosted asset request initiated
  *     by whoever wrote the description — an outbound beacon with a picture
  *     attached.

@@ -192,7 +192,7 @@ export type DiscountType = z.infer<typeof discountTypeSchema>;
  *
  * This is the sub-code the API attaches as the error envelope's `reason`
  * (`errorEnvelopeSchema`, libs/contracts/src/lib/common.ts). It is an
- * IDENTIFIER a client parses and maps to a translated string; it is never
+ * IDENTIFIER a client parses and maps to its own message; it is never
  * rendered, and it is never the display text.
  *
  * INVALID_CODE stays deliberately coarse — an unknown code and a typo are the
@@ -230,46 +230,6 @@ export const discountFailureReasonSchema = z.enum([
   "USAGE_LIMIT_REACHED",
 ]);
 export type DiscountFailureReason = z.infer<typeof discountFailureReasonSchema>;
-
-/**
- * Why a machine translation did not happen.
- *
- * A SUB-CODE, not an ErrorCode. `errorCodeSchema` is closed and exhausted by
- * `satisfies Record<ErrorCode, string>` maps in both web apps, so widening it
- * for a vendor integration would break every one of those files; and the coarse
- * code that is correct here (CONFLICT) cannot separate "nobody configured a
- * key" from "the quota ran out" from "the vendor is down". Those need three
- * different sentences and three different operator actions, which is exactly
- * what the envelope's `reason` member exists to carry.
- *
- * Rendered NOWHERE. The dashboard branches on these against its own message
- * catalogue; the vendor's own prose never reaches a client at all, because
- * `TranslationFailure` has no field to carry it.
- */
-export const translationFailureReasonSchema = z.enum([
-  /** No DEEPL_API_KEY on this deployment. The feature is off, not broken. */
-  "NOT_CONFIGURED",
-  /** The vendor rejected our credential (401/403) — rotate the key. */
-  "INVALID_KEY",
-  /** The character allowance is spent (DeepL's own 456). Waiting does not fix it. */
-  "QUOTA_EXCEEDED",
-  /** Too many requests (429). Waiting DOES fix it, which is why it is distinct. */
-  "RATE_LIMITED",
-  /** The vendor refused the language pair. The only reason a caller can fix. */
-  "UNSUPPORTED_LANGUAGE",
-  /** 5xx, connection refused, DNS — the vendor is down. */
-  "VENDOR_UNAVAILABLE",
-  /** Our own deadline elapsed first. Distinct from an outage: it may have been billed. */
-  "VENDOR_TIMEOUT",
-  /**
-   * The response could not be trusted: unparseable, wrong shape, or a different
-   * number of translations than texts sent. Never degraded into empty copy —
-   * blank text written over a product's other locale is the one genuinely
-   * destructive outcome available here.
-   */
-  "MALFORMED_RESPONSE",
-]);
-export type TranslationFailureReason = z.infer<typeof translationFailureReasonSchema>;
 
 /**
  * Tax class. Clothing carries Colombia's general IVA rate (19%), but some goods

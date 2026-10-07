@@ -2,8 +2,8 @@
  * @akai/money — the ONLY money implementation in the platform.
  *
  * Absorbs the old apps/storefront/src/lib/pricing.ts and fixes its two defects:
- *   1. it hardcoded `Intl.NumberFormat("en-US")`, ignoring the shopper's locale
- *      (a Colombian shopper expects "$ 89.000", not "$89,000.00");
+ *   1. it hardcoded `Intl.NumberFormat("en-US")` — a Colombian shopper expects
+ *      "$ 89.000", not "$89,000.00" (every amount now formats in `es-CO`);
  *   2. it parsed Woo's string minor units inline with `parseInt(x || "0")`,
  *      which silently turns malformed input into zero — a free product.
  *
@@ -14,8 +14,8 @@
 
 import {
   MINOR_MAX,
+  STORE_LOCALE,
   type CurrencyCode,
-  type Locale,
   type Minor,
   type Money,
   toMinor,
@@ -307,29 +307,18 @@ export function displayFractionDigits(currency: CurrencyCode): number {
   return DISPLAY_FRACTION_DIGITS[currency] ?? minorUnitExponent(currency);
 }
 
-/** The Intl locale each UI locale formats with. */
-export function intlLocale(locale: Locale): string {
-  return locale === "es" ? "es-CO" : "en-US";
-}
-
 /**
- * Format for display, driven by the ACTIVE locale.
- *
- * For COP, `es` (es-CO) yields "$ 89.000" and `en` (en-US) yields "$89,000" —
- * whole pesos, no decimals (`displayFractionDigits`). Locale is a required
- * parameter precisely so no call site can forget it.
+ * Format for display. The shop is Spanish only, so every amount formats in
+ * `STORE_LOCALE` (es-CO): COP yields "$ 89.000" — whole pesos, no decimals
+ * (`displayFractionDigits`).
  */
-export function formatMoney(
-  amount: Minor,
-  currency: CurrencyCode,
-  locale: Locale,
-): string {
-  return formatMinorUnits(amount, currency, locale);
+export function formatMoney(amount: Minor, currency: CurrencyCode): string {
+  return formatMinorUnits(amount, currency);
 }
 
 /** Convenience over the Money envelope. */
-export function formatMoneyValue(value: Money, locale: Locale): string {
-  return formatMoney(value.amount, value.currency, locale);
+export function formatMoneyValue(value: Money): string {
+  return formatMoney(value.amount, value.currency);
 }
 
 /**
@@ -349,7 +338,7 @@ export function formatMoneyValue(value: Money, locale: Locale): string {
  *
  * So this takes an unbranded integer, applies no range check, and never throws.
  * The Intl call is the same one `formatMoney` makes, so an aggregate and a line
- * total render identically in both locales.
+ * total render identically.
  *
  * DISPLAY ONLY, and the three halves of that are load-bearing:
  *   - it NEVER feeds a charge, a refund, or any other value that moves money;
@@ -358,12 +347,8 @@ export function formatMoneyValue(value: Money, locale: Locale): string {
  * Anything that must be added, compared or settled goes through `Minor` and its
  * overflow guard, which is the whole point of the cap this function sidesteps.
  */
-export function formatAggregateMinor(
-  value: number,
-  currency: CurrencyCode,
-  locale: Locale,
-): string {
-  return formatMinorUnits(value, currency, locale);
+export function formatAggregateMinor(value: number, currency: CurrencyCode): string {
+  return formatMinorUnits(value, currency);
 }
 
 /**
@@ -371,21 +356,17 @@ export function formatAggregateMinor(
  * branded and the display-only paths cannot drift into two spellings of the
  * same figure.
  *
- * `narrowSymbol` so English renders "$89,000" rather than "COP 89,000": the
+ * `narrowSymbol` so COP renders "$ 89.000" rather than "COP 89.000": the
  * store sells in one currency, so the bare "$" is unambiguous to its shoppers.
  * A COP amount with stray centavos is ROUNDED for display only — it is never
  * the stored value, which stays exact.
  */
-function formatMinorUnits(
-  amount: number,
-  currency: CurrencyCode,
-  locale: Locale,
-): string {
+function formatMinorUnits(amount: number, currency: CurrencyCode): string {
   const exponent = minorUnitExponent(currency);
   const fractionDigits = displayFractionDigits(currency);
   const major = amount / 10 ** exponent;
 
-  return new Intl.NumberFormat(intlLocale(locale), {
+  return new Intl.NumberFormat(STORE_LOCALE, {
     style: "currency",
     currency,
     currencyDisplay: "narrowSymbol",
@@ -397,8 +378,8 @@ function formatMinorUnits(
 /**
  * The MACHINE-readable decimal form: `8900000` COP → `"89000.00"`.
  *
- * NOT a display format. `formatMoney` is locale-driven and emits grouping
- * separators, a currency symbol and, in Spanish, a decimal COMMA — all correct
+ * NOT a display format. `formatMoney` emits es-CO grouping separators, a
+ * currency symbol and a decimal COMMA — all correct
  * for a human and all invalid in the places this function exists for: a
  * schema.org `offers.price`, a `<meta itemprop="price">`, a CSV export, an
  * analytics event. Feeding a rendered "1.234,56 €" to any of those is a

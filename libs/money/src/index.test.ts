@@ -11,7 +11,6 @@ import {
   formatMoney,
   fromDecimalString,
   grossFromNet,
-  intlLocale,
   minorUnitExponent,
   multiply,
   parseMinorUnitString,
@@ -173,27 +172,23 @@ describe("formatting", () => {
 
   it("formats COP as a Colombian shopper reads it: whole pesos, dot grouping, no decimals", () => {
     // 8_900_000 centavos is $89.000 — stored in centavos, never DISPLAYED in them.
-    expect(normalise(formatMoney(toMinor(8_900_000), "COP", "es"))).toBe("$ 89.000");
-    expect(normalise(formatMoney(toMinor(123_400), "COP", "es"))).toBe("$ 1.234");
-    expect(normalise(formatMoney(toMinor(0), "COP", "es"))).toBe("$ 0");
-  });
-
-  it("formats COP in English with a bare leading symbol and comma grouping", () => {
-    expect(normalise(formatMoney(toMinor(8_900_000), "COP", "en"))).toBe("$89,000");
+    expect(normalise(formatMoney(toMinor(8_900_000), "COP"))).toBe("$ 89.000");
+    expect(normalise(formatMoney(toMinor(123_400), "COP"))).toBe("$ 1.234");
+    expect(normalise(formatMoney(toMinor(0), "COP"))).toBe("$ 0");
   });
 
   it("rounds stray centavos for DISPLAY only", () => {
-    expect(normalise(formatMoney(toMinor(8_900_060), "COP", "es"))).toBe("$ 89.001");
+    expect(normalise(formatMoney(toMinor(8_900_060), "COP"))).toBe("$ 89.001");
   });
 
   it("still formats a two-decimal currency with its decimals", () => {
-    expect(normalise(formatMoney(toMinor(123_456), "EUR", "en"))).toBe("€1,234.56");
-    expect(normalise(formatMoney(toMinor(123_456), "EUR", "es"))).toBe("€ 1.234,56");
+    expect(normalise(formatMoney(toMinor(123_456), "EUR"))).toBe("€ 1.234,56");
   });
 
-  it("formats Spanish with es-CO and English with en-US", () => {
-    expect(intlLocale("es")).toBe("es-CO");
-    expect(intlLocale("en")).toBe("en-US");
+  it("formats with the store locale, es-CO, whatever the runtime's default", () => {
+    expect(normalise(formatMoney(toMinor(8_900_000), "COP"))).toBe(
+      normalise(new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", currencyDisplay: "narrowSymbol", maximumFractionDigits: 0 }).format(89_000)),
+    );
   });
 
   it("respects currencies whose minor unit is not 1/100", () => {
@@ -201,7 +196,7 @@ describe("formatting", () => {
     expect(minorUnitExponent("EUR")).toBe(2);
     expect(minorUnitExponent("KWD")).toBe(3);
     // 5000 JPY minor units is ¥5000, not ¥50.
-    expect(normalise(formatMoney(toMinor(5000), "JPY", "en"))).toContain("5,000");
+    expect(normalise(formatMoney(toMinor(5000), "JPY"))).toContain("5.000");
   });
 
   it("keeps COP's ISO exponent at 2 (centavos) while displaying it with 0 digits", () => {
@@ -220,10 +215,9 @@ describe("formatAggregateMinor — the display-only path around the Minor cap", 
   it("renders exactly what formatMoney renders for an in-range amount", () => {
     // Same Intl call, so an aggregate tile and a line total cannot drift into
     // two spellings of the same peso figure.
-    expect(normalise(formatAggregateMinor(8_900_000, "COP", "es"))).toBe("$ 89.000");
-    expect(normalise(formatAggregateMinor(8_900_000, "COP", "en"))).toBe("$89,000");
-    expect(normalise(formatAggregateMinor(8_900_000, "COP", "es"))).toBe(
-      normalise(formatMoney(toMinor(8_900_000), "COP", "es")),
+    expect(normalise(formatAggregateMinor(8_900_000, "COP"))).toBe("$ 89.000");
+    expect(normalise(formatAggregateMinor(8_900_000, "COP"))).toBe(
+      normalise(formatMoney(toMinor(8_900_000), "COP")),
     );
   });
 
@@ -236,24 +230,23 @@ describe("formatAggregateMinor — the display-only path around the Minor cap", 
     const lifetimeRevenue = MINOR_MAX * 50;
 
     expect(() => toMinor(lifetimeRevenue)).toThrow();
-    expect(normalise(formatAggregateMinor(lifetimeRevenue, "COP", "es"))).toBe(
+    expect(normalise(formatAggregateMinor(lifetimeRevenue, "COP"))).toBe(
       "$ 1.000.000.000",
     );
-    expect(normalise(formatAggregateMinor(lifetimeRevenue, "COP", "en"))).toBe("$1,000,000,000");
   });
 
   it("respects a currency whose minor unit is not 1/100, like formatMoney does", () => {
-    expect(normalise(formatAggregateMinor(5000, "JPY", "en"))).toContain("5,000");
+    expect(normalise(formatAggregateMinor(5000, "JPY"))).toContain("5.000");
   });
 
   it("carries a sign, so a refunded-total tile is not read as a credit", () => {
-    expect(normalise(formatAggregateMinor(-4_200_000, "COP", "es"))).toBe("-$ 42.000");
+    expect(normalise(formatAggregateMinor(-4_200_000, "COP"))).toBe("-$ 42.000");
   });
 });
 
 describe("toDecimalString", () => {
   it("emits a machine-readable decimal, never a localized one", () => {
-    // The point of the function: `formatMoney(…, "es")` gives "1.234,56 €",
+    // The point of the function: `formatMoney` gives "1.234,56 €",
     // which a schema.org consumer would read as 1234 with a stray comma.
     expect(toDecimalString(toMinor(123_456), "EUR")).toBe("1234.56");
   });

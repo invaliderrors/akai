@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   blogCoverUploadUrlRequestSchema,
-  blogPostDetailQuerySchema,
   blogPostListQuerySchema,
   createBlogPostSchema,
   isBlogCoverObjectKey,
@@ -14,36 +13,32 @@ import { REVALIDATE_TAG_BLOG, revalidateRequestSchema } from "./support";
 
 const POST_ID = "3f2504e0-4f89-41d3-9a0c-0305e82c3301";
 
-const ES = {
-  locale: "es",
+const COPY = {
   title: "  Cómo combinar un oversize  ",
   excerpt: "Una introducción.",
   bodyHtml: "<p>Cuerpo</p>",
 };
 
 describe("createBlogPostSchema", () => {
-  const valid = { slug: "como-combinar-un-oversize", category: "STYLE_GUIDES", translations: [ES] };
+  const valid = { slug: "como-combinar-un-oversize", category: "STYLE_GUIDES", ...COPY };
 
-  it("accepts a Spanish-only post (D8c) and trims its copy", () => {
+  it("accepts a post with its copy inline and trims it", () => {
     const parsed = createBlogPostSchema.parse(valid);
 
-    expect(parsed.translations).toHaveLength(1);
-    expect(parsed.translations[0]?.title).toBe("Cómo combinar un oversize");
-    expect(parsed.translations[0]?.metaTitle).toBeNull();
-    expect(parsed.translations[0]?.coverAlt).toBe("");
+    expect(parsed.title).toBe("Cómo combinar un oversize");
+    expect(parsed.metaTitle).toBeNull();
+    expect(parsed.coverAlt).toBe("");
   });
 
-  it("requires a Spanish translation — the default-locale page is the canonical one", () => {
+  it("requires a title", () => {
+    expect(createBlogPostSchema.safeParse({ ...valid, title: undefined }).success).toBe(false);
+  });
+
+  it("refuses per-language rows — the shop is Spanish only", () => {
     const result = createBlogPostSchema.safeParse({
       ...valid,
-      translations: [{ ...ES, locale: "en" }],
+      translations: [{ locale: "es", ...COPY }],
     });
-
-    expect(result.success).toBe(false);
-  });
-
-  it("refuses two rows for the same locale", () => {
-    const result = createBlogPostSchema.safeParse({ ...valid, translations: [ES, ES] });
 
     expect(result.success).toBe(false);
   });
@@ -54,8 +49,7 @@ describe("createBlogPostSchema", () => {
 
   it("refuses a blank body, a bad slug and an unknown key", () => {
     expect(
-      createBlogPostSchema.safeParse({ ...valid, translations: [{ ...ES, bodyHtml: "   " }] })
-        .success,
+      createBlogPostSchema.safeParse({ ...valid, bodyHtml: "   " }).success,
     ).toBe(false);
     expect(createBlogPostSchema.safeParse({ ...valid, slug: "Not A Slug" }).success).toBe(false);
     expect(createBlogPostSchema.safeParse({ ...valid, status: "PUBLISHED" }).success).toBe(false);
@@ -74,29 +68,25 @@ describe("updateBlogPostSchema", () => {
     expect(updateBlogPostSchema.parse({ coverObjectKey: null })).toEqual({ coverObjectKey: null });
   });
 
-  it("applies the same translation rules as a create when translations are sent", () => {
-    expect(
-      updateBlogPostSchema.safeParse({ translations: [{ ...ES, locale: "en" }] }).success,
-    ).toBe(false);
+  it("applies the same copy rules as a create to the fields it carries", () => {
+    expect(updateBlogPostSchema.parse({ title: "  Nuevo  " })).toEqual({ title: "Nuevo" });
+    expect(updateBlogPostSchema.safeParse({ bodyHtml: "  " }).success).toBe(false);
   });
 });
 
-describe("list and detail queries", () => {
-  it("leaves the locale unset when absent — the sitemap wants every post", () => {
+describe("list query", () => {
+  it("defaults the page size", () => {
     expect(blogPostListQuerySchema.parse({})).toEqual({ limit: 12 });
   });
 
   it("coerces the limit from a query string and caps it", () => {
-    expect(blogPostListQuerySchema.parse({ limit: "4", locale: "en" })).toEqual({
-      limit: 4,
-      locale: "en",
-    });
+    expect(blogPostListQuerySchema.parse({ limit: "4" })).toEqual({ limit: 4 });
     expect(blogPostListQuerySchema.safeParse({ limit: "500" }).success).toBe(false);
   });
 
-  it("rejects an unknown locale and an unknown key", () => {
-    expect(blogPostDetailQuerySchema.safeParse({ locale: "fr" }).success).toBe(false);
+  it("rejects an unknown key — a locale filter included", () => {
     expect(blogPostListQuerySchema.safeParse({ status: "DRAFT" }).success).toBe(false);
+    expect(blogPostListQuerySchema.safeParse({ locale: "es" }).success).toBe(false);
   });
 });
 
@@ -107,7 +97,9 @@ describe("public shapes", () => {
     category: "STYLE_GUIDES",
     publishedAt: "2026-09-24T10:00:00.000Z",
     coverUrl: null,
-    translations: [{ locale: "es", title: "T", excerpt: "E", coverAlt: "" }],
+    title: "T",
+    excerpt: "E",
+    coverAlt: "",
   };
 
   it("parses a summary and refuses one carrying a body or a status", () => {
@@ -122,11 +114,19 @@ describe("public shapes", () => {
       publicBlogPostSchema.safeParse({
         ...summary,
         coverObjectKey: "blog/x/y.png",
-        translations: [
-          { ...summary.translations[0], bodyHtml: "<p>x</p>", metaTitle: null, metaDescription: null },
-        ],
+        bodyHtml: "<p>x</p>",
+        metaTitle: null,
+        metaDescription: null,
       }).success,
     ).toBe(false);
+    expect(
+      publicBlogPostSchema.safeParse({
+        ...summary,
+        bodyHtml: "<p>x</p>",
+        metaTitle: null,
+        metaDescription: null,
+      }).success,
+    ).toBe(true);
   });
 });
 

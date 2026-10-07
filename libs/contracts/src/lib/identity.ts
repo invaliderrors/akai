@@ -11,7 +11,6 @@ import {
   emailSchema,
   idSchema,
   isoDateTimeSchema,
-  localeSchema,
 } from "./common";
 
 /**
@@ -34,7 +33,6 @@ export const customerSchema = z
     lastName: z.string().min(1).max(80).nullable(),
     phone: z.string().max(32).nullable(),
     role: roleSchema,
-    preferredLocale: localeSchema,
     /** True once TOTP is enrolled. Mandatory for ADMIN (spec §8). */
     twoFactorEnabled: z.boolean(),
     /** Set when the customer exercised erasure; the row is anonymised, never deleted. */
@@ -164,7 +162,6 @@ export const registerRequestSchema = z
     password: passwordSchema,
     firstName: z.string().min(1).max(80),
     lastName: z.string().min(1).max(80),
-    preferredLocale: localeSchema.default("es"),
     /** Bot protection: verified server-side against Turnstile. */
     turnstileToken: z.string().min(1),
     marketingConsent: z.boolean().default(false),

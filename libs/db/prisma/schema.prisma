@@ -180,11 +180,6 @@ enum ReturnStatus {
   REFUNDED
 }
 
-enum Locale {
-  es
-  en
-}
-
 /// A blog post is either a draft only operators see, or published.
 enum BlogPostStatus {
   DRAFT
@@ -192,7 +187,7 @@ enum BlogPostStatus {
 }
 
 /// Decision D8b (spec 2026-09-24 §8): a FIXED list, editable only by code, so
-/// the storefront's category chip is a translated label rather than whatever
+/// the storefront's category chip is a catalogue label rather than whatever
 /// an operator typed. Mirrors `blogCategorySchema` in libs/contracts.
 enum BlogCategory {
   DROPS
@@ -218,8 +213,7 @@ model Customer {
   lastName  String? @db.VarChar(80)
   phone     String? @db.VarChar(32)
 
-  role            Role   @default(CUSTOMER)
-  preferredLocale Locale @default(es)
+  role Role @default(CUSTOMER)
 
   /// TOTP secret, encrypted at rest by the application. Mandatory for ADMIN.
   totpSecret      String?
@@ -449,6 +443,13 @@ model Product {
   status   ProductStatus @default(DRAFT)
   taxClass TaxClass      @default(STANDARD)
 
+  /// The product's copy. The shop is Spanish only, so it is a set of plain
+  /// columns rather than per-language rows.
+  name             String @db.VarChar(200)
+  shortDescription String @default("") @db.VarChar(500)
+  /// Sanitised with `@akai/rich-text` on write (and again on render).
+  description      String @default("") @db.Text
+
   /// Countries this product may NOT ship to. Enforced in cart validation AND at
   /// checkout — for licensing, export or carrier restrictions on a given item.
   restrictedCountries String[] @default([])
@@ -522,11 +523,10 @@ model Product {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  translations ProductTranslation[]
-  variants     ProductVariant[]
-  media        MediaAsset[]
-  categories   ProductCategory[]
-  slugHistory  ProductSlugHistory[]
+  variants    ProductVariant[]
+  media       MediaAsset[]
+  categories  ProductCategory[]
+  slugHistory ProductSlugHistory[]
 
   /// The add-ons THIS product's page offers.
   addOns         ProductAddOn[] @relation("ProductAddOnHost")
@@ -545,21 +545,6 @@ model Product {
   @@index([sortOrder])
   @@index([kind])
   @@map("product")
-}
-
-model ProductTranslation {
-  id        String @id @default(uuid()) @db.Uuid
-  productId String @db.Uuid
-  locale    Locale
-
-  name             String @db.VarChar(200)
-  shortDescription String @db.VarChar(500)
-  description      String @db.Text
-
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-
-  @@unique([productId, locale])
-  @@map("product_translation")
 }
 
 /// Changed slugs keep resolving. Deleting this table breaks every inbound link
@@ -584,12 +569,11 @@ model ProductVariant {
   /// `product.slug` is. See the note on that field.
   sku String @db.VarChar(64)
 
-  /// Per-locale display name, e.g. {"es":"M / Negro","en":"M / Black"}. Null on
-  /// single-variant products.
-  name    Json?
+  /// Display name, e.g. "M / Negro". Null on single-variant products.
+  name    String? @db.VarChar(120)
   /// Option values, e.g. {"size":"M","color":"black"}. The combination is unique per product
   /// (enforced by a partial index in the migration).
-  options Json  @default("{}")
+  options Json    @default("{}")
 
   /// MONEY: integer minor units. `net + tax === gross` is guaranteed by
   /// @akai/money's splitGross, not by re-deriving tax at read time.
@@ -750,8 +734,8 @@ model MediaAsset {
   /// never streamed through the API.
   objectKey String @db.VarChar(512)
   url       String @db.VarChar(1024)
-  /// Per-locale alt text: it is user-facing copy like any other.
-  alt       Json   @default("{}")
+  /// Alt text: user-facing copy like any other. "" when none was written.
+  alt       String @default("") @db.VarChar(300)
   width     Int
   height    Int
   sortOrder Int    @default(0)
@@ -794,9 +778,9 @@ model Category {
   /// `@unique` here would recreate the unconditional index and break that.
   slug String @db.VarChar(160)
 
-  /// Per-locale names, e.g. {"es":"Sudaderas","en":"Hoodies"}.
-  name      Json
-  sortOrder Int  @default(0)
+  /// Display name, e.g. "Sudaderas".
+  name      String @db.VarChar(120)
+  sortOrder Int    @default(0)
 
   createdAt DateTime  @default(now())
   deletedAt DateTime?
@@ -1216,16 +1200,11 @@ model ShippingRate {
   id     String @id @default(uuid()) @db.Uuid
   zoneId String @db.Uuid
 
-  /// Per-locale method name, e.g.
-  /// {"es":"Estándar (2-3 días)","en":"Standard (2-3 days)"}.
-  ///
-  /// A Json record and NOT a VARCHAR, for the same reason `Category.name` and
-  /// `ProductVariant.name` are: this string is rendered on the last page before
-  /// payment. A single monolingual column meant a Spanish shopper picked their
-  /// delivery method in English, and — because the chosen name is stamped onto
-  /// `order.shippingMethodName` — inherited that English into the confirmation
-  /// email and the invoice too.
-  name     Json
+  /// The method's display name, e.g. "Envío nacional". Stamped onto
+  /// `order.shippingMethodName` at checkout, so a later rename never rewrites
+  /// what an order (its email, its invoice) says. Non-blank: a CHECK in
+  /// `20260927000100_invariants`.
+  name     String @db.VarChar(120)
   /// "FLAT" | "WEIGHT" | "PRICE"
   strategy String @db.VarChar(16)
 
@@ -1273,7 +1252,6 @@ model Order {
   email      String  @db.Citext
 
   status   OrderStatus @default(PENDING)
-  locale   Locale      @default(es)
   currency String      @db.Char(3)
 
   /// MONEY: separate integer columns, not derived at read time. An invariant
@@ -1572,7 +1550,6 @@ model EmailEvent {
   id          String      @id @default(uuid()) @db.Uuid
   recipient   String      @db.Citext
   templateKey String      @db.VarChar(64)
-  locale      Locale      @default(es)
   status      EmailStatus @default(QUEUED)
 
   providerMessageId String? @db.VarChar(200)
@@ -1829,12 +1806,11 @@ model SiteSettings {
 // Blog — spec 2026-09-24 §8
 // =============================================================================
 
-/// A blog post. Its copy lives in `BlogPostTranslation`, one row per locale —
-/// the same per-locale shape as `ProductTranslation`.
+/// A blog post, its copy included (the shop is Spanish only).
 ///
 /// NOT SOFT-DELETED, unlike almost everything else in this schema: the rule
 /// above is "soft delete wherever a record can be referenced by an order", and
-/// nothing references a post. A deleted post is gone, translations included.
+/// nothing references a post. A deleted post is gone.
 ///
 /// `publishedAt` is stamped on the FIRST publish and kept across an
 /// unpublish/republish cycle, so re-publishing a corrected post does not jump
@@ -1851,28 +1827,6 @@ model BlogPost {
   coverObjectKey String?      @db.VarChar(512)
   category       BlogCategory
 
-  /// Nullable, with ON DELETE SET NULL: a post outlives the operator account
-  /// that wrote it.
-  authorId String? @db.Uuid
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  author       Customer?             @relation(fields: [authorId], references: [id], onDelete: SetNull)
-  translations BlogPostTranslation[]
-
-  @@index([status, publishedAt])
-  @@index([authorId])
-  @@map("blog_post")
-}
-
-/// Per-locale post copy. Decision D8c: a post may exist in Spanish only — the
-/// storefront lists a post in a locale only when a row for that locale exists.
-model BlogPostTranslation {
-  id     String @id @default(uuid()) @db.Uuid
-  postId String @db.Uuid
-  locale Locale
-
   title           String  @db.VarChar(200)
   excerpt         String  @db.VarChar(500)
   /// Sanitised with `@akai/rich-text` on write (and again on render).
@@ -1881,9 +1835,16 @@ model BlogPostTranslation {
   metaDescription String? @db.VarChar(320)
   coverAlt        String  @default("") @db.VarChar(300)
 
-  post BlogPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  /// Nullable, with ON DELETE SET NULL: a post outlives the operator account
+  /// that wrote it.
+  authorId String? @db.Uuid
 
-  @@unique([postId, locale])
-  @@index([locale])
-  @@map("blog_post_translation")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  author Customer? @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([status, publishedAt])
+  @@index([authorId])
+  @@map("blog_post")
 }

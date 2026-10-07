@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { idSchema, isoDateTimeSchema, localeSchema, paginatedSchema, slugSchema } from "./common";
+import { idSchema, isoDateTimeSchema, paginatedSchema, slugSchema } from "./common";
 
 /**
  * The blog — spec 2026-09-24 §8 ("Nuestras últimas publicaciones").
@@ -10,12 +10,9 @@ import { idSchema, isoDateTimeSchema, localeSchema, paginatedSchema, slugSchema 
  *    allow-list as product descriptions, which has no `img`; inline images are
  *    a later change to that allow-list, not to these schemas.
  *  - D8b: the category is a FIXED enum, editable only by code, so the chip on a
- *    card is a translated label rather than whatever an operator typed.
- *  - D8c: a post may exist in Spanish only. `translations[]` carries only the
- *    locales that exist; the public list filters by `locale`, and the storefront
- *    404s a post page in a locale the post has no row for. There is NO fallback
- *    to another language on the public surface — an English page rendering
- *    Spanish copy is exactly what D8c rules out.
+ *    card is a catalogue label rather than whatever an operator typed.
+ *  - The shop is Spanish only, so a post's copy (title, excerpt, body, meta,
+ *    cover alt) sits on the post itself — there are no per-language rows.
  */
 
 /** D8b. Mirrors the `BlogCategory` Prisma enum member-for-member. */
@@ -34,10 +31,9 @@ export const BLOG_META_TITLE_MAX = 200;
 export const BLOG_META_DESCRIPTION_MAX = 320;
 export const BLOG_COVER_ALT_MAX = 300;
 
-/** A post's copy in one locale, as the platform stores and serves it. */
-export const blogPostTranslationSchema = z
+/** A post's copy, as the platform stores and serves it. */
+export const blogPostCopySchema = z
   .object({
-    locale: localeSchema,
     title: z.string().min(1).max(BLOG_TITLE_MAX),
     excerpt: z.string().max(BLOG_EXCERPT_MAX),
     bodyHtml: z.string().max(BLOG_BODY_MAX),
@@ -47,14 +43,7 @@ export const blogPostTranslationSchema = z
   })
   .strict();
 
-export type BlogPostTranslation = z.infer<typeof blogPostTranslationSchema>;
-
-/** The card-sized slice of a translation — no body, no meta. */
-export const blogPostSummaryTranslationSchema = blogPostTranslationSchema
-  .pick({ locale: true, title: true, excerpt: true, coverAlt: true })
-  .strict();
-
-export type BlogPostSummaryTranslation = z.infer<typeof blogPostSummaryTranslationSchema>;
+export type BlogPostCopy = z.infer<typeof blogPostCopySchema>;
 
 // ---------------------------------------------------------------------------
 // Public surface
@@ -74,7 +63,9 @@ export const publicBlogPostSummarySchema = z
     category: blogCategorySchema,
     publishedAt: isoDateTimeSchema,
     coverUrl: z.string().url().nullable(),
-    translations: z.array(blogPostSummaryTranslationSchema).min(1),
+    title: blogPostCopySchema.shape.title,
+    excerpt: blogPostCopySchema.shape.excerpt,
+    coverAlt: blogPostCopySchema.shape.coverAlt,
   })
   .strict();
 
@@ -83,22 +74,17 @@ export type PublicBlogPostSummary = z.infer<typeof publicBlogPostSummarySchema>;
 /** One post in full — `/blog/[slug]`. */
 export const publicBlogPostSchema = publicBlogPostSummarySchema
   .extend({
-    translations: z.array(blogPostTranslationSchema).min(1),
+    bodyHtml: blogPostCopySchema.shape.bodyHtml,
+    metaTitle: blogPostCopySchema.shape.metaTitle,
+    metaDescription: blogPostCopySchema.shape.metaDescription,
   })
   .strict();
 
 export type PublicBlogPost = z.infer<typeof publicBlogPostSchema>;
 
-/**
- * `GET /v1/blog/posts`.
- *
- * `locale` FILTERS (D8c): with it, only posts that have a translation in that
- * locale come back. Without it, every published post does — which is what the
- * sitemap wants, since it reads each post's available locales off the payload.
- */
+/** `GET /v1/blog/posts` — every published post, newest first. */
 export const blogPostListQuerySchema = z
   .object({
-    locale: localeSchema.optional(),
     cursor: idSchema.optional(),
     limit: z.coerce.number().int().min(1).max(50).default(12),
   })
@@ -109,18 +95,6 @@ export type BlogPostListQuery = z.infer<typeof blogPostListQuerySchema>;
 export const publicBlogPostListResponseSchema = paginatedSchema(publicBlogPostSummarySchema);
 
 export type PublicBlogPostListResponse = z.infer<typeof publicBlogPostListResponseSchema>;
-
-/**
- * `GET /v1/blog/posts/:slug`. With `locale`, a post with no translation in that
- * locale is a 404 — the same answer as a post that does not exist (D8c).
- */
-export const blogPostDetailQuerySchema = z
-  .object({
-    locale: localeSchema.optional(),
-  })
-  .strict();
-
-export type BlogPostDetailQuery = z.infer<typeof blogPostDetailQuerySchema>;
 
 // ---------------------------------------------------------------------------
 // Admin surface
@@ -139,8 +113,8 @@ export const adminBlogPostSchema = z
     authorId: idSchema.nullable(),
     createdAt: isoDateTimeSchema,
     updatedAt: isoDateTimeSchema,
-    translations: z.array(blogPostTranslationSchema),
   })
+  .merge(blogPostCopySchema)
   .strict();
 
 export type AdminBlogPost = z.infer<typeof adminBlogPostSchema>;
@@ -160,59 +134,25 @@ export const adminBlogPostListResponseSchema = paginatedSchema(adminBlogPostSche
 export type AdminBlogPostListResponse = z.infer<typeof adminBlogPostListResponseSchema>;
 
 /**
- * One locale's copy on a write.
+ * A post's copy on a write.
  *
  * Trimmed, and `title`/`excerpt`/`bodyHtml` are required non-blank: a card
- * with an empty excerpt or a page with an empty body is a half-written post,
- * and a half-written locale is exactly what D8c lets an operator simply leave
- * out instead. The meta fields are optional — the page falls back to the title
- * and the excerpt.
+ * with an empty excerpt or a page with an empty body is a half-written post.
+ * The meta fields are optional — the page falls back to the title and the
+ * excerpt.
  */
-export const blogPostTranslationInputSchema = z
-  .object({
-    locale: localeSchema,
-    title: z.string().trim().min(1).max(BLOG_TITLE_MAX),
-    excerpt: z.string().trim().min(1).max(BLOG_EXCERPT_MAX),
-    bodyHtml: z.string().trim().min(1).max(BLOG_BODY_MAX),
-    metaTitle: z.string().trim().max(BLOG_META_TITLE_MAX).nullable().default(null),
-    metaDescription: z.string().trim().max(BLOG_META_DESCRIPTION_MAX).nullable().default(null),
-    coverAlt: z.string().trim().max(BLOG_COVER_ALT_MAX).default(""),
-  })
-  .strict();
+const blogPostCopyInputShape = {
+  title: z.string().trim().min(1).max(BLOG_TITLE_MAX),
+  excerpt: z.string().trim().min(1).max(BLOG_EXCERPT_MAX),
+  bodyHtml: z.string().trim().min(1).max(BLOG_BODY_MAX),
+  metaTitle: z.string().trim().max(BLOG_META_TITLE_MAX).nullable().default(null),
+  metaDescription: z.string().trim().max(BLOG_META_DESCRIPTION_MAX).nullable().default(null),
+  coverAlt: z.string().trim().max(BLOG_COVER_ALT_MAX).default(""),
+};
 
-export type BlogPostTranslationInput = z.infer<typeof blogPostTranslationInputSchema>;
+export const blogPostCopyInputSchema = z.object(blogPostCopyInputShape).strict();
 
-/**
- * At most one row per locale, and Spanish always present.
- *
- * Spanish is REQUIRED because it is the store's default locale: the unprefixed
- * `/blog/<slug>` URL is the Spanish page, so a post with no Spanish row would
- * have no canonical page at all. English stays optional (D8c).
- */
-const translationsInputSchema = z
-  .array(blogPostTranslationInputSchema)
-  .min(1)
-  .max(localeSchema.options.length)
-  .superRefine((translations, ctx) => {
-    const seen = new Set<string>();
-    for (const [index, translation] of translations.entries()) {
-      if (seen.has(translation.locale)) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: [index, "locale"],
-          message: `Duplicate translation for locale ${translation.locale}`,
-        });
-      }
-      seen.add(translation.locale);
-    }
-    if (!seen.has("es")) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: [],
-        message: "A Spanish (es) translation is required",
-      });
-    }
-  });
+export type BlogPostCopyInput = z.infer<typeof blogPostCopyInputSchema>;
 
 /**
  * Create a DRAFT. No cover and no status here: a cover key is scoped to the
@@ -223,23 +163,27 @@ export const createBlogPostSchema = z
   .object({
     slug: slugSchema,
     category: blogCategorySchema,
-    translations: translationsInputSchema,
+    ...blogPostCopyInputShape,
   })
   .strict();
 
 export type CreateBlogPost = z.infer<typeof createBlogPostSchema>;
 
 /**
- * A partial update. `translations`, when present, REPLACES the whole set — a
- * locale left out is removed, which is how an operator withdraws an English
- * version (D8c). `coverObjectKey: null` removes the cover.
+ * A partial update: only the fields present change. `coverObjectKey: null`
+ * removes the cover.
  */
 export const updateBlogPostSchema = z
   .object({
     slug: slugSchema.optional(),
     category: blogCategorySchema.optional(),
     coverObjectKey: z.string().min(1).max(512).nullable().optional(),
-    translations: translationsInputSchema.optional(),
+    title: blogPostCopyInputShape.title.optional(),
+    excerpt: blogPostCopyInputShape.excerpt.optional(),
+    bodyHtml: blogPostCopyInputShape.bodyHtml.optional(),
+    metaTitle: z.string().trim().max(BLOG_META_TITLE_MAX).nullable().optional(),
+    metaDescription: z.string().trim().max(BLOG_META_DESCRIPTION_MAX).nullable().optional(),
+    coverAlt: blogPostCopyInputShape.coverAlt.removeDefault().optional(),
   })
   .strict();
 

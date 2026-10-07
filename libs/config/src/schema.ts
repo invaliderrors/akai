@@ -268,27 +268,6 @@ export const serverEnvShape = z
     S3_ACCESS_KEY_ID: z.string().min(1),
     S3_SECRET_ACCESS_KEY: z.string().min(1),
 
-    // --- Translation -------------------------------------------------------
-    /**
-     * DeepL auth key for the admin product form's ES <-> EN copy translation.
-     *
-     * OPTIONAL, and the feature is ABSENT rather than broken when it is unset:
-     * TranslationModule binds a gateway that answers every call with
-     * NOT_CONFIGURED, so the endpoint returns a typed refusal the dashboard can
-     * branch on instead of a 500. No environment's boot depends on a vendor key
-     * for a convenience feature, and a contributor without a DeepL account can
-     * still run the whole API.
-     *
-     * There is deliberately NO companion DEEPL_BASE_URL. DeepL's free tier
-     * lives on api-free.deepl.com and its paid tier on api.deepl.com, and a
-     * FREE key is the one ending in ":fx" — so the host is DERIVED from the key
-     * (`deeplBaseUrl`, apps/api/src/modules/translation). A second variable
-     * could only ever disagree with the first, and the disagreement surfaces as
-     * a 403 that reads exactly like a revoked credential, so an operator would
-     * rotate a perfectly good key trying to fix a wrong hostname.
-     */
-    DEEPL_API_KEY: z.string().optional(),
-
     // --- Origins -----------------------------------------------------------
     CORS_ALLOWED_ORIGINS: csvList,
     STOREFRONT_URL: z.string().url(),

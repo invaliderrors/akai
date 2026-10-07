@@ -20,7 +20,6 @@
       "@akai/money": ["libs/money/src/index.ts"],
       "@akai/rich-text": ["libs/rich-text/src/index.ts"],
       "@akai/config": ["libs/config/src/index.ts"],
-      "@akai/i18n": ["libs/i18n/src/index.ts"],
       "@akai/session": ["libs/session/src/index.ts"],
       "@akai/ui": ["libs/ui/src/index.ts"],
       "@akai/email-templates": ["libs/email-templates/src/index.ts"],

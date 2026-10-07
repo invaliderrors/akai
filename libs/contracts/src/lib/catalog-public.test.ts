@@ -19,7 +19,7 @@ const VARIANT = {
   id: "11111111-1111-4111-8111-111111111111",
   productId: "22222222-2222-4222-8222-222222222222",
   sku: "AK-CRE-300",
-  name: { es: "300 g", en: "300 g" },
+  name: "300 g",
   options: { size: "300 g" },
   price: {
     currency: "EUR",
@@ -45,9 +45,9 @@ const PRODUCT = {
   slug: "oversized-tee",
   status: "ACTIVE",
   taxClass: "STANDARD",
-  translations: [
-    { locale: "es", name: "Camiseta", shortDescription: "", description: "" },
-  ],
+  name: "Camiseta",
+  shortDescription: "",
+  description: "",
   variants: [VARIANT],
   media: [],
   categories: [],
@@ -119,14 +119,12 @@ describe("productSortSchema", () => {
 });
 
 describe("categoryListQuerySchema", () => {
-  it("defaults to the Spanish locale", () => {
-    expect(categoryListQuerySchema.parse({}).locale).toEqual("es");
+  it("accepts no filters", () => {
+    expect(categoryListQuerySchema.parse({})).toEqual({});
   });
 
   it("is strict — no privileged filter can be smuggled in", () => {
-    expect(
-      categoryListQuerySchema.safeParse({ locale: "en", includeDeleted: true }).success,
-    ).toBe(false);
+    expect(categoryListQuerySchema.safeParse({ includeDeleted: true }).success).toBe(false);
   });
 });
 
@@ -137,7 +135,7 @@ describe("categoryListResponseSchema", () => {
         {
           id: "33333333-3333-4333-8333-333333333333",
           slug: "recovery",
-          name: { es: "Recuperación", en: "Recovery" },
+          name: "Recuperación",
           sortOrder: 0,
           productCount: 2,
         },
@@ -153,7 +151,7 @@ describe("categoryListResponseSchema", () => {
         {
           id: "33333333-3333-4333-8333-333333333333",
           slug: "recovery",
-          name: { es: "Recuperación" },
+          name: "Recuperación",
           sortOrder: 0,
           productCount: -1,
         },
@@ -285,7 +283,7 @@ describe("publicProductSchema variant image", () => {
     const image = {
       id: "44444444-4444-4444-8444-444444444444",
       url: "https://cdn.example.com/tee-black.jpg",
-      alt: { es: "Camiseta negra doblada" },
+      alt: "Camiseta negra doblada",
       width: 1200,
       height: 1200,
       sortOrder: 0,
@@ -522,7 +520,9 @@ describe("computeStackDiscountTiers", () => {
 describe("fields from the previous catalogue are gone", () => {
   const base = {
     slug: "x",
-    translations: PRODUCT.translations,
+    name: PRODUCT.name,
+    shortDescription: "",
+    description: "",
     variants: [{ sku: "X-1", priceGross: 100, currency: "EUR" }],
   };
 

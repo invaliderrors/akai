@@ -35,7 +35,6 @@ export default defineConfig({
       "@akai/money": path.resolve(workspaceRoot, "libs/money/src/index.ts"),
       "@akai/rich-text": path.resolve(workspaceRoot, "libs/rich-text/src/index.ts"),
       "@akai/config": path.resolve(workspaceRoot, "libs/config/src/index.ts"),
-      "@akai/i18n": path.resolve(workspaceRoot, "libs/i18n/src/index.ts"),
       "@akai/email-templates": path.resolve(
         workspaceRoot,
         "libs/email-templates/src/index.ts",

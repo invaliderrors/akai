@@ -19,43 +19,18 @@ export const shippingStrategySchema = z.enum(["FLAT", "WEIGHT", "PRICE"]);
 export type ShippingStrategy = z.infer<typeof shippingStrategySchema>;
 
 /**
- * A rate's per-locale name as staff WRITE it: Spanish required, English
- * optional.
- *
- * Spanish is the store's default locale and the fallback every reader of this
- * name already applies (`localized-text.ts` on the order snapshot, the
- * storefront's `view.ts`), so a rate with only Spanish copy still renders
- * everywhere — in Spanish — rather than disappearing. English is optional so a
- * new method can go live before its translation is written; an empty English
- * name is refused rather than stored, because `""` would satisfy "has a name"
- * and render as a blank method line.
+ * A rate's name as staff WRITE it. Trimmed and non-blank: `""` would render as
+ * a blank method line at checkout.
  */
-export const shippingRateNameSchema = z
-  .object({
-    es: z.string().trim().min(1).max(120),
-    en: z.string().trim().min(1).max(120).optional(),
-  })
-  .strict();
+export const shippingRateNameSchema = z.string().trim().min(1).max(120);
 
 export type ShippingRateName = z.infer<typeof shippingRateNameSchema>;
-
-/**
- * A rate's name as it is READ back. Both locales optional: the column is Json
- * and rows written before this editor existed (or by hand) are narrowed, not
- * trusted — a row missing Spanish must still be listable so staff can fix it.
- */
-export const storedShippingRateNameSchema = z
-  .object({
-    es: z.string().max(120).optional(),
-    en: z.string().max(120).optional(),
-  })
-  .strict();
 
 const transitDaysSchema = z.number().int().min(0).max(60);
 
 /**
  * Why a zones/rates admin write was refused — the error envelope's `reason`
- * (the `translationFailureReasonSchema` precedent: no new `ErrorCode`). The
+ * (a sub-code, not a new `ErrorCode`). The
  * dashboard branches on these against its own message catalogue; the API's
  * English message is for logs.
  *
@@ -97,7 +72,7 @@ export const adminShippingRateSchema = z
   .object({
     id: idSchema,
     zoneId: idSchema,
-    name: storedShippingRateNameSchema,
+    name: z.string().max(120),
     strategy: shippingStrategySchema,
     /** WEIGHT: grams. PRICE: minor units. Inclusive lower / exclusive upper. */
     minValue: z.number().int().min(0).nullable(),

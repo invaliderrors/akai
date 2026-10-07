@@ -101,12 +101,17 @@ ALTER TABLE "product_pack_component"
 -- 2. SHAPE AND DOMAIN CHECKS
 -- -----------------------------------------------------------------------------
 
--- Shipping method names are per-locale JSON. `narrowLocalizedText` in the API
--- degrades an unparseable record to "no name" (and the selector then refuses to
--- offer the rate), but that is a read-side guard: this is what stops a manual
--- UPDATE writing a bare string or an array in the first place.
+-- A shipping method's name is shown at checkout and stamped onto the order. The
+-- request schema refuses a blank one; this is what stops a manual UPDATE from
+-- writing one anyway and leaving shoppers an empty method line.
 ALTER TABLE "shipping_rate"
-  ADD CONSTRAINT "shipping_rate_name_is_object" CHECK (jsonb_typeof("name") = 'object');
+  ADD CONSTRAINT "shipping_rate_name_not_blank" CHECK (btrim("name") <> '');
+
+-- Likewise a category name and a product name: both are rendered as headings.
+ALTER TABLE "category"
+  ADD CONSTRAINT "category_name_not_blank" CHECK (btrim("name") <> '');
+ALTER TABLE "product"
+  ADD CONSTRAINT "product_name_not_blank" CHECK (btrim("name") <> '');
 
 -- A PAGE NEVER OFFERS ITSELF. The service checks this too, to return a named
 -- 400 — but the service is not the only writer a database ever has.

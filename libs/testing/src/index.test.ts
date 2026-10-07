@@ -15,7 +15,6 @@ describe("FakeEmailPort", () => {
     const result = await email.send({
       to: "ana@example.com",
       templateKey: "order-confirmation",
-      locale: "es",
       data: {},
       orderId: "order-1",
     });
@@ -34,14 +33,13 @@ describe("FakeEmailPort", () => {
     email.failOnce();
 
     await expect(
-      email.send({ to: "a@b.com", templateKey: "verify-email", locale: "es", data: {} }),
+      email.send({ to: "a@b.com", templateKey: "verify-email", data: {} }),
     ).rejects.toThrow();
 
     // The next send succeeds — the failure is armed once, not sticky.
     await email.send({
       to: "a@b.com",
       templateKey: "verify-email",
-      locale: "es",
       data: {},
     });
     expect(email.messages).toHaveLength(1);

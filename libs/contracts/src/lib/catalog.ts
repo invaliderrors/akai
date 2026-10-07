@@ -8,7 +8,6 @@ import {
   countryCodeSchema,
   idSchema,
   isoDateTimeSchema,
-  localeSchema,
   slugSchema,
 } from "./common";
 import { currencyCodeSchema, nonNegativeMinorSchema, toMinor, type Minor } from "./money";
@@ -22,24 +21,26 @@ import { currencyCodeSchema, nonNegativeMinorSchema, toMinor, type Minor } from 
  * rewriting every order, cart and inventory query the day a second size ships.
  */
 
-/** Per-locale product copy. Product text is the one surface that would otherwise escape i18n. */
-export const productTranslationSchema = z
-  .object({
-    locale: localeSchema,
-    name: z.string().min(1).max(200),
-    shortDescription: z.string().max(500),
-    description: z.string().max(20_000),
-  })
-  .strict();
+/**
+ * A product's copy. The shop is Spanish only, so these are plain fields on the
+ * product — spread into `productSchema` and `createProductSchema` below.
+ */
+export const productCopyShape = {
+  name: z.string().min(1).max(200),
+  shortDescription: z.string().max(500),
+  description: z.string().max(20_000),
+};
 
-export type ProductTranslation = z.infer<typeof productTranslationSchema>;
+export const productCopySchema = z.object(productCopyShape).strict();
+
+export type ProductCopy = z.infer<typeof productCopySchema>;
 
 export const mediaAssetSchema = z
   .object({
     id: idSchema,
     url: z.string().url(),
-    /** Alt text is per-locale: it is user-facing copy like any other. */
-    alt: z.record(localeSchema, z.string().max(300)),
+    /** Alt text: user-facing copy like any other. "" when none was written. */
+    alt: z.string().max(300),
     width: z.number().int().positive(),
     height: z.number().int().positive(),
     sortOrder: z.number().int().min(0),
@@ -52,7 +53,7 @@ export const categorySchema = z
   .object({
     id: idSchema,
     slug: slugSchema,
-    name: z.record(localeSchema, z.string().min(1).max(120)),
+    name: z.string().min(1).max(120),
     sortOrder: z.number().int().min(0),
   })
   .strict();
@@ -81,12 +82,8 @@ export const categoryListItemSchema = categorySchema
 
 export type CategoryListItem = z.infer<typeof categoryListItemSchema>;
 
-/** Public category list filters. Locale affects nothing but is accepted for symmetry. */
-export const categoryListQuerySchema = z
-  .object({
-    locale: localeSchema.default("es"),
-  })
-  .strict();
+/** Public category list filters. There are none; the empty object rejects unknown keys. */
+export const categoryListQuerySchema = z.object({}).strict();
 
 export type CategoryListQuery = z.infer<typeof categoryListQuerySchema>;
 
@@ -245,8 +242,8 @@ export const productVariantSchema = z
     id: idSchema,
     productId: idSchema,
     sku: z.string().min(1).max(64),
-    /** e.g. { es: "M / Negro", en: "M / Black" }. Null for single-variant products. */
-    name: z.record(localeSchema, z.string().max(120)).nullable(),
+    /** e.g. "M / Negro". Null for single-variant products. */
+    name: z.string().max(120).nullable(),
     /** Option values keyed by option name, e.g. { size: "M", color: "black" }. */
     options: z.record(z.string().max(40), z.string().max(80)),
     price: priceSchema,
@@ -321,9 +318,8 @@ export type ProductVariant = z.infer<typeof productVariantSchema>;
  * product payload into a tree. `GET /v1/products` returns up to 100 products, so
  * that tree would be paid for on every catalogue read.
  *
- * `slug` rather than a resolved name because a slug needs no locale, is unique,
- * is already what the storefront falls back to for a product with no
- * translation, and is enough for an operator to recognise a row.
+ * `slug` rather than a name because a slug is unique, stable across renames,
+ * and enough for an operator to recognise a row.
  */
 export const productAddOnRefSchema = z
   .object({
@@ -394,7 +390,7 @@ export const productSchema = z
     slug: slugSchema,
     status: productStatusSchema,
     taxClass: taxClassSchema,
-    translations: z.array(productTranslationSchema).min(1),
+    ...productCopyShape,
     /**
      * NO `.min(1)` HERE, DELIBERATELY — and `publicProductSchema` below adds it
      * back for the customer-facing shape.
@@ -593,7 +589,7 @@ export type PublicPackComponent = z.infer<typeof publicPackComponentSchema>;
 export const createVariantSchema = z
   .object({
     sku: z.string().min(1).max(64),
-    name: z.record(localeSchema, z.string().max(120)).nullable().default(null),
+    name: z.string().max(120).nullable().default(null),
     options: z.record(z.string().max(40), z.string().max(80)).default({}),
     /** Admin supplies GROSS (what the customer sees); the API derives net and tax. */
     priceGross: nonNegativeMinorSchema,
@@ -684,7 +680,7 @@ export const createProductSchema = z
     slug: slugSchema,
     status: productStatusSchema.default("DRAFT"),
     taxClass: taxClassSchema.default("STANDARD"),
-    translations: z.array(productTranslationSchema).min(1),
+    ...productCopyShape,
     variants: z.array(createVariantSchema).min(1),
     categoryIds: z.array(idSchema).default([]),
     /**
