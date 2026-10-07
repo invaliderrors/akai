@@ -6,7 +6,6 @@ import {
   normaliseDocumentNumber,
   type Cart,
   type IdentityDocumentType,
-  type Locale,
   type ShippingOptionDto,
 } from "@akai/contracts";
 import { formatMoney } from "@akai/money";
@@ -14,11 +13,9 @@ import { useEffect, useMemo, useState, type SyntheticEvent } from "react";
 
 import { errorMessage, type Messages } from "@/i18n/messages";
 import { CartClient } from "@/lib/cart-client";
-import { pickLocaleText } from "@/lib/view";
 
 interface Props {
   readonly apiUrl: string;
-  readonly locale: Locale;
   readonly cartHref: string;
   readonly termsVersion: string;
   readonly t: Messages["checkout"];
@@ -52,8 +49,8 @@ const EMPTY_ADDRESS: Readonly<Record<TextField, string>> = {
  * so the shopper is told what to fix before the round trip; the API stays the
  * authority.
  */
-export default function CheckoutForm({ apiUrl, locale, cartHref, termsVersion, t, errors }: Props) {
-  const client = useMemo(() => new CartClient(apiUrl, locale), [apiUrl, locale]);
+export default function CheckoutForm({ apiUrl, cartHref, termsVersion, t, errors }: Props) {
+  const client = useMemo(() => new CartClient(apiUrl), [apiUrl]);
 
   const [cart, setCart] = useState<Cart | null | undefined>(undefined);
   const [email, setEmail] = useState("");
@@ -140,7 +137,6 @@ export default function CheckoutForm({ apiUrl, locale, cartHref, termsVersion, t
           shippingMethodId: rateId,
           documentType,
           documentNumber,
-          locale,
           acceptedTermsVersion: termsVersion,
         },
         idempotencyKey,
@@ -261,9 +257,9 @@ export default function CheckoutForm({ apiUrl, locale, cartHref, termsVersion, t
                     checked={rateId === option.rateId}
                     onChange={() => setRateId(option.rateId)}
                   />
-                  <span className="flex-1">{pickLocaleText(option.name, locale)}</span>
+                  <span className="flex-1">{option.name}</span>
                   <span className="tabular-nums">
-                    {option.isFree ? t.free : formatMoney(option.priceGross, option.currency, locale)}
+                    {option.isFree ? t.free : formatMoney(option.priceGross, option.currency)}
                   </span>
                 </label>
               ))}
@@ -280,7 +276,7 @@ export default function CheckoutForm({ apiUrl, locale, cartHref, termsVersion, t
                 {item.name}
                 {item.variantName ? ` — ${item.variantName}` : ""} × {item.quantity}
               </span>
-              <span className="tabular-nums">{formatMoney(item.lineTotalGross, cart.totals.currency, locale)}</span>
+              <span className="tabular-nums">{formatMoney(item.lineTotalGross, cart.totals.currency)}</span>
             </li>
           ))}
         </ul>

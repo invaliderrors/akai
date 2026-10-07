@@ -7,8 +7,8 @@ import { defineConfig } from "astro/config";
 /**
  * Server-rendered on every request (`output: "server"`): prices, stock and the
  * visitor's session are per-request facts, and the API is the source of truth
- * for all of them. Locale routing lives in `src/middleware.ts`, not in Astro's
- * i18n config — pages are written once under `src/pages/[locale]/`.
+ * for all of them. The shop is Spanish only: no Astro i18n config, every page
+ * at its bare path; `src/middleware.ts` 301s the old `/en/...` URLs.
  */
 export default defineConfig({
   output: "server",

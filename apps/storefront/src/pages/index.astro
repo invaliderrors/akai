@@ -1,13 +1,10 @@
 ---
 import ProductCard from "@/components/ProductCard.astro";
-import { messages } from "@/i18n/messages";
-import { href } from "@/i18n/routing";
+import { t } from "@/i18n/messages";
 import Base from "@/layouts/Base.astro";
 import { listProducts } from "@/lib/catalog";
 
-const locale = Astro.locals.locale;
-const t = messages(locale);
-const { items } = await listProducts({ locale, sort: "newest", limit: 8 });
+const { items } = await listProducts({ sort: "newest", limit: 8 });
 ---
 
 <Base>
@@ -17,7 +14,7 @@ const { items } = await listProducts({ locale, sort: "newest", limit: 8 });
         <p class="text-xs font-bold uppercase tracking-[0.3em] text-akai">{t.home.kicker}</p>
         <h1 class="mt-4 font-display text-7xl uppercase leading-[0.9] sm:text-9xl">{t.home.title}</h1>
         <p class="mt-6 max-w-md text-lg">{t.home.lead}</p>
-        <a href={href(locale, "/products")} class="btn mt-8">{t.home.cta} →</a>
+        <a href={"/products"} class="btn mt-8">{t.home.cta} →</a>
       </div>
       <p
         aria-hidden="true"
@@ -31,7 +28,7 @@ const { items } = await listProducts({ locale, sort: "newest", limit: 8 });
   <section class="mx-auto max-w-7xl px-4 pt-16 sm:px-6">
     <div class="mb-8 flex items-end justify-between">
       <h2 class="font-display text-4xl uppercase">{t.home.newArrivals}</h2>
-      <a href={href(locale, "/products")} class="text-xs font-bold uppercase tracking-[0.2em] hover:text-akai">
+      <a href={"/products"} class="text-xs font-bold uppercase tracking-[0.2em] hover:text-akai">
         {t.home.viewAll} →
       </a>
     </div>

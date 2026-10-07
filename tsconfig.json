@@ -12,7 +12,6 @@
     { "path": "./libs/db" },
     { "path": "./libs/money" },
     { "path": "./libs/config" },
-    { "path": "./libs/i18n" },
     { "path": "./libs/ui" },
     { "path": "./libs/email-templates" },
     { "path": "./libs/testing" },

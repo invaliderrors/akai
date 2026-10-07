@@ -1,8 +1,9 @@
 ---
+import { STORE_LOCALE } from "@akai/contracts";
+
 import Footer from "@/components/Footer.astro";
 import Header from "@/components/Header.astro";
-import { messages } from "@/i18n/messages";
-import { alternatePath } from "@/i18n/routing";
+import { t } from "@/i18n/messages";
 import "@/styles/global.css";
 
 interface Props {
@@ -10,22 +11,18 @@ interface Props {
   description?: string | undefined;
 }
 
-const locale = Astro.locals.locale;
-const t = messages(locale);
 const { title, description = t.meta.description } = Astro.props;
-const other = locale === "es" ? "en" : "es";
 const fullTitle = title === undefined ? "AKAI — 赤い" : `${title} · AKAI`;
 ---
 
 <!doctype html>
-<html lang={locale}>
+<html lang={STORE_LOCALE}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{fullTitle}</title>
     <meta name="description" content={description} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="alternate" hreflang={other} href={alternatePath(Astro.url.pathname, locale, other)} />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

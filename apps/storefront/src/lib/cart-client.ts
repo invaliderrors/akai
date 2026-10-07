@@ -8,7 +8,6 @@ import {
   shippingQuoteRequestSchema,
   shippingQuoteResponseSchema,
   type Cart,
-  type Locale,
 } from "@akai/contracts";
 import { z } from "zod";
 
@@ -48,10 +47,7 @@ function cartTokenHeader(): Record<string, string> {
 }
 
 export class CartClient {
-  constructor(
-    private readonly apiUrl: string,
-    private readonly locale: Locale,
-  ) {}
+  constructor(private readonly apiUrl: string) {}
 
   private async cartCall(method: HttpMethod, path: string, body?: unknown): Promise<Cart> {
     const { data, headers } = await apiRequest({
@@ -59,7 +55,6 @@ export class CartClient {
       method,
       path,
       schema: cartSchema,
-      query: { locale: this.locale },
       headers: cartTokenHeader(),
       ...(body === undefined ? {} : { body }),
     });

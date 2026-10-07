@@ -1,4 +1,4 @@
-import type { Cart, CartItem, Locale, Minor } from "@akai/contracts";
+import type { Cart, CartItem, Minor } from "@akai/contracts";
 import { formatMoney } from "@akai/money";
 import { useEffect, useMemo, useState } from "react";
 
@@ -7,7 +7,6 @@ import { CartClient } from "@/lib/cart-client";
 
 interface Props {
   readonly apiUrl: string;
-  readonly locale: Locale;
   readonly shopHref: string;
   readonly checkoutHref: string;
   readonly productHrefBase: string;
@@ -17,8 +16,8 @@ interface Props {
 
 type State = { kind: "loading" } | { kind: "error" } | { kind: "ready"; cart: Cart | null };
 
-export default function CartView({ apiUrl, locale, shopHref, checkoutHref, productHrefBase, t, problems }: Props) {
-  const client = useMemo(() => new CartClient(apiUrl, locale), [apiUrl, locale]);
+export default function CartView({ apiUrl, shopHref, checkoutHref, productHrefBase, t, problems }: Props) {
+  const client = useMemo(() => new CartClient(apiUrl), [apiUrl]);
   const [state, setState] = useState<State>({ kind: "loading" });
   const [busy, setBusy] = useState(false);
 
@@ -58,7 +57,7 @@ export default function CartView({ apiUrl, locale, shopHref, checkoutHref, produ
     );
   }
 
-  const money = (amount: Minor) => formatMoney(amount, cart.totals.currency, locale);
+  const money = (amount: Minor) => formatMoney(amount, cart.totals.currency);
   const problemFor = (itemId: string) => cart.problems.find((problem) => problem.itemId === itemId)?.code;
 
   return (

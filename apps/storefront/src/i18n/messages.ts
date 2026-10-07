@@ -1,10 +1,10 @@
-import type { CartProblem, ErrorCode, Locale } from "@akai/contracts";
+import type { CartProblem, ErrorCode } from "@akai/contracts";
 
 /**
- * Every user-visible string. `es` is the source of truth for the key set;
- * `en` is typed against it, so a missing translation is a compile error.
- */
-/**
+ * Every user-visible string. The shop is Spanish only, so there is ONE
+ * catalogue: `t`. Pages import it; islands receive the slice they need as a
+ * prop, so the catalogue is not bundled into client JS wholesale.
+ *
  * Server messages (`ApiError.message`, `CartProblem.message`) are English for
  * logs and are NEVER shown to shoppers. UI branches on the closed code enums
  * instead; these maps are total, so a new code is a compile error.
@@ -12,7 +12,7 @@ import type { CartProblem, ErrorCode, Locale } from "@akai/contracts";
 type ErrorMessages = Readonly<Record<ErrorCode | "NETWORK", string>>;
 type ProblemMessages = Readonly<Record<CartProblem["code"], string>>;
 
-const esErrors: ErrorMessages = {
+const errorMessages: ErrorMessages = {
   VALIDATION_FAILED: "Revisa los datos introducidos.",
   UNAUTHENTICATED: "Tu sesión ha caducado. Vuelve a entrar.",
   FORBIDDEN: "No tienes permiso para hacer esto.",
@@ -28,7 +28,7 @@ const esErrors: ErrorMessages = {
   NETWORK: "No hay conexión con la tienda. Inténtalo de nuevo.",
 };
 
-const esProblems: ProblemMessages = {
+const problemMessages: ProblemMessages = {
   OUT_OF_STOCK: "Agotado.",
   INSUFFICIENT_STOCK: "No quedan suficientes unidades.",
   PRODUCT_UNAVAILABLE: "Ya no está disponible.",
@@ -37,13 +37,19 @@ const esProblems: ProblemMessages = {
   COUNTRY_RESTRICTED: "No se puede enviar a tu país.",
 };
 
-const es = {
-  errors: esErrors,
-  cartProblems: esProblems,
+export const t = {
+  errors: errorMessages,
+  cartProblems: problemMessages,
   meta: {
     description: "Akai — streetwear de inspiración japonesa. Ediciones limitadas, cortes amplios.",
   },
-  nav: { shop: "Tienda", cart: "Carrito", account: "Mi cuenta", signIn: "Entrar", language: "English" },
+  nav: {
+    banner: "赤い · Ediciones limitadas · Tokio",
+    shop: "Tienda",
+    cart: "Carrito",
+    account: "Mi cuenta",
+    signIn: "Entrar",
+  },
   home: {
     kicker: "Streetwear · Tokio",
     title: "Vestir en rojo.",
@@ -124,121 +130,9 @@ const es = {
   notFound: { title: "Página no encontrada", back: "Volver a la tienda" },
 };
 
-export type Messages = typeof es;
+export type Messages = typeof t;
 
-const en: Messages = {
-  errors: {
-    VALIDATION_FAILED: "Please check the details you entered.",
-    UNAUTHENTICATED: "Your session has expired. Please sign in again.",
-    FORBIDDEN: "You're not allowed to do that.",
-    NOT_FOUND: "We couldn't find that.",
-    CONFLICT: "Something changed in the meantime. Please reload.",
-    IDEMPOTENCY_KEY_REUSED: "This was already submitted. Please reload.",
-    RATE_LIMITED: "Too many attempts. Please wait a moment.",
-    PAYMENT_FAILED: "Payment could not be started.",
-    OUT_OF_STOCK: "An item has sold out.",
-    PRICE_CHANGED: "A price has changed. Please review your cart.",
-    ILLEGAL_STATE_TRANSITION: "This is no longer possible.",
-    INTERNAL_ERROR: "Something went wrong. Please try again.",
-    NETWORK: "Can't reach the shop right now. Please try again.",
-  },
-  cartProblems: {
-    OUT_OF_STOCK: "Sold out.",
-    INSUFFICIENT_STOCK: "Not enough units left.",
-    PRODUCT_UNAVAILABLE: "No longer available.",
-    PRICE_CHANGED: "The price has changed.",
-    QUANTITY_EXCEEDS_MAX: "Maximum quantity exceeded.",
-    COUNTRY_RESTRICTED: "Can't be shipped to your country.",
-  },
-  meta: { description: "Akai — Japanese-inspired streetwear. Limited runs, relaxed cuts." },
-  nav: { shop: "Shop", cart: "Cart", account: "Account", signIn: "Sign in", language: "Español" },
-  home: {
-    kicker: "Streetwear · Tokyo",
-    title: "Wear red.",
-    lead: "Relaxed cuts and limited runs, designed between the street and the studio.",
-    cta: "Shop the collection",
-    newArrivals: "New arrivals",
-    viewAll: "View all",
-  },
-  shop: { title: "Shop", all: "All", empty: "No products yet.", loadMore: "Load more" },
-  product: {
-    addToCart: "Add to cart",
-    adding: "Adding…",
-    added: "Added to cart",
-    soldOut: "Sold out",
-    selectOption: "Choose an option",
-    description: "Description",
-    viewCart: "View cart",
-  },
-  cart: {
-    title: "Cart",
-    empty: "Your cart is empty.",
-    continue: "Continue shopping",
-    subtotal: "Subtotal",
-    discount: "Discount",
-    total: "Total",
-    remove: "Remove",
-    checkout: "Checkout",
-    loading: "Loading cart…",
-    error: "The cart could not be loaded.",
-  },
-  checkout: {
-    title: "Checkout",
-    contact: "Contact",
-    email: "Email",
-    shipping: "Shipping",
-    countryFixed: "We ship to Colombia only.",
-    firstName: "First name",
-    lastName: "Last name",
-    line1: "Address (e.g. Calle 10 # 43-21)",
-    line2: "Apartment, tower, neighbourhood (optional)",
-    city: "City or municipality",
-    region: "Department",
-    regionPlaceholder: "Choose a department",
-    phone: "Mobile",
-    documentType: "ID type",
-    documentNumber: "ID number",
-    documentTypes: {
-      CC: "Citizenship ID (CC)",
-      CE: "Foreigner ID (CE)",
-      NIT: "Tax ID (NIT)",
-      PP: "Passport",
-      TI: "Identity card (TI)",
-      PPT: "Temporary protection permit (PPT)",
-    },
-    invalidPhone: "Enter a Colombian mobile: ten digits starting with 3.",
-    invalidDocument: "Check the ID number for the type you chose.",
-    method: "Shipping method",
-    quote: "Get shipping options",
-    noMethods: "No shipping methods are available right now.",
-    free: "Free",
-    terms: "I accept the terms and conditions of sale.",
-    pay: "Pay",
-    paying: "Redirecting to payment…",
-    failed: "Payment could not be started. Check your details and try again.",
-  },
-  processing: {
-    title: "Processing your order",
-    waiting: "We're confirming your payment. Please keep this page open.",
-    paid: "Payment confirmed! We've emailed you the details.",
-    failed: "The payment didn't go through. Your cart is still available.",
-    pending:
-      "Your payment is still processing (PSE, Nequi or bank transfers can take a while). We'll email you as soon as it's confirmed; you can close this page.",
-    review:
-      "We're reviewing your payment. Please don't pay again — we'll email you shortly.",
-    order: "Order",
-  },
-  footer: { tagline: "赤い — Japanese-inspired streetwear.", rights: "All rights reserved." },
-  notFound: { title: "Page not found", back: "Back to the shop" },
-};
-
-const MESSAGES: Readonly<Record<Locale, Messages>> = { es, en };
-
-export function messages(locale: Locale): Messages {
-  return MESSAGES[locale];
-}
-
-/** The translated message for any error thrown by an API call. */
+/** The shopper-facing message for any error thrown by an API call. */
 export function errorMessage(errors: Messages["errors"], error: unknown): string {
   if (error instanceof Error && "code" in error && typeof error.code === "string" && error.code in errors) {
     return errors[error.code as keyof Messages["errors"]];

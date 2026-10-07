@@ -4,12 +4,12 @@ import { identityDocumentTypeSchema } from "@akai/contracts";
 
 import { ApiError } from "@/lib/http";
 
-import { errorMessage, messages } from "./messages";
+import { errorMessage, t } from "./messages";
 
-const { errors } = messages("es");
+const { errors } = t;
 
 describe("errorMessage", () => {
-  it("translates an API error by its code, never its English message", () => {
+  it("maps an API error by its code, never its English message", () => {
     const error = new ApiError(429, {
       error: {
         code: "RATE_LIMITED",
@@ -18,7 +18,7 @@ describe("errorMessage", () => {
         timestamp: "2026-09-27T00:00:00.000Z",
       },
     });
-    expect(errorMessage(errors, error)).toBe(errors.RATE_LIMITED);
+    expect(errorMessage(errors, error)).toBe("Demasiados intentos. Espera un momento.");
   });
 
   it("treats a failed fetch as a network error", () => {
@@ -31,13 +31,11 @@ describe("errorMessage", () => {
 });
 
 describe("checkout copy for Colombia", () => {
-  it("names every identity document type the API accepts, in both locales", () => {
-    for (const locale of ["es", "en"] as const) {
-      const labels = messages(locale).checkout.documentTypes;
-      expect(Object.keys(labels).sort()).toEqual([...identityDocumentTypeSchema.options].sort());
-      for (const type of identityDocumentTypeSchema.options) {
-        expect(labels[type].trim()).not.toBe("");
-      }
+  it("names every identity document type the API accepts", () => {
+    const labels = t.checkout.documentTypes;
+    expect(Object.keys(labels).sort()).toEqual([...identityDocumentTypeSchema.options].sort());
+    for (const type of identityDocumentTypeSchema.options) {
+      expect(labels[type].trim()).not.toBe("");
     }
   });
 });

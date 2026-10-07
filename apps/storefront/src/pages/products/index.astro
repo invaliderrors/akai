@@ -2,23 +2,19 @@
 import { idSchema, slugSchema } from "@akai/contracts";
 
 import ProductCard from "@/components/ProductCard.astro";
-import { messages } from "@/i18n/messages";
-import { href } from "@/i18n/routing";
+import { t } from "@/i18n/messages";
 import Base from "@/layouts/Base.astro";
 import { listCategories, listProducts } from "@/lib/catalog";
-import { pickLocaleText } from "@/lib/view";
 
-const locale = Astro.locals.locale;
-const t = messages(locale);
 const category = slugSchema.safeParse(Astro.url.searchParams.get("category")).data;
 const cursor = idSchema.safeParse(Astro.url.searchParams.get("cursor")).data;
 
 const [page, categories] = await Promise.all([
-  listProducts({ locale, category, cursor, sort: "manual", limit: 24 }),
-  listCategories(locale),
+  listProducts({ category, cursor, sort: "manual", limit: 24 }),
+  listCategories(),
 ]);
 
-const base = href(locale, "/products");
+const base = "/products";
 const withQuery = (query: Record<string, string | undefined>) => {
   const params = new URLSearchParams(Object.entries(query).filter((entry): entry is [string, string] => entry[1] !== undefined));
   const qs = params.toString();
@@ -42,7 +38,7 @@ const withQuery = (query: Record<string, string | undefined>) => {
               href={withQuery({ category: entry.slug })}
               class:list={["border px-3 py-1.5", category === entry.slug ? "border-ink bg-ink text-paper" : "border-line hover:border-ink"]}
             >
-              {pickLocaleText(entry.name, locale)}
+              {entry.name}
             </a>
           ))
       }

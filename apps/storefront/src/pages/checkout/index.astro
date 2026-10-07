@@ -1,13 +1,10 @@
 ---
 import CheckoutForm from "@/components/islands/CheckoutForm";
-import { messages } from "@/i18n/messages";
-import { href } from "@/i18n/routing";
+import { t } from "@/i18n/messages";
 import Base from "@/layouts/Base.astro";
 import { serverEnv } from "@/lib/env";
 import { TERMS_VERSION } from "@/lib/legal";
 
-const locale = Astro.locals.locale;
-const t = messages(locale);
 ---
 
 <Base title={t.checkout.title}>
@@ -16,8 +13,7 @@ const t = messages(locale);
     <CheckoutForm
       client:only="react"
       apiUrl={serverEnv().PUBLIC_API_URL}
-      locale={locale}
-      cartHref={href(locale, "/cart")}
+      cartHref={"/cart"}
       termsVersion={TERMS_VERSION}
       t={t.checkout}
       errors={t.errors}

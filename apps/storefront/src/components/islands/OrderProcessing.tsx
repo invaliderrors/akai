@@ -1,4 +1,3 @@
-import type { Locale } from "@akai/contracts";
 import { useEffect, useState } from "react";
 
 import type { Messages } from "@/i18n/messages";
@@ -7,7 +6,6 @@ import { processingOutcome, type ProcessingOutcome } from "@/lib/payment-status"
 
 interface Props {
   readonly apiUrl: string;
-  readonly locale: Locale;
   readonly orderNumber: string;
   /** Wompi's `?id=`, already shape-checked by the page; null when absent. */
   readonly transactionId: string | null;
@@ -31,11 +29,11 @@ const MAX_POLLS = 48;
  * webhook is slow. The id is only a pointer: the API looks it up with its own
  * private key and checks it belongs to this order.
  */
-export default function OrderProcessing({ apiUrl, locale, orderNumber, transactionId, t }: Props) {
+export default function OrderProcessing({ apiUrl, orderNumber, transactionId, t }: Props) {
   const [shown, setShown] = useState<Shown>("waiting");
 
   useEffect(() => {
-    const client = new CartClient(apiUrl, locale);
+    const client = new CartClient(apiUrl);
     let polls = 0;
     let timer: ReturnType<typeof setTimeout> | undefined;
 
@@ -62,7 +60,7 @@ export default function OrderProcessing({ apiUrl, locale, orderNumber, transacti
 
     void poll();
     return () => clearTimeout(timer);
-  }, [apiUrl, locale, orderNumber, transactionId]);
+  }, [apiUrl, orderNumber, transactionId]);
 
   const message: Readonly<Record<Shown, string>> = {
     waiting: t.waiting,

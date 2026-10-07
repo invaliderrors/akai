@@ -3,7 +3,6 @@ import {
   paginatedSchema,
   publicProductSchema,
   type CategoryListItem,
-  type Locale,
   type ProductSortMode,
   type PublicProduct,
 } from "@akai/contracts";
@@ -16,7 +15,6 @@ import { ApiError, apiRequest } from "./http";
 const productPageSchema = paginatedSchema(publicProductSchema);
 
 export interface ProductListOptions {
-  readonly locale: Locale;
   readonly category?: string | undefined;
   readonly sort?: ProductSortMode;
   readonly limit?: number;
@@ -29,7 +27,6 @@ export async function listProducts(options: ProductListOptions) {
     path: "/products",
     schema: productPageSchema,
     query: {
-      locale: options.locale,
       category: options.category,
       sort: options.sort,
       limit: options.limit,
@@ -54,12 +51,11 @@ export async function getProduct(slug: string): Promise<PublicProduct | null> {
   }
 }
 
-export async function listCategories(locale: Locale): Promise<readonly CategoryListItem[]> {
+export async function listCategories(): Promise<readonly CategoryListItem[]> {
   const { data } = await apiRequest({
     baseUrl: serverEnv().API_INTERNAL_URL,
     path: "/categories",
     schema: categoryListResponseSchema,
-    query: { locale },
   });
   return data.items;
 }
