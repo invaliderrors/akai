@@ -8,7 +8,6 @@ import {
   type Category,
   type CreateProduct,
   type CreateVariant,
-  type Locale,
   type OfferEverywhere,
   type OfferEverywhereResult,
   type Paginated,
@@ -16,7 +15,6 @@ import {
   type ProductAddOnInput,
   type ProductKind,
   type ProductListQuery,
-  type ProductTranslation,
   type ProductVariant,
   type PublicPackComponent,
   type PublicProduct,
@@ -70,8 +68,8 @@ const ADD_ON_MAX = 20;
 /**
  * The outcome of a write that stored product COPY.
  *
- * `product` is what the caller gets back. `sanitizedLocales` is the honest part:
- * descriptions are rewritten on the way into the column, and a write that
+ * `product` is what the caller gets back. `descriptionSanitized` is the honest
+ * part: descriptions are rewritten on the way into the column, and a write that
  * changed the operator's input without saying so is a silent edit of somebody
  * else's words. The controller turns a non-empty list into a response header
  * (see `CONTENT_SANITIZED_HEADER`, which carries the full reasoning) rather than
@@ -79,19 +77,19 @@ const ADD_ON_MAX = 20;
  * every existing admin client already parses.
  *
  * Only `create` and `update` return this. `setPublished`, `restore`, `addMedia`
- * and the rest write no translations, so there is nothing they could report and
- * no reason to make every caller unwrap a result that is always empty.
+ * and the rest write no copy, so there is nothing they could report and no
+ * reason to make every caller unwrap a result that is always empty.
  */
 export interface ProductWriteResult {
   readonly product: Product;
-  /** Locales whose `description` the sanitiser altered. Empty when it did not. */
-  readonly sanitizedLocales: readonly Locale[];
+  /** Whether the sanitiser altered the submitted `description`. */
+  readonly descriptionSanitized: boolean;
 }
 
-/** A translation ready for the column, paired with whether storing it changed it. */
-interface SanitizedTranslations {
-  readonly stored: readonly ProductTranslation[];
-  readonly sanitizedLocales: readonly Locale[];
+/** A description ready for the column, paired with whether storing it changed it. */
+interface SanitizedDescription {
+  readonly stored: string;
+  readonly sanitized: boolean;
 }
 
 /**
@@ -122,7 +120,6 @@ export class ProductsService {
    */
   async listPublic(
     query: ProductListQuery,
-    locale: Locale,
   ): Promise<Paginated<PublicProduct>> {
     const page = await this.list(
       {
@@ -141,7 +138,6 @@ export class ProductsService {
         sort: query.sort,
         cursor: query.cursor,
         limit: query.limit,
-        locale,
       },
       { activeVariantsOnly: true },
     );
@@ -181,7 +177,6 @@ export class ProductsService {
    */
   async listPublicAddOns(
     query: PublicAddOnListQuery,
-    locale: Locale,
   ): Promise<Paginated<PublicProduct>> {
     const page = await this.list(
       {
@@ -197,7 +192,6 @@ export class ProductsService {
         sort: "name",
         cursor: query.cursor,
         limit: query.limit,
-        locale,
       },
       { activeVariantsOnly: true },
     );
@@ -224,7 +218,6 @@ export class ProductsService {
   /** Admin listing: drafts and soft-deleted rows are reachable. */
   async listAdmin(
     query: AdminProductListQuery,
-    locale: Locale,
   ): Promise<Paginated<Product>> {
     const page = await this.list(
       {
@@ -241,7 +234,6 @@ export class ProductsService {
         sort: query.sort,
         cursor: query.cursor,
         limit: query.limit,
-        locale,
       },
       { activeVariantsOnly: false },
     );
@@ -266,7 +258,6 @@ export class ProductsService {
       sort: ProductSort;
       cursor: string | undefined;
       limit: number;
-      locale: Locale;
     },
     mapping: { activeVariantsOnly: boolean },
   ): Promise<Paginated<HydratedProduct>> {
@@ -281,7 +272,6 @@ export class ProductsService {
       includeDeleted: options.includeDeleted,
       requirePurchasableVariant: options.requirePurchasableVariant,
       sort: options.sort,
-      locale: options.locale,
       cursor: options.cursor,
       take: options.limit + 1,
     });
@@ -508,9 +498,9 @@ export class ProductsService {
     }
 
     // Sanitised OUTSIDE the transaction: it is pure string work, and holding a
-    // Postgres transaction open across a parse of up to 20,000 characters per
-    // locale buys nothing and locks rows for longer.
-    const { stored, sanitizedLocales } = this.sanitizeTranslations(input.translations);
+    // Postgres transaction open across a parse of up to 20,000 characters buys
+    // nothing and locks rows for longer.
+    const description = ProductsService.sanitizeDescription(input.description);
 
     const priced = await Promise.all(
       input.variants.map(async (variant) => ({
@@ -539,7 +529,9 @@ export class ProductsService {
           // a product must not silently keep the column's own SIMPLE default
           // until a later update.
           kind: input.kind ?? "SIMPLE",
-          translations: { create: [...stored] },
+          name: input.name,
+          shortDescription: input.shortDescription,
+          description: description.stored,
           categories: {
             create: input.categoryIds.map((categoryId, index) => ({
               categoryId,
@@ -597,7 +589,10 @@ export class ProductsService {
       return product.id;
     }, "Product");
 
-    return { product: await this.getByIdAdmin(created), sanitizedLocales };
+    return {
+      product: await this.getByIdAdmin(created),
+      descriptionSanitized: description.sanitized,
+    };
   }
 
   async update(id: string, input: UpdateProduct): Promise<ProductWriteResult> {
@@ -653,10 +648,10 @@ export class ProductsService {
       ]);
     }
 
-    const { stored, sanitizedLocales } =
-      input.translations === undefined
-        ? { stored: [], sanitizedLocales: [] }
-        : this.sanitizeTranslations(input.translations);
+    const description =
+      input.description === undefined
+        ? undefined
+        : ProductsService.sanitizeDescription(input.description);
 
     await this.runWrite(async (tx) => {
       // A slug change preserves the old value in history BEFORE the update, so
@@ -697,6 +692,11 @@ export class ProductsService {
             ? {}
             : { stackDiscountEnabled: input.stackDiscountEnabled }),
           ...(input.kind === undefined ? {} : { kind: input.kind }),
+          ...(input.name === undefined ? {} : { name: input.name }),
+          ...(input.shortDescription === undefined
+            ? {}
+            : { shortDescription: input.shortDescription }),
+          ...(description === undefined ? {} : { description: description.stored }),
         },
       });
 
@@ -731,21 +731,6 @@ export class ProductsService {
         }
       }
 
-      // `stored` is empty when the caller sent no translations at all, so the
-      // loop simply does not run — the same "leave them alone" behaviour the
-      // `undefined` check used to express, now expressed once, above.
-      for (const translation of stored) {
-        await tx.productTranslation.upsert({
-          where: { productId_locale: { productId: id, locale: translation.locale } },
-          create: { productId: id, ...translation },
-          update: {
-            name: translation.name,
-            shortDescription: translation.shortDescription,
-            description: translation.description,
-          },
-        });
-      }
-
       if (input.categoryIds !== undefined) {
         await this.replaceCategories(tx, id, input.categoryIds);
       }
@@ -761,14 +746,16 @@ export class ProductsService {
       await this.enqueueRevalidation(tx, CATALOG_TOPICS.productUpdated);
     }, "Product");
 
-    return { product: await this.getByIdAdmin(id), sanitizedLocales };
+    return {
+      product: await this.getByIdAdmin(id),
+      descriptionSanitized: description?.sanitized ?? false,
+    };
   }
 
   /**
    * Publish / unpublish.
    *
-   * Publishing REQUIRES at least one active variant and at least one
-   * translation. A published product with nothing to sell renders a detail page
+   * Publishing REQUIRES at least one active variant. A published product with nothing to sell renders a detail page
    * with a dead buy button; the check belongs here rather than in the UI,
    * because the UI is not the only writer.
    */
@@ -777,7 +764,6 @@ export class ProductsService {
       where: { id, deletedAt: null },
       include: {
         variants: { where: { deletedAt: null, isActive: true }, select: { id: true } },
-        translations: { select: { id: true } },
       },
     });
 
@@ -790,9 +776,6 @@ export class ProductsService {
         throw CatalogError.validation(
           "Cannot publish a product with no active variant — there would be nothing to buy",
         );
-      }
-      if (product.translations.length === 0) {
-        throw CatalogError.validation("Cannot publish a product with no translations");
       }
     }
 
@@ -978,7 +961,7 @@ export class ProductsService {
         where: { id: variantId, version: input.version, deletedAt: null },
         data: {
           ...(input.sku === undefined ? {} : { sku: input.sku }),
-          ...(input.name === undefined ? {} : { name: jsonOrDbNull(input.name) }),
+          ...(input.name === undefined ? {} : { name: input.name }),
           ...(input.options === undefined ? {} : { options: toJsonObject(input.options) }),
           ...(input.weightGrams === undefined ? {} : { weightGrams: input.weightGrams }),
           ...(input.isActive === undefined ? {} : { isActive: input.isActive }),
@@ -1177,7 +1160,7 @@ export class ProductsService {
           variantId,
           objectKey: input.objectKey,
           url: input.url,
-          alt: toJsonObject(input.alt),
+          alt: input.alt,
           width: input.width,
           height: input.height,
           sortOrder: input.sortOrder,
@@ -1298,7 +1281,7 @@ export class ProductsService {
       const sortOrder = (_max.sortOrder ?? -1) + 1;
 
       const created = await tx.category.create({
-        data: { slug: input.slug, name: toJsonObject(input.name), sortOrder },
+        data: { slug: input.slug, name: input.name, sortOrder },
       });
 
       await this.enqueueRevalidation(tx, CATALOG_TOPICS.categoryCreated);
@@ -1327,7 +1310,7 @@ export class ProductsService {
 
       const updated = await tx.category.update({
         where: { id },
-        data: { name: toJsonObject(input.name) },
+        data: { name: input.name },
       });
 
       await this.enqueueRevalidation(tx, CATALOG_TOPICS.categoryUpdated);
@@ -1826,7 +1809,7 @@ export class ProductsService {
       data: {
         productId,
         sku: input.sku,
-        name: jsonOrDbNull(input.name),
+        name: input.name,
         options: toJsonObject(input.options),
         currency: input.currency,
         priceNet: components.net,
@@ -1922,7 +1905,7 @@ export class ProductsService {
   }
 
   /**
-   * Sanitise translations on their way into the column, and say what changed.
+   * Sanitise a description on its way into the column, and say whether it changed.
    *
    * THE STORED COPY IS THE AUTHORITATIVE ONE. `description` is rendered as HTML
    * on the storefront, and it is written by an admin — which the repo already
@@ -1939,36 +1922,23 @@ export class ProductsService {
    * escaping is correct for `description` for exactly the same reason it is
    * wrong here: one is parsed as HTML by the browser, the other is not.
    *
-   * THE REWRITE IS REPORTED, NOT SWALLOWED. Every locale whose description came
-   * out different from what was submitted is named in the result, and the
+   * THE REWRITE IS REPORTED, NOT SWALLOWED. A description that came out
+   * different from what was submitted is flagged in the result, and the
    * controller turns that into a response header. Sanitising silently would
    * mean an operator pastes a `<script>`, gets a 200, and concludes the editor
    * ate their content at random — see `CONTENT_SANITIZED_HEADER` for why the
    * report travels beside the resource rather than inside it, and why a 400
    * would be the wrong kind of loud.
    */
-  private sanitizeTranslations(
-    translations: readonly ProductTranslation[],
-  ): SanitizedTranslations {
-    const stored: ProductTranslation[] = [];
-    const sanitizedLocales: Locale[] = [];
+  private static sanitizeDescription(submitted: string): SanitizedDescription {
+    const stored = sanitizeRichText(submitted);
 
-    for (const translation of translations) {
-      const description = sanitizeRichText(translation.description);
-
-      // Compared against the SUBMITTED string, not against a second pass of the
-      // sanitiser. `sanitizeRichText` is idempotent, so re-running it would
-      // report "unchanged" for every input including the one that just had a
-      // <script> taken out of it — which is precisely the case the operator
-      // needs to hear about.
-      if (description !== translation.description) {
-        sanitizedLocales.push(translation.locale);
-      }
-
-      stored.push({ ...translation, description });
-    }
-
-    return { stored, sanitizedLocales };
+    // Compared against the SUBMITTED string, not against a second pass of the
+    // sanitiser. `sanitizeRichText` is idempotent, so re-running it would
+    // report "unchanged" for every input including the one that just had a
+    // <script> taken out of it — which is precisely the case the operator
+    // needs to hear about.
+    return { stored, sanitized: stored !== submitted };
   }
 
   private assertUniqueSkus(skus: readonly string[]): void {
@@ -2111,17 +2081,6 @@ function toJsonObject(source: Readonly<Record<string, string>>): Prisma.InputJso
     result[key] = value;
   }
   return result;
-}
-
-/**
- * Null on a nullable Json column must be `Prisma.DbNull` (SQL NULL), not
- * JavaScript `null` — which Prisma would store as the JSON literal `null`, a
- * different value that `name IS NULL` does not match.
- */
-function jsonOrDbNull(
-  source: Readonly<Record<string, string>> | null,
-): Prisma.InputJsonObject | typeof Prisma.DbNull {
-  return source === null ? Prisma.DbNull : toJsonObject(source);
 }
 
 /** Re-exported for the tax resolver's consumers; keeps TaxClass off every import site. */

@@ -1,6 +1,6 @@
 import type { ServerEnv } from "@akai/config";
 import type { Logger } from "@akai/observability";
-import type { EmailTemplateKey, Locale } from "@akai/contracts";
+import type { EmailTemplateKey } from "@akai/contracts";
 
 /**
  * The ONLY config this module reads, and the ONLY logger surface it uses.
@@ -27,7 +27,7 @@ export type TransportLogger = Pick<Logger, "info">;
  *
  * NOTE ON @akai/contracts' `EmailPort`: that interface is
  * template-key-plus-data shaped, i.e. it assumes PROVIDER-SIDE templating. We
- * render locally instead (spec §10 puts templates in the repo, in both locales,
+ * render locally instead (spec §10 puts templates in the repo, in Spanish,
  * unit-testable without a network), so the transport needs an already-rendered
  * subject/html/text and knows nothing about templates.
  *
@@ -109,10 +109,9 @@ export const DEFAULT_EMAIL_RETRY_POLICY: EmailRetryPolicy = {
 /** Tag values are sent to a third party; keep them free of PII by construction. */
 export function buildTags(
   templateKey: EmailTemplateKey,
-  locale: Locale,
   orderId: string | null,
 ): Readonly<Record<string, string>> {
   return orderId === null
-    ? { template: templateKey, locale }
-    : { template: templateKey, locale, order_id: orderId };
+    ? { template: templateKey }
+    : { template: templateKey, order_id: orderId };
 }

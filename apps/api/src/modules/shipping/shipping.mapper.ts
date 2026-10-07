@@ -34,10 +34,6 @@ export function toShippingQuote(
     weightGrams: basis.weightGrams,
     options: options.map((option) => ({
       rateId: option.rateId,
-      // The WHOLE locale record crosses the wire, unresolved. The quote endpoint
-      // has no locale — it is a function of destination and cart — and inventing
-      // one here would pin the label to a guess. The storefront already owns the
-      // fallback chain for every other locale-keyed name it renders.
       name: option.name,
       currency: option.currency,
       // Through toMinor() rather than a cast: a non-integer price that somehow

@@ -16,14 +16,15 @@ import { z } from "zod";
 const SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
 /**
- * Every existing top-level storefront route segment, plus both locale
- * prefixes (`/en` collides with the English locale route exactly as a
- * same-named slug would). Checked case-insensitively in the service — a
+ * Every existing top-level storefront route segment, plus the two former
+ * locale prefixes: the storefront is Spanish only but still 301s `/en/*` to
+ * `/*` for stray links, so `/en` is taken, and `/es` is kept out so a partner
+ * slug can never be mistaken for a language path. Checked case-insensitively in the service — a
  * partner slug that only differs in case from a real route is exactly as
  * broken as an exact match, and Postgres's `citext`-free `VARCHAR` unique
  * index would not catch it.
  *
- * `apps/storefront/src/app/[locale]` is the source of truth for this list.
+ * `apps/storefront/src/pages` is the source of truth for this list.
  * A new top-level storefront route must be added here in the same commit.
  */
 export const RESERVED_PARTNER_SLUGS: readonly string[] = [

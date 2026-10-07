@@ -1,10 +1,10 @@
 import { Inject, Injectable } from "@nestjs/common";
 import type { ServerEnv } from "@akai/config";
 import type { Minor, OrderStatus, OrderStatusResponse } from "@akai/contracts";
-import { storefrontUrl } from "@akai/i18n";
 import { add, subtract, sum, ZERO } from "@akai/money";
 import type { Logger } from "@akai/observability";
 
+import { storefrontUrl } from "../../common/storefront-url";
 import { SERVER_CONFIG } from "../config/config.module";
 import { LOGGER } from "../observability/logger.module";
 import type { StartCheckoutResponse } from "./dto/payments.dto";
@@ -41,8 +41,8 @@ import { WOMPI_GATEWAY, type WompiGateway } from "./wompi/wompi.gateway";
 /**
  * The storefront route a customer returns to from Wompi.
  *
- * LOCALE-FREE ON PURPOSE — `storefrontUrl` adds the prefix the storefront's own
- * routing rule calls for. The page polls `GET payments/orders/:n/status` (and
+ * The storefront serves it at this bare path (it has no locale prefix). The
+ * page polls `GET payments/orders/:n/status` (and
  * hands back Wompi's `?id=` once); it does not assert success.
  */
 const CHECKOUT_PROCESSING_PATH = "/checkout/processing";
@@ -199,7 +199,7 @@ export class PaymentsService {
       expiresAt: new Date(Date.now() + CHECKOUT_EXPIRY_MS),
       // A PROCESSING screen that polls, deliberately not a success page: an
       // order becomes PAID only from a verified event or a transaction read back
-      // with the private key. Locale-correct via the shared routing rule.
+      // with the private key.
       redirectUrl: this.processingUrl(order),
       vatInCents: order.taxTotal,
       customer: {
@@ -360,7 +360,7 @@ export class PaymentsService {
   }
 
   private processingUrl(order: OrderSnapshot): string {
-    return storefrontUrl(this.config.STOREFRONT_URL, order.locale, CHECKOUT_PROCESSING_PATH, {
+    return storefrontUrl(this.config.STOREFRONT_URL, CHECKOUT_PROCESSING_PATH, {
       order: order.orderNumber,
     });
   }

@@ -6,7 +6,6 @@ import {
   type ShippingStrategy,
 } from "@akai/contracts";
 
-import { narrowLocalizedText } from "../../../common/localized-text";
 
 /**
  * Prisma rows → the admin wire shapes.
@@ -18,7 +17,7 @@ import { narrowLocalizedText } from "../../../common/localized-text";
 export interface ShippingRateRecord {
   readonly id: string;
   readonly zoneId: string;
-  readonly name: unknown;
+  readonly name: string;
   readonly strategy: string;
   readonly priceGross: number;
   readonly currency: string;
@@ -55,17 +54,10 @@ export function narrowStrategy(value: string): ShippingStrategy {
 }
 
 export function toAdminShippingRate(row: ShippingRateRecord): AdminShippingRate {
-  // Parsed, never cast — see `narrowLocalizedText`. Only the two locales the
-  // contract carries are projected; an unparseable name reads as "no name",
-  // which the editor shows as an empty field for staff to fill.
-  const name = narrowLocalizedText(row.name);
   return {
     id: row.id,
     zoneId: row.zoneId,
-    name: {
-      ...(name.es === undefined ? {} : { es: name.es }),
-      ...(name.en === undefined ? {} : { en: name.en }),
-    },
+    name: row.name,
     strategy: narrowStrategy(row.strategy),
     minValue: row.minValue,
     maxValue: row.maxValue,

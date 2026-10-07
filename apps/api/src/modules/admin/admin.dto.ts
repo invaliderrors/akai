@@ -3,7 +3,6 @@ import {
   countryCodeSchema,
   currencyCodeSchema,
   idSchema,
-  localeSchema,
   productStatusSchema,
   slugSchema,
   taxClassSchema,
@@ -148,21 +147,14 @@ const bulkVariantSchema = z
     },
   );
 
-const bulkTranslationSchema = z
-  .object({
-    locale: localeSchema,
-    name: z.string().min(1).max(200),
-    shortDescription: z.string().max(500),
-    description: z.string().max(20_000),
-  })
-  .strict();
-
 export const bulkImportRowSchema = z
   .object({
     slug: slugSchema,
     status: productStatusSchema.default("DRAFT"),
     taxClass: taxClassSchema.default("STANDARD"),
-    translations: z.array(bulkTranslationSchema).min(1),
+    name: z.string().min(1).max(200),
+    shortDescription: z.string().max(500).default(""),
+    description: z.string().max(20_000).default(""),
     variants: z.array(bulkVariantSchema).min(1),
     restrictedCountries: z.array(countryCodeSchema).default([]),
   })
@@ -176,12 +168,6 @@ export const bulkImportRowSchema = z
       message: "Duplicate SKU within a single product",
       path: ["variants"],
     },
-  )
-  .refine(
-    (row) =>
-      new Set(row.translations.map((translation) => translation.locale)).size ===
-      row.translations.length,
-    { message: "Duplicate locale in translations", path: ["translations"] },
   );
 
 export type BulkImportRow = z.infer<typeof bulkImportRowSchema>;

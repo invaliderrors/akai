@@ -65,7 +65,6 @@ const CUSTOMER_SELECT = {
   lastName: true,
   phone: true,
   role: true,
-  preferredLocale: true,
   totpEnabledAt: true,
   marketingConsentAt: true,
   anonymisedAt: true,
@@ -168,9 +167,6 @@ export class PrismaUsersDataAccess implements UsersDataAccess {
         ...(patch.firstName !== undefined ? { firstName: patch.firstName } : {}),
         ...(patch.lastName !== undefined ? { lastName: patch.lastName } : {}),
         ...(patch.phone !== undefined ? { phone: patch.phone } : {}),
-        ...(patch.preferredLocale !== undefined
-          ? { preferredLocale: patch.preferredLocale }
-          : {}),
       },
       select: CUSTOMER_SELECT,
     });

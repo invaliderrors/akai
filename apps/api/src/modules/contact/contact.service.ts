@@ -101,7 +101,6 @@ export class ContactService {
             // comment in `libs/config` for why sharing one value is a
             // deliverability risk, not just a naming inconvenience.
             to: this.config.CONTACT_INBOX_EMAIL ?? this.config.EMAIL_FROM,
-            locale: request.locale,
             payload: {
               referenceId,
               name: request.name,
@@ -119,7 +118,6 @@ export class ContactService {
           payload: {
             templateKey: "contact-autoreply",
             to: request.email,
-            locale: request.locale,
             payload: { name: request.name, subject, referenceId },
           },
         },

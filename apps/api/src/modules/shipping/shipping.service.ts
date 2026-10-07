@@ -1,8 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
-import type { CurrencyCode, Locale, Minor, Money } from "@akai/contracts";
+import type { CurrencyCode, Minor, Money } from "@akai/contracts";
 import { splitGross } from "@akai/money";
 
-import { pickLocalizedText } from "../../common/localized-text";
 import { sharedFreeShippingThreshold } from "./free-shipping";
 import type { ShippingCharge } from "../orders/order-totals";
 import {
@@ -51,23 +50,12 @@ export interface ShippingQuoteInput {
 export interface ShippingChargeInput extends ShippingQuoteInput {
   /** The method the customer chose. Validated, never trusted for its price. */
   readonly shippingMethodId: string;
-  /**
-   * The locale the order is being placed in.
-   *
-   * Required here and NOT on `ShippingQuoteInput`, and the asymmetry is the
-   * point. A quote returns the whole locale record and lets the client pick, so
-   * changing language re-labels the list without a round trip. A CHARGE freezes
-   * one string onto the immutable order, which the confirmation email and the
-   * invoice then reproduce for years — that copy has to be the language the
-   * customer actually bought in, resolved once, at that moment.
-   */
-  readonly locale: Locale;
 }
 
 /** A fully-resolved shipping charge, ready to feed `priceOrder`. */
 export interface ResolvedShipping {
   readonly rateId: string;
-  /** Resolved into ONE string, in the order's locale, ready to be stamped on it. */
+  /** The rate's name, ready to be stamped onto the immutable order. */
   readonly methodName: string;
   readonly currency: CurrencyCode;
   readonly priceGross: Minor;
@@ -149,13 +137,10 @@ export class ShippingService {
 
     return {
       rateId: chosen.rateId,
-      // `?? chosen.rateId` is unreachable in practice: `selectShippingOptions`
-      // already drops a rate with no name in any locale, so `chosen` is
-      // nameable by construction. The rate id is the fallback rather than a
-      // literal like "Shipping" because inventing English prose is the exact
-      // failure this whole change removes — an id is at least the value that
-      // identifies the method to support.
-      methodName: pickLocalizedText(chosen.name, input.locale) ?? chosen.rateId,
+      // Non-blank by construction: `selectShippingOptions` drops a blank-named
+      // rate. Stamped onto the order so a later rename never rewrites what the
+      // order, its email and its invoice say.
+      methodName: chosen.name,
       currency: chosen.currency,
       priceGross: chosen.priceGross,
       taxRateBps,

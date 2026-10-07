@@ -57,9 +57,6 @@ export class UsersService {
       ...(input.firstName !== undefined ? { firstName: input.firstName } : {}),
       ...(input.lastName !== undefined ? { lastName: input.lastName } : {}),
       ...(input.phone !== undefined ? { phone: input.phone } : {}),
-      ...(input.preferredLocale !== undefined
-        ? { preferredLocale: input.preferredLocale }
-        : {}),
     };
 
     // An empty PATCH is a no-op, not an error, but there is no reason to spend a

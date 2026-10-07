@@ -19,7 +19,7 @@ function variantFixture(overrides: Partial<HydratedVariant> = {}): HydratedVaria
     id: VARIANT_ID,
     productId: PRODUCT_ID,
     sku: "AK-CREA-500",
-    name: { es: "500 g", en: "500 g" },
+    name: "500 g",
     options: { size: "500g" },
     currency: "EUR",
     // 49.99 EUR gross at 21% VAT.
@@ -48,7 +48,7 @@ function variantFixture(overrides: Partial<HydratedVariant> = {}): HydratedVaria
       variantId: VARIANT_ID,
       objectKey: "variants/secret-variant-key.jpg",
       url: "https://cdn.example.com/camiseta-negra.jpg",
-      alt: { es: "Bote de 500 g" },
+      alt: "Bote de 500 g",
       width: 900,
       height: 900,
       sortOrder: 0,
@@ -90,16 +90,9 @@ function productFixture(overrides: Partial<HydratedProduct> = {}): HydratedProdu
     createdAt: CREATED,
     updatedAt: CREATED,
     deletedAt: null,
-    translations: [
-      {
-        id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
-        productId: PRODUCT_ID,
-        locale: "es",
-        name: "Camiseta Oversize",
-        shortDescription: "Algodón orgánico",
-        description: "Descripcion larga",
-      },
-    ],
+    name: "Camiseta Oversize",
+    shortDescription: "Algodón orgánico",
+    description: "Descripcion larga",
     media: [
       {
         id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
@@ -107,7 +100,7 @@ function productFixture(overrides: Partial<HydratedProduct> = {}): HydratedProdu
         variantId: null,
         objectKey: "products/secret-key.jpg",
         url: "https://cdn.example.com/camiseta.jpg",
-        alt: { es: "Camiseta doblada" },
+        alt: "Camiseta doblada",
         width: 1200,
         height: 1200,
         sortOrder: 0,
@@ -122,7 +115,7 @@ function productFixture(overrides: Partial<HydratedProduct> = {}): HydratedProdu
         category: {
           id: "ffffffff-ffff-4fff-8fff-ffffffffffff",
           slug: "recuperacion",
-          name: { es: "Recuperación", en: "Recovery" },
+          name: "Recuperación",
           sortOrder: 1,
           createdAt: CREATED,
           deletedAt: null,
@@ -273,7 +266,7 @@ describe("mapVariant", () => {
     // Same wire shape as `product.media[n]`, so the storefront's fallback can be
     // a plain `variant.image ?? primaryMedia(product)` with no adapter between.
     expect(image?.url).toBe("https://cdn.example.com/camiseta-negra.jpg");
-    expect(image?.alt).toEqual({ es: "Bote de 500 g" });
+    expect(image?.alt).toEqual("Bote de 500 g");
     // objectKey is dropped here exactly as it is for a gallery image.
     expect(Object.keys(image ?? {})).not.toContain("objectKey");
   });
@@ -301,7 +294,7 @@ describe("mapVariant", () => {
   it("narrows well-formed json columns", () => {
     const mapped = mapVariant(variantFixture());
 
-    expect(mapped.name).toEqual({ es: "500 g", en: "500 g" });
+    expect(mapped.name).toEqual("500 g");
     expect(mapped.options).toEqual({ size: "500g" });
   });
 
@@ -319,13 +312,11 @@ describe("mapVariant", () => {
     expect(mapVariant(variant).options).toEqual({});
   });
 
-  it("degrades a json column of the wrong value type to empty", () => {
-    const variant = variantFixture({ name: { es: 42 } });
-
-    expect(mapVariant(variant).name).toEqual({});
+  it("carries the variant name through as a plain string", () => {
+    expect(mapVariant(variantFixture({ name: "M / Negro" })).name).toBe("M / Negro");
   });
 
-  it("keeps an explicitly null variant name as null, not an empty object", () => {
+  it("keeps an explicitly null variant name as null, not an empty string", () => {
     // null means "single-variant product, no size label" — semantically
     // different from "a label exists but is empty".
     expect(mapVariant(variantFixture({ name: null })).name).toBeNull();

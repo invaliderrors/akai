@@ -9,7 +9,6 @@ import type {
   AdminOrder,
   AdminOrderSummary,
   CurrencyCode,
-  Locale,
   Minor,
   Order,
   OrderSummary,
@@ -109,18 +108,6 @@ const SUMMARY_INCLUDE = {
   items: { select: { quantity: true } },
 } satisfies Prisma.OrderInclude;
 
-/** Per-locale JSON blobs (`variant.name`) parsed rather than cast. */
-const localisedTextSchema = z.record(z.string(), z.unknown());
-
-function readLocalised(value: unknown, locale: Locale): string | null {
-  const parsed = localisedTextSchema.safeParse(value);
-  if (!parsed.success) {
-    return null;
-  }
-  const text = parsed.data[locale];
-  return typeof text === "string" && text.length > 0 ? text : null;
-}
-
 /**
  * Narrow the result of a `$queryRaw` down to one text column.
  *
@@ -164,7 +151,6 @@ export interface CreateOrderFromCartInput {
   /** Null for guest checkout; the order is claimable later by verifying `email`. */
   readonly customerId: string | null;
   readonly email: string;
-  readonly locale: Locale;
   readonly shippingAddress: AddressFields;
   readonly billingAddress: AddressFields;
   /** Resolved server-side from a ShippingRate row. Never from the client. */
@@ -234,7 +220,6 @@ export class OrdersService {
                   include: {
                     product: {
                       include: {
-                        translations: true,
                         media: { orderBy: { sortOrder: "asc" }, take: 1 },
                       },
                     },
@@ -360,18 +345,13 @@ export class OrdersService {
           );
         }
 
-        const translation =
-          variant.product.translations.find((row) => row.locale === input.locale) ??
-          variant.product.translations[0];
         const [image] = variant.product.media;
 
         drafts.push({
           line: {
             variantId: variant.id,
-            // Falling back to the slug rather than an empty string: a line with no
-            // name is unreadable on an invoice, and the slug is always present.
-            productName: translation?.name ?? variant.product.slug,
-            variantName: readLocalised(variant.name, input.locale),
+            productName: variant.product.name,
+            variantName: variant.name,
             sku: variant.sku,
             imageUrl: image?.url ?? null,
             quantity,
@@ -508,7 +488,6 @@ export class OrdersService {
           customerId: input.customerId,
           email: input.email,
           status: "PENDING",
-          locale: input.locale,
           currency: cart.currency,
 
           subtotal: priced.totals.subtotal,
@@ -766,7 +745,7 @@ export class OrdersService {
           data: {
             orderId: order.id,
             type: "payment.canceled",
-            message: cancellationReason(order.locale),
+            message: CANCELLATION_REASON,
             isInternal: false,
             actorId: actor.customerId,
           },
@@ -779,7 +758,6 @@ export class OrdersService {
               templateKey: "order-cancelled",
               orderId: order.id,
               orderNumber: order.orderNumber,
-              locale: order.locale,
               recipient: order.email,
             },
           },
@@ -1027,7 +1005,6 @@ export class OrdersService {
           payload: {
             templateKey: "shipping-confirmation",
             to: order.email,
-            locale: order.locale,
             orderId: order.id,
             dedupeScope: shipment.id,
             payload: {
@@ -1157,7 +1134,6 @@ export class OrdersService {
               templateKey: "delivery-confirmation",
               orderId: order.id,
               orderNumber: order.orderNumber,
-              locale: order.locale,
               recipient: order.email,
             },
           },
@@ -1322,7 +1298,6 @@ export class OrdersService {
             templateKey: "refund-confirmation",
             orderId: order.id,
             orderNumber: order.orderNumber,
-            locale: order.locale,
             recipient: order.email,
             amount,
             currency: order.currency,
@@ -1370,20 +1345,15 @@ export interface ApplyStatusInput {
  * makes the provider retry against fresh state.
  */
 /**
- * The customer-facing cancellation line.
- *
- * Written in the ORDER's locale because that is the locale the cancellation
- * mail renders in and the locale the customer reads their timeline in.
+ * The customer-facing cancellation line, in Spanish like every customer-facing
+ * string.
  *
  * It says WHO cancelled and offers a way back, which is as specific as this
  * path can honestly be: `transitionByAdmin` is operator-driven, and the only
  * other thing it knows is `body.note`, which is internal by construction.
  */
-function cancellationReason(locale: Locale): string {
-  return locale === "es"
-    ? "Cancelado por nuestro equipo. Si no lo esperabas, responde a este correo y lo revisamos."
-    : "Cancelled by our team. If you were not expecting this, reply to this email and we will look into it.";
-}
+const CANCELLATION_REASON =
+  "Cancelado por nuestro equipo. Si no lo esperabas, responde a este correo y lo revisamos.";
 
 /**
  * EXPORTED so any future writer of `order.status` goes through this one

@@ -8,9 +8,7 @@ import { ZodError, z } from "zod";
 import {
   emailSchema,
   emailTemplateKeySchema,
-  localeSchema,
   type EmailTemplateKey,
-  type Locale,
   type SendEmailInput,
   type SendEmailResult,
 } from "@akai/contracts";
@@ -53,7 +51,6 @@ const MAX_ERROR_LENGTH = 1000;
 export interface SendEmailRequest<K extends EmailTemplateKey> {
   readonly templateKey: K;
   readonly to: string;
-  readonly locale: Locale;
   readonly payload: EmailPayloadFor<K>;
   /**
    * Present for every order-related mail. Its presence is what activates the
@@ -224,7 +221,6 @@ export class EmailService {
     const claim = await this.claim(
       request.templateKey,
       recipient,
-      request.locale,
       orderId,
       dedupeScope,
     );
@@ -251,7 +247,7 @@ export class EmailService {
     }
 
     // --- 4. Render (pure) ---------------------------------------------------
-    const rendered = renderEmail(request.templateKey, request.locale, payload);
+    const rendered = renderEmail(request.templateKey, payload);
 
     // --- 5. Deliver, with backoff ------------------------------------------
     return this.deliver(claim, {
@@ -259,7 +255,7 @@ export class EmailService {
       subject: rendered.subject,
       html: rendered.html,
       text: rendered.text,
-      tags: buildTags(request.templateKey, request.locale, orderId),
+      tags: buildTags(request.templateKey, orderId),
     });
   }
 
@@ -304,7 +300,6 @@ export class EmailService {
     const result = await this.send({
       templateKey: input.templateKey,
       to: input.to,
-      locale: input.locale,
       // Parsed inside send(); typed here as the registry payload for that key.
       payload: parseTemplatePayload(input.templateKey, input.data),
       ...(input.orderId === undefined ? {} : { orderId: input.orderId }),
@@ -337,7 +332,6 @@ export class EmailService {
   async sendChecked(input: {
     readonly templateKey: EmailTemplateKey;
     readonly to: string;
-    readonly locale: Locale;
     readonly data: unknown;
     readonly orderId?: string;
     readonly dedupeScope?: string;
@@ -362,7 +356,6 @@ export class EmailService {
     return this.send({
       templateKey: input.templateKey,
       to: input.to,
-      locale: input.locale,
       payload,
       ...(input.orderId === undefined ? {} : { orderId: input.orderId }),
       ...(input.dedupeScope === undefined ? {} : { dedupeScope: input.dedupeScope }),
@@ -396,7 +389,6 @@ export class EmailService {
         id: true,
         recipient: true,
         templateKey: true,
-        locale: true,
         status: true,
         orderId: true,
       },
@@ -416,7 +408,6 @@ export class EmailService {
     // a row written by an older deploy, or by hand, must not reach a renderer
     // lookup as an unvalidated key.
     const templateKey = emailTemplateKeySchema.parse(event.templateKey);
-    const locale = localeSchema.parse(event.locale);
 
     const suppression = await this.checkSuppression(templateKey, event.recipient);
     if (suppression !== null) {
@@ -424,7 +415,7 @@ export class EmailService {
     }
 
     const parsed = parseTemplatePayload(templateKey, payload);
-    const rendered = renderEmail(templateKey, locale, parsed);
+    const rendered = renderEmail(templateKey, parsed);
 
     return this.deliver(
       { id: event.id },
@@ -433,7 +424,7 @@ export class EmailService {
         subject: rendered.subject,
         html: rendered.html,
         text: rendered.text,
-        tags: buildTags(templateKey, locale, event.orderId),
+        tags: buildTags(templateKey, event.orderId),
       },
     );
   }
@@ -496,7 +487,6 @@ export class EmailService {
   private async claim(
     templateKey: EmailTemplateKey,
     recipient: string,
-    locale: Locale,
     orderId: string | null,
     dedupeScope: string,
   ): Promise<
@@ -509,7 +499,6 @@ export class EmailService {
         data: {
           recipient,
           templateKey,
-          locale,
           orderId,
           dedupeScope,
           status: "QUEUED",

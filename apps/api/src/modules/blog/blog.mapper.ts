@@ -43,19 +43,18 @@ export function toPublicSummary(
     category: record.category,
     publishedAt: publishedAtOf(record),
     coverUrl: coverUrlOf(record, resolve),
-    translations: record.translations.map((translation) => ({
-      locale: translation.locale,
-      title: translation.title,
-      excerpt: translation.excerpt,
-      coverAlt: translation.coverAlt,
-    })),
+    title: record.title,
+    excerpt: record.excerpt,
+    coverAlt: record.coverAlt,
   };
 }
 
 export function toPublicPost(record: BlogPostRecord, resolve: CoverUrlResolver): PublicBlogPost {
   return {
     ...toPublicSummary(record, resolve),
-    translations: record.translations.map((translation) => ({ ...translation })),
+    bodyHtml: record.bodyHtml,
+    metaTitle: record.metaTitle,
+    metaDescription: record.metaDescription,
   };
 }
 
@@ -71,6 +70,11 @@ export function toAdminPost(record: BlogPostRecord, resolve: CoverUrlResolver): 
     authorId: record.authorId,
     createdAt: record.createdAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),
-    translations: record.translations.map((translation) => ({ ...translation })),
+    title: record.title,
+    excerpt: record.excerpt,
+    bodyHtml: record.bodyHtml,
+    metaTitle: record.metaTitle,
+    metaDescription: record.metaDescription,
+    coverAlt: record.coverAlt,
   };
 }

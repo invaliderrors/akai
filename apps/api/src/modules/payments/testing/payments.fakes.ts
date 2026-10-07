@@ -43,7 +43,6 @@ export function orderSnapshot(overrides: Partial<OrderSnapshot> = {}): OrderSnap
     orderNumber: "AK-2026-000123",
     status: "PENDING",
     email: "customer@example.com",
-    locale: "es",
     currency: "COP",
     // $ 89.000, IVA-inclusive at 19%: 8_900_000 / 1.19 = 7_478_992 net.
     grandTotal: toMinor(8_900_000),

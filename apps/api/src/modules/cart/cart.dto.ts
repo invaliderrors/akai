@@ -3,10 +3,9 @@ import {
   addCartItemSchema,
   addPackToCartSchema,
   countryCodeSchema,
-  localeSchema,
   updateCartItemSchema,
 } from "@akai/contracts";
-import { CART_TOKEN_ENCODED_LENGTH, DEFAULT_CART_LOCALE } from "./cart.constants";
+import { CART_TOKEN_ENCODED_LENGTH } from "./cart.constants";
 
 /**
  * Request DTOs.
@@ -65,29 +64,6 @@ export const validateCartSchema = z
   .strict();
 
 export type ValidateCartDto = z.infer<typeof validateCartSchema>;
-
-/**
- * Display locale for a cart response.
- *
- * A QUERY parameter rather than a body field, because it must apply uniformly to
- * GET and DELETE as well as to the writes — and because it is a presentation
- * concern, not part of the cart's state. Nothing is persisted from it: the same
- * cart requested twice in two languages is one cart, rendered twice.
- *
- * Before this existed, `prisma-cart.repository.ts` pinned Spanish for both the
- * product name and the variant name, so an English-speaking customer's basket
- * came back as "Camiseta Oversize" and no client could ask for anything else.
- * That is a violation of the platform's translation rule located in the API, and
- * a storefront cannot fix it by re-fetching the catalog on every cart render
- * without duplicating the whole read.
- */
-export const cartLocaleQuerySchema = z
-  .object({
-    locale: localeSchema.default(DEFAULT_CART_LOCALE),
-  })
-  .strict();
-
-export type CartLocaleQueryDto = z.infer<typeof cartLocaleQuerySchema>;
 
 /**
  * Apply-coupon payload. Just a code — carries no amount, like every cart input.

@@ -16,7 +16,6 @@ interface EmailEventRow {
   readonly id: string;
   readonly recipient: string;
   readonly templateKey: string;
-  readonly locale: string;
   readonly status: string;
   readonly providerMessageId: string | null;
   readonly orderId: string | null;
@@ -66,7 +65,6 @@ export class EmailAdminService {
         id: true,
         recipient: true,
         templateKey: true,
-        locale: true,
         status: true,
         providerMessageId: true,
         orderId: true,
@@ -95,7 +93,6 @@ export class EmailAdminService {
         id: true,
         recipient: true,
         templateKey: true,
-        locale: true,
         status: true,
         providerMessageId: true,
         orderId: true,
@@ -159,7 +156,6 @@ export class EmailAdminService {
       id: row.id,
       recipient: row.recipient,
       templateKey: row.templateKey,
-      locale: row.locale,
       status: row.status,
       providerMessageId: row.providerMessageId,
       orderId: row.orderId,

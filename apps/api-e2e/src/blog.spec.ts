@@ -29,8 +29,8 @@ import { isDockerAvailable, startTestDatabase, type TestDatabase } from "./harne
  *
  * What only this level proves:
  *   - the public reads see PUBLISHED posts only, through the real global guards;
- *   - D8c: a Spanish-only post is absent from `?locale=en` and its detail 404s
- *     there, while a bilingual one appears in both;
+ *   - a post's copy is stored on the post and served back, and the public
+ *     list refuses a stray `?locale=` (the query is `.strict()`);
  *   - the unique slug is a 409 CONFLICT envelope, not a 500;
  *   - every publish/update/unpublish/delete writes a `storefront.revalidate`
  *     outbox row carrying the `blog` tag, in the same transaction;
@@ -59,20 +59,12 @@ const TEST_ENV: NodeJS.ProcessEnv = {
 };
 
 const BODY_ES = {
-  locale: "es",
   title: "Cómo combinar un oversize",
   excerpt: "Una guía rápida de estilo.",
   bodyHtml: "<h2>Origen</h2><p>Texto<script>alert(1)</script></p>",
 };
 
-const BODY_EN = {
-  locale: "en",
-  title: "How to style an oversized tee",
-  excerpt: "A quick styling guide.",
-  bodyHtml: "<p>Text</p>",
-};
-
-describe.skipIf(!isDockerAvailable())("Blog — public visibility, D8c and admin CRUD", () => {
+describe.skipIf(!isDockerAvailable())("Blog — public visibility and admin CRUD", () => {
   let db: TestDatabase;
   let app: NestExpressApplication;
   let savedEnv: NodeJS.ProcessEnv;
@@ -127,11 +119,11 @@ describe.skipIf(!isDockerAvailable())("Blog — public visibility, D8c and admin
 
   const http = () => request(app.getHttpServer());
 
-  async function createPost(slug: string, translations: readonly object[]) {
+  async function createPost(slug: string, copy: object = BODY_ES) {
     const response = await http()
       .post(`/${API_GLOBAL_PREFIX}/admin/blog/posts`)
       .set("authorization", `Bearer ${staffToken}`)
-      .send({ slug, category: "STYLE_GUIDES", translations });
+      .send({ slug, category: "STYLE_GUIDES", ...copy });
     expect(response.status).toBe(201);
     return adminBlogPostSchema.parse(response.body);
   }
@@ -167,11 +159,11 @@ describe.skipIf(!isDockerAvailable())("Blog — public visibility, D8c and admin
   }
 
   it("keeps a draft off every public read, and shows it once published", async () => {
-    const draft = await createPost("como-combinar-un-oversize", [BODY_ES]);
+    const draft = await createPost("como-combinar-un-oversize");
     expect(draft.status).toBe("DRAFT");
     expect(draft.publishedAt).toBeNull();
     // Sanitised on write.
-    expect(draft.translations[0]?.bodyHtml).toBe("<h2>Origen</h2><p>Texto</p>");
+    expect(draft.bodyHtml).toBe("<h2>Origen</h2><p>Texto</p>");
 
     expect((await publicList()).items).toHaveLength(0);
     const hidden = await http().get(`/${API_GLOBAL_PREFIX}/blog/posts/como-combinar-un-oversize`);
@@ -185,43 +177,34 @@ describe.skipIf(!isDockerAvailable())("Blog — public visibility, D8c and admin
     expect(list.items.map((item) => item.slug)).toEqual(["como-combinar-un-oversize"]);
     const detail = await http().get(`/${API_GLOBAL_PREFIX}/blog/posts/como-combinar-un-oversize`);
     expect(detail.status).toBe(200);
-    expect(publicBlogPostSchema.parse(detail.body).translations[0]?.title).toBe(BODY_ES.title);
+    expect(publicBlogPostSchema.parse(detail.body).title).toBe(BODY_ES.title);
   });
 
-  it("D8c: a Spanish-only post is absent from the English list and 404s in English", async () => {
-    const spanishOnly = await createPost("solo-espanol", [BODY_ES]);
-    const bilingual = await createPost("bilingue", [BODY_ES, BODY_EN]);
-    await publish(spanishOnly.id);
-    await publish(bilingual.id);
+  it("edits the copy in place and refuses a locale filter on the public list", async () => {
+    const post = await createPost("editable");
+    await publish(post.id);
 
-    expect((await publicList({ locale: "en" })).items.map((item) => item.slug)).toEqual(["bilingue"]);
-    expect((await publicList({ locale: "es" })).items.map((item) => item.slug).sort()).toEqual([
-      "bilingue",
-      "solo-espanol",
-    ]);
-
-    const missing = await http()
-      .get(`/${API_GLOBAL_PREFIX}/blog/posts/solo-espanol`)
-      .query({ locale: "en" });
-    expect(missing.status).toBe(404);
-    const present = await http()
-      .get(`/${API_GLOBAL_PREFIX}/blog/posts/bilingue`)
-      .query({ locale: "en" });
-    expect(present.status).toBe(200);
-
-    // Withdrawing the English version takes the post out of /en.
-    const withdrawn = await http()
-      .patch(`/${API_GLOBAL_PREFIX}/admin/blog/posts/${bilingual.id}`)
+    const edited = await http()
+      .patch(`/${API_GLOBAL_PREFIX}/admin/blog/posts/${post.id}`)
       .set("authorization", `Bearer ${staffToken}`)
-      .send({ translations: [BODY_ES] });
-    expect(withdrawn.status).toBe(200);
-    expect((await publicList({ locale: "en" })).items).toHaveLength(0);
+      .send({ title: "Título nuevo" });
+    expect(edited.status).toBe(200);
+    expect(adminBlogPostSchema.parse(edited.body)).toMatchObject({
+      title: "Título nuevo",
+      excerpt: BODY_ES.excerpt,
+    });
+
+    const detail = await http().get(`/${API_GLOBAL_PREFIX}/blog/posts/editable`);
+    expect(publicBlogPostSchema.parse(detail.body).title).toBe("Título nuevo");
+
+    const stray = await http().get(`/${API_GLOBAL_PREFIX}/blog/posts`).query({ locale: "en" });
+    expect(stray.status).toBe(400);
   });
 
   it("orders newest first and pages with a cursor", async () => {
-    const first = await createPost("primero", [BODY_ES]);
+    const first = await createPost("primero");
     await publish(first.id);
-    const second = await createPost("segundo", [BODY_ES]);
+    const second = await createPost("segundo");
     await publish(second.id);
 
     const pageOne = await publicList({ limit: "1" });
@@ -235,19 +218,19 @@ describe.skipIf(!isDockerAvailable())("Blog — public visibility, D8c and admin
   });
 
   it("refuses a duplicate slug with a CONFLICT envelope", async () => {
-    await createPost("repetido", [BODY_ES]);
+    await createPost("repetido");
 
     const duplicate = await http()
       .post(`/${API_GLOBAL_PREFIX}/admin/blog/posts`)
       .set("authorization", `Bearer ${staffToken}`)
-      .send({ slug: "repetido", category: "NEWS", translations: [BODY_ES] });
+      .send({ slug: "repetido", category: "NEWS", ...BODY_ES });
 
     expect(duplicate.status).toBe(409);
     expect(errorEnvelopeSchema.parse(duplicate.body).error.code).toBe("CONFLICT");
   });
 
   it("enqueues a blog purge on update, publish, unpublish and delete — not on create", async () => {
-    const post = await createPost("purgas", [BODY_ES]);
+    const post = await createPost("purgas");
     expect(await blogPurges()).toEqual([]);
 
     await http()
@@ -279,7 +262,7 @@ describe.skipIf(!isDockerAvailable())("Blog — public visibility, D8c and admin
   });
 
   it("signs a cover upload under blog/{postId}/ and resolves the stored key publicly", async () => {
-    const post = await createPost("con-portada", [BODY_ES]);
+    const post = await createPost("con-portada");
 
     const signed = await http()
       .post(`/${API_GLOBAL_PREFIX}/admin/blog/posts/${post.id}/cover/upload-url`)
@@ -307,11 +290,11 @@ describe.skipIf(!isDockerAvailable())("Blog — public visibility, D8c and admin
   });
 
   it("refuses the admin surface to anonymous (401) and customer (403) callers", async () => {
-    const post = await createPost("privado", [BODY_ES]);
+    const post = await createPost("privado");
     const base = `/${API_GLOBAL_PREFIX}/admin/blog/posts`;
 
     await http().get(base).expect(401);
-    await http().post(base).send({ slug: "x", category: "NEWS", translations: [BODY_ES] }).expect(401);
+    await http().post(base).send({ slug: "x", category: "NEWS", ...BODY_ES }).expect(401);
     await http().post(`${base}/${post.id}/publish`).expect(401);
 
     await http().get(base).set("authorization", `Bearer ${customerToken}`).expect(403);

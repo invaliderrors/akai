@@ -58,7 +58,6 @@ export async function settleOrderPaid(
       templateKey,
       orderId: order.id,
       orderNumber: order.orderNumber,
-      locale: order.locale,
       recipient: order.email,
     });
   }
@@ -67,7 +66,6 @@ export async function settleOrderPaid(
     templateKey: "admin-new-order",
     orderId: order.id,
     orderNumber: order.orderNumber,
-    locale: "es",
   });
 
   // NOT ENQUEUED HERE: `invoice-pdf`.

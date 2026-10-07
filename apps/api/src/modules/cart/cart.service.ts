@@ -23,7 +23,6 @@ import { CartTokenService } from "./cart-token.service";
 import {
   CART_TTL_MS,
   DEFAULT_CART_CURRENCY,
-  DEFAULT_CART_LOCALE,
   MAX_LINE_QUANTITY,
 } from "./cart.constants";
 import type { AddCartItemDto, AddPackToCartDto, MergeCartDto, UpdateCartItemDto } from "./cart.dto";
@@ -105,13 +104,12 @@ export class CartService {
   /** Fetch the caller's cart, creating an empty one if they have none. */
   async getOrCreateCart(
     actor: CartActor,
-    locale: string = DEFAULT_CART_LOCALE,
   ): Promise<CartView> {
     const existing = await this.resolveCart(actor);
     if (existing !== null) {
-      return { cart: await this.present(existing, null, locale), issuedToken: null };
+      return { cart: await this.present(existing, null), issuedToken: null };
     }
-    return this.createCart(actor, locale);
+    return this.createCart(actor);
   }
 
   /**
@@ -131,10 +129,9 @@ export class CartService {
   async validateCart(
     actor: CartActor,
     countryCode: string | null,
-    locale: string = DEFAULT_CART_LOCALE,
   ): Promise<Cart> {
     const record = await this.requireCart(actor);
-    return this.present(record, countryCode, locale);
+    return this.present(record, countryCode);
   }
 
   /**
@@ -188,7 +185,6 @@ export class CartService {
   async addItem(
     actor: CartActor,
     dto: AddCartItemDto,
-    locale: string = DEFAULT_CART_LOCALE,
   ): Promise<CartView> {
     // Adding to a cart that does not exist yet creates one, so a first-time
     // visitor's very first action works without a preceding GET.
@@ -249,7 +245,7 @@ export class CartService {
 
     await this.touch(record.id);
     return {
-      cart: await this.presentById(record.id, locale),
+      cart: await this.presentById(record.id),
       issuedToken: created?.token ?? null,
     };
   }
@@ -259,7 +255,6 @@ export class CartService {
     actor: CartActor,
     itemId: string,
     dto: UpdateCartItemDto,
-    locale: string = DEFAULT_CART_LOCALE,
   ): Promise<CartView> {
     const record = await this.requireCart(actor);
     const line = this.requireLine(record, itemId);
@@ -292,13 +287,12 @@ export class CartService {
     }
 
     await this.touch(record.id);
-    return { cart: await this.presentById(record.id, locale), issuedToken: null };
+    return { cart: await this.presentById(record.id), issuedToken: null };
   }
 
   async removeItem(
     actor: CartActor,
     itemId: string,
-    locale: string = DEFAULT_CART_LOCALE,
   ): Promise<CartView> {
     const record = await this.requireCart(actor);
     const line = this.requireLine(record, itemId);
@@ -307,17 +301,16 @@ export class CartService {
     await this.repository.removeItem(record.id, line.id);
     await this.touch(record.id);
 
-    return { cart: await this.presentById(record.id, locale), issuedToken: null };
+    return { cart: await this.presentById(record.id), issuedToken: null };
   }
 
   async clearCart(
     actor: CartActor,
-    locale: string = DEFAULT_CART_LOCALE,
   ): Promise<CartView> {
     const record = await this.requireCart(actor);
     await this.repository.removeAllItems(record.id);
     await this.touch(record.id);
-    return { cart: await this.presentById(record.id, locale), issuedToken: null };
+    return { cart: await this.presentById(record.id), issuedToken: null };
   }
 
   // -------------------------------------------------------------------------
@@ -330,7 +323,6 @@ export class CartService {
   async addPack(
     actor: CartActor,
     dto: AddPackToCartDto,
-    locale: string = DEFAULT_CART_LOCALE,
   ): Promise<CartView> {
     const resolved = await this.resolveCart(actor);
     const created = resolved === null ? await this.createCartRecord(actor) : null;
@@ -363,7 +355,7 @@ export class CartService {
     }
 
     const componentVariantIds = components.map((component) => component.variantId);
-    const variants = await this.repository.loadVariants(componentVariantIds, locale);
+    const variants = await this.repository.loadVariants(componentVariantIds);
     for (const variantId of componentVariantIds) {
       const variant = variants.get(variantId);
       if (variant === undefined || !variant.isPurchasable) {
@@ -422,7 +414,7 @@ export class CartService {
 
     await this.touch(record.id);
     return {
-      cart: await this.presentById(record.id, locale),
+      cart: await this.presentById(record.id),
       issuedToken: created?.token ?? null,
     };
   }
@@ -430,7 +422,6 @@ export class CartService {
   async removePack(
     actor: CartActor,
     packInstanceId: string,
-    locale: string = DEFAULT_CART_LOCALE,
   ): Promise<CartView> {
     const record = await this.requireCart(actor);
     // Ownership check: at least one line of this instance must belong to the
@@ -443,7 +434,7 @@ export class CartService {
 
     await this.repository.removePackInstance(record.id, packInstanceId);
     await this.touch(record.id);
-    return { cart: await this.presentById(record.id, locale), issuedToken: null };
+    return { cart: await this.presentById(record.id), issuedToken: null };
   }
 
   // -------------------------------------------------------------------------
@@ -463,7 +454,6 @@ export class CartService {
   async applyDiscountCode(
     actor: CartActor,
     code: string,
-    locale: string = DEFAULT_CART_LOCALE,
   ): Promise<Cart> {
     const record = await this.requireCart(actor);
 
@@ -482,18 +472,17 @@ export class CartService {
 
     await this.repository.setDiscountCode(record.id, validated.code);
     await this.touch(record.id);
-    return this.presentById(record.id, locale);
+    return this.presentById(record.id);
   }
 
   /** Remove any applied coupon code from the caller's cart. */
   async removeDiscountCode(
     actor: CartActor,
-    locale: string = DEFAULT_CART_LOCALE,
   ): Promise<Cart> {
     const record = await this.requireCart(actor);
     await this.repository.setDiscountCode(record.id, null);
     await this.touch(record.id);
-    return this.presentById(record.id, locale);
+    return this.presentById(record.id);
   }
 
   // -------------------------------------------------------------------------
@@ -864,10 +853,9 @@ export class CartService {
 
   private async createCart(
     actor: CartActor,
-    locale: string = DEFAULT_CART_LOCALE,
   ): Promise<CartView> {
     const { record, token } = await this.createCartRecord(actor);
-    return { cart: await this.present(record, null, locale), issuedToken: token };
+    return { cart: await this.present(record, null), issuedToken: token };
   }
 
   private nextExpiry(): Date {
@@ -889,9 +877,8 @@ export class CartService {
 
   private async presentById(
     cartId: string,
-    locale: string = DEFAULT_CART_LOCALE,
   ): Promise<Cart> {
-    return this.present(await this.requireRecordById(cartId), null, locale);
+    return this.present(await this.requireRecordById(cartId), null);
   }
 
   private async requirePurchasableVariant(
@@ -1057,12 +1044,10 @@ export class CartService {
   private async present(
     record: CartRecord,
     countryCode: string | null = null,
-    locale: string = DEFAULT_CART_LOCALE,
     allowRepair = true,
   ): Promise<Cart> {
     const variants = await this.repository.loadVariants(
       record.items.map((item) => item.variantId),
-      locale,
     );
 
     // Every PACK product referenced by any line, resolved in one batched call
@@ -1260,7 +1245,7 @@ export class CartService {
           stale.lines,
         );
       }
-      return this.present(await this.requireRecordById(record.id), countryCode, locale, false);
+      return this.present(await this.requireRecordById(record.id), countryCode, false);
     }
 
     // Two passes, because a discount rule is a function of the subtotal and the

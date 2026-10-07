@@ -1,7 +1,6 @@
 import type {
   CurrencyCode,
   IdentityDocumentType,
-  Locale,
   Minor,
   OrderStatus,
   PaymentStatus,
@@ -45,7 +44,6 @@ export interface OrderSnapshot {
   readonly orderNumber: string;
   readonly status: OrderStatus;
   readonly email: string;
-  readonly locale: Locale;
   readonly currency: CurrencyCode;
   readonly grandTotal: Minor;
   readonly discountTotal: Minor;

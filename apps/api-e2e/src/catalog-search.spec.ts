@@ -47,8 +47,7 @@ const TEST_ENV: NodeJS.ProcessEnv = {
 
 const pageSchema = paginatedSchema(publicProductSchema);
 
-interface SeedTranslation {
-  readonly locale: "es" | "en";
+interface SeedCopy {
   readonly name: string;
   readonly shortDescription: string;
   readonly description: string;
@@ -58,11 +57,11 @@ interface SeedProduct {
   readonly slug: string;
   readonly sku: string;
   readonly sortOrder?: number;
-  readonly translations: readonly SeedTranslation[];
+  readonly copy: SeedCopy;
 }
 
-function es(name: string, shortDescription: string, description: string): SeedTranslation {
-  return { locale: "es", name, shortDescription, description };
+function copy(name: string, shortDescription: string, description: string): SeedCopy {
+  return { name, shortDescription, description };
 }
 
 /**
@@ -76,57 +75,48 @@ const PRODUCTS: readonly SeedProduct[] = [
     slug: "kumo-hdy-3",
     sku: "AK-K1",
     sortOrder: 50,
-    translations: [es("KUMO (HDY-3)", "Sudadera pesada.", "<p>Colección de invierno.</p>")],
+    copy: copy("KUMO (HDY-3)", "Sudadera pesada.", "<p>Colección de invierno.</p>"),
   },
   {
     slug: "kumogata",
     sku: "AK-K2",
     sortOrder: 40,
-    translations: [es("Kumogata", "Camiseta de algodón.", "<p>Estampado serigrafiado.</p>")],
+    copy: copy("Kumogata", "Camiseta de algodón.", "<p>Estampado serigrafiado.</p>"),
   },
   {
     // Reaches "kumo" ONLY through a description word start: ranked last.
     slug: "coach-jacket",
     sku: "AK-C1",
     sortOrder: 0,
-    translations: [
-      es("Coach Jacket", "Nailon cortavientos.", "<p>Se combina a menudo con <strong>kumo</strong>.</p>"),
-    ],
+    copy: copy("Coach Jacket", "Nailon cortavientos.", "<p>Se combina a menudo con <strong>kumo</strong>.</p>"),
   },
   {
     // "kumo" is only ever INSIDE a word here — must never match.
     slug: "cargo-pants",
     sku: "AK-G1",
     sortOrder: 0,
-    translations: [
-      es(
-        "Cargo Pants",
-        "Tejido tsukumo.",
-        "<p>Inspirado en el barrio de Akumoto, de corte recto y relajado.</p>",
-      ),
-    ],
+    copy: copy(
+      "Cargo Pants",
+      "Tejido tsukumo.",
+      "<p>Inspirado en el barrio de Akumoto, de corte recto y relajado.</p>",
+    ),
   },
   {
     slug: "sudadera-basica",
     sku: "AK-B1",
-    translations: [es("Sudadera Básica", "Felpa perchada.", "<p>Sudadera básica.</p>")],
+    copy: copy("Sudadera Básica", "Felpa perchada.", "<p>Sudadera básica.</p>"),
   },
   {
-    // "kumo" appears only in the ENGLISH name. An es search reads the es row.
+    // No "kumo" anywhere in its copy: never matches.
     slug: "tote-bag",
     sku: "AK-T1",
-    translations: [
-      es("Bolsa Tote", "Lona.", "<p>Algodón.</p>"),
-      { locale: "en", name: "Kumoline Tote", shortDescription: "Canvas.", description: "<p>Cotton.</p>" },
-    ],
+    copy: copy("Bolsa Tote", "Lona.", "<p>Algodón.</p>"),
   },
   {
-    // No es row at all: falls back to en, so an es search still finds it.
-    slug: "english-only",
+    // "kumo" as a later word of the name: a name word-start hit.
+    slug: "gorra-kumo",
     sku: "AK-E1",
-    translations: [
-      { locale: "en", name: "Six-Panel Cap Kumo", shortDescription: "Cap.", description: "<p>Cap.</p>" },
-    ],
+    copy: copy("Gorra Seis Paneles Kumo", "Gorra.", "<p>Gorra.</p>"),
   },
 ];
 
@@ -157,7 +147,7 @@ describe.skipIf(!isDockerAvailable())("Catalog search — ranking, word starts, 
           slug: product.slug,
           status: "ACTIVE",
           sortOrder: product.sortOrder ?? 0,
-          translations: { create: product.translations.map((row) => ({ ...row })) },
+          ...product.copy,
         },
       });
       const variant = await db.prisma.productVariant.create({
@@ -185,13 +175,13 @@ describe.skipIf(!isDockerAvailable())("Catalog search — ranking, word starts, 
   async function page(query: Record<string, string>): Promise<ReturnType<typeof pageSchema.parse>> {
     const response = await request(app.getHttpServer())
       .get("/v1/products")
-      .query({ sort: "manual", locale: "es", ...query });
+      .query({ sort: "manual", ...query });
     expect(response.status).toBe(200);
     return pageSchema.parse(response.body);
   }
 
-  async function slugs(search: string, locale: "es" | "en" = "es"): Promise<string[]> {
-    const result = await page({ search, locale, limit: "100" });
+  async function slugs(search: string): Promise<string[]> {
+    const result = await page({ search, limit: "100" });
     return result.items.map((item) => item.slug);
   }
 
@@ -201,19 +191,19 @@ describe.skipIf(!isDockerAvailable())("Catalog search — ranking, word starts, 
     // Whole-word prefix → partial prefix → name word start → description word
     // start. Every name hit outranks the description hit, although the manual
     // order (sortOrder 0 vs 40/50) says the opposite.
-    expect(found).toEqual(["kumo-hdy-3", "kumogata", "english-only", "coach-jacket"]);
+    expect(found).toEqual(["kumo-hdy-3", "kumogata", "gorra-kumo", "coach-jacket"]);
     expect(found).not.toContain("cargo-pants");
   });
 
-  it("matches the active locale's translation, falling back when a product lacks it", async () => {
-    const found = await slugs("kumo");
+  it("searches the product's own copy and refuses a stray locale parameter", async () => {
+    expect(await slugs("kumo")).not.toContain("tote-bag");
+    expect(await slugs("lona")).toEqual(["tote-bag"]);
 
-    // "Kumoline" is only the en name of a product that HAS an es row.
-    expect(found).not.toContain("tote-bag");
-    // No es row at all: the en row is the one the product is shown in.
-    expect(found).toContain("english-only");
-
-    expect(await slugs("kumoline", "en")).toEqual(["tote-bag"]);
+    // One language, so no `?locale=`: the strict query refuses it.
+    const response = await request(app.getHttpServer())
+      .get("/v1/products")
+      .query({ search: "kumo", locale: "es" });
+    expect(response.status).toBe(400);
   });
 
   it("is accent-insensitive in both directions", async () => {

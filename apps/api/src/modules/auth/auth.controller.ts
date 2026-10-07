@@ -104,7 +104,6 @@ export class AuthController {
       password: body.password,
       firstName: body.firstName,
       lastName: body.lastName,
-      preferredLocale: body.preferredLocale,
       marketingConsent: body.marketingConsent,
     });
   }

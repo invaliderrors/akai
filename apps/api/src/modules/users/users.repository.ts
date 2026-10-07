@@ -1,4 +1,4 @@
-import type { AddressType, Locale, Role } from "@akai/contracts";
+import type { AddressType, Role } from "@akai/contracts";
 
 /**
  * The data surface of UsersModule, declared as a port.
@@ -38,7 +38,6 @@ export interface CustomerRow {
   readonly lastName: string | null;
   readonly phone: string | null;
   readonly role: Role;
-  readonly preferredLocale: Locale;
   /** Non-null once TOTP is enrolled. The SECRET itself is not exposed here. */
   readonly totpEnabledAt: Date | null;
   readonly marketingConsentAt: Date | null;
@@ -131,7 +130,6 @@ export interface ProfilePatch {
   readonly firstName?: string | undefined;
   readonly lastName?: string | undefined;
   readonly phone?: string | null | undefined;
-  readonly preferredLocale?: Locale | undefined;
 }
 
 export interface AddressInsert {

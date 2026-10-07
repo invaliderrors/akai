@@ -144,7 +144,7 @@ describe.skipIf(!isDockerAvailable())("Invoice numbering — gap-free under roll
 
   async function seedCatalog(): Promise<void> {
     await db.prisma.product.create({
-      data: { id: PRODUCT_ID, slug: "oversized-tee", status: "ACTIVE" },
+      data: { id: PRODUCT_ID, slug: "oversized-tee", name: "Camiseta Oversize", status: "ACTIVE" },
     });
 
     await db.prisma.productVariant.create({
@@ -176,7 +176,6 @@ describe.skipIf(!isDockerAvailable())("Invoice numbering — gap-free under roll
         orderNumber,
         email: "customer@example.com",
         status: "AWAITING_PAYMENT",
-        locale: "es",
         currency: "COP",
         subtotal: 7_478_992,
         taxTotal: 1_421_008,

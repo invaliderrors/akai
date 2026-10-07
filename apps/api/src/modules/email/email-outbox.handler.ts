@@ -4,9 +4,7 @@ import { z } from "zod";
 import {
   emailSchema,
   emailTemplateKeySchema,
-  localeSchema,
   type EmailTemplateKey,
-  type Locale,
 } from "@akai/contracts";
 import type { ServerEnv } from "@akai/config";
 import type { Logger } from "@akai/observability";
@@ -27,7 +25,6 @@ import { EmailService } from "./email.service";
 const hydratedEnvelopeSchema = z.object({
   templateKey: emailTemplateKeySchema,
   to: emailSchema,
-  locale: localeSchema,
   payload: z.record(z.string(), z.unknown()),
   orderId: z.string().uuid().optional(),
   /**
@@ -53,7 +50,6 @@ const referenceEnvelopeSchema = z
   .object({
     templateKey: emailTemplateKeySchema,
     orderId: z.string().uuid(),
-    locale: localeSchema.optional(),
     recipient: emailSchema.optional(),
     amount: z.number().int().optional(),
     currency: z.string().length(3).optional(),
@@ -64,7 +60,6 @@ type ReferenceEnvelope = z.infer<typeof referenceEnvelopeSchema>;
 
 interface HydratedEmail {
   readonly to: string;
-  readonly locale: Locale;
   readonly data: Record<string, unknown>;
   readonly orderId: string;
 }
@@ -107,10 +102,9 @@ export class EmailOutboxHandler implements OutboxHandler {
   async handle(payload: unknown, message: OutboxMessage): Promise<void> {
     const hydrated = hydratedEnvelopeSchema.safeParse(payload);
     if (hydrated.success) {
-      const { templateKey, to, locale, orderId, dedupeScope } = hydrated.data;
+      const { templateKey, to, orderId, dedupeScope } = hydrated.data;
       await this.deliver(templateKey, {
         to,
-        locale,
         data: hydrated.data.payload,
         ...(orderId === undefined ? {} : { orderId }),
         ...(dedupeScope === undefined ? {} : { dedupeScope }),
@@ -136,7 +130,6 @@ export class EmailOutboxHandler implements OutboxHandler {
     templateKey: EmailTemplateKey,
     input: {
       readonly to: string;
-      readonly locale: Locale;
       readonly data: Record<string, unknown>;
       readonly orderId?: string;
       readonly dedupeScope?: string;
@@ -145,7 +138,6 @@ export class EmailOutboxHandler implements OutboxHandler {
     const result: EmailDispatchResult = await this.emails.sendChecked({
       templateKey,
       to: input.to,
-      locale: input.locale,
       data: input.data,
       ...(input.orderId === undefined ? {} : { orderId: input.orderId }),
       ...(input.dedupeScope === undefined ? {} : { dedupeScope: input.dedupeScope }),
@@ -191,7 +183,6 @@ export class EmailOutboxHandler implements OutboxHandler {
       );
     }
 
-    const locale: Locale = reference.locale ?? order.locale;
     const firstName =
       order.customer?.firstName !== undefined && order.customer.firstName !== null
         ? order.customer.firstName
@@ -206,7 +197,6 @@ export class EmailOutboxHandler implements OutboxHandler {
       case "order-confirmation":
         return {
           to: order.email,
-          locale,
           orderId: order.id,
           data: {
             firstName,
@@ -239,7 +229,6 @@ export class EmailOutboxHandler implements OutboxHandler {
         }
         return {
           to: order.email,
-          locale,
           orderId: order.id,
           data: {
             firstName,
@@ -255,7 +244,6 @@ export class EmailOutboxHandler implements OutboxHandler {
       case "payment-failed":
         return {
           to: order.email,
-          locale,
           orderId: order.id,
           data: {
             firstName,
@@ -263,9 +251,7 @@ export class EmailOutboxHandler implements OutboxHandler {
             reason: await this.eventReason(
               order.id,
               "payment.failed",
-              locale === "es"
-                ? "No pudimos procesar el pago."
-                : "We could not process the payment.",
+              "No pudimos procesar el pago.",
             ),
             retryUrl: `${base}/orders/${order.orderNumber}`,
           },
@@ -274,7 +260,6 @@ export class EmailOutboxHandler implements OutboxHandler {
       case "order-cancelled":
         return {
           to: order.email,
-          locale,
           orderId: order.id,
           data: {
             firstName,
@@ -282,7 +267,7 @@ export class EmailOutboxHandler implements OutboxHandler {
             reason: await this.eventReason(
               order.id,
               "payment.canceled",
-              locale === "es" ? "El pedido fue cancelado." : "The order was cancelled.",
+              "El pedido fue cancelado.",
             ),
             cancelledAt: (order.cancelledAt ?? order.updatedAt).toISOString(),
           },
@@ -303,7 +288,6 @@ export class EmailOutboxHandler implements OutboxHandler {
 
         return {
           to: order.email,
-          locale,
           orderId: order.id,
           data: {
             firstName,
@@ -326,7 +310,6 @@ export class EmailOutboxHandler implements OutboxHandler {
         const refundAmount = reference.amount;
         return {
           to: order.email,
-          locale,
           orderId: order.id,
           data: {
             firstName,
@@ -338,7 +321,7 @@ export class EmailOutboxHandler implements OutboxHandler {
             reason: await this.eventReason(
               order.id,
               "refund.succeeded",
-              locale === "es" ? "Reembolso procesado." : "Refund processed.",
+              "Reembolso procesado.",
             ),
             refundedAt: order.updatedAt.toISOString(),
             isPartial: refundAmount < order.grandTotal,
@@ -351,7 +334,6 @@ export class EmailOutboxHandler implements OutboxHandler {
           // Staff alert: goes to the configured operations inbox, never the
           // customer. The payload deliberately carries the customer's email.
           to: this.config.EMAIL_FROM,
-          locale,
           orderId: order.id,
           data: {
             orderNumber: order.orderNumber,

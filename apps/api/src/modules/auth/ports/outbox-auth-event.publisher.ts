@@ -1,7 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 
 import type { ServerEnv } from "@akai/config";
-import type { Locale } from "@akai/contracts";
 import type { Logger } from "@akai/observability";
 
 import { SERVER_CONFIG } from "../../config/config.module";
@@ -42,7 +41,7 @@ function baseUrl(url: string): string {
  * left the whole customer flow a dead end.
  *
  * This writer turns the two token-bearing events into `email` outbox rows. It
- * emits the FULLY-HYDRATED shape (`{ templateKey, to, locale, payload }`) rather
+ * emits the FULLY-HYDRATED shape (`{ templateKey, to, payload }`) rather
  * than an order reference: the reset/verify link can only be built here, at emit
  * time, from the one-time token that never touches the database in clear text.
  * `EmailOutboxHandler` sends it; `EmailService` owns delivery, suppression
@@ -73,7 +72,7 @@ export class OutboxAuthEventPublisher implements AuthEventPublisher {
     switch (event.type) {
       case "auth.customer.registered":
       case "auth.email_verification.requested":
-        await this.enqueueVerifyEmail(event.email, event.locale, event.verificationToken, {
+        await this.enqueueVerifyEmail(event.email, event.verificationToken, {
           occurredAt: event.occurredAt,
           expiresAt: event.expiresAt,
           origin: event.origin,
@@ -81,7 +80,7 @@ export class OutboxAuthEventPublisher implements AuthEventPublisher {
         return;
 
       case "auth.login_code.requested":
-        await this.enqueueLoginCode(event.email, event.locale, event.code, {
+        await this.enqueueLoginCode(event.email, event.code, {
           occurredAt: event.occurredAt,
           expiresAt: event.expiresAt,
           origin: event.origin,
@@ -89,7 +88,7 @@ export class OutboxAuthEventPublisher implements AuthEventPublisher {
         return;
 
       case "auth.password_reset.requested":
-        await this.enqueueResetPassword(event.email, event.locale, event.resetToken, {
+        await this.enqueueResetPassword(event.email, event.resetToken, {
           occurredAt: event.occurredAt,
           expiresAt: event.expiresAt,
           origin: event.origin,
@@ -110,7 +109,6 @@ export class OutboxAuthEventPublisher implements AuthEventPublisher {
 
   private async enqueueVerifyEmail(
     email: string,
-    locale: Locale,
     token: string,
     window: EventWindow,
   ): Promise<void> {
@@ -119,16 +117,15 @@ export class OutboxAuthEventPublisher implements AuthEventPublisher {
       1,
       168,
     );
-    await this.enqueue("verify-email", email, locale, {
+    await this.enqueue("verify-email", email, {
       firstName: this.greetingName(email),
-      verifyUrl: `${this.authBase(locale, window.origin)}/verify-email?token=${encodeURIComponent(token)}`,
+      verifyUrl: `${this.authBase(window.origin)}/verify-email?token=${encodeURIComponent(token)}`,
       expiresInHours,
     });
   }
 
   private async enqueueResetPassword(
     email: string,
-    locale: Locale,
     token: string,
     window: EventWindow,
   ): Promise<void> {
@@ -137,9 +134,9 @@ export class OutboxAuthEventPublisher implements AuthEventPublisher {
       1,
       1440,
     );
-    await this.enqueue("reset-password", email, locale, {
+    await this.enqueue("reset-password", email, {
       firstName: this.greetingName(email),
-      resetUrl: `${this.authBase(locale, window.origin)}/reset-password?token=${encodeURIComponent(token)}`,
+      resetUrl: `${this.authBase(window.origin)}/reset-password?token=${encodeURIComponent(token)}`,
       expiresInMinutes,
     });
   }
@@ -156,7 +153,6 @@ export class OutboxAuthEventPublisher implements AuthEventPublisher {
    */
   private async enqueueLoginCode(
     email: string,
-    locale: Locale,
     code: string,
     window: EventWindow,
   ): Promise<void> {
@@ -165,7 +161,7 @@ export class OutboxAuthEventPublisher implements AuthEventPublisher {
       1,
       60,
     );
-    await this.enqueue("login-code", email, locale, {
+    await this.enqueue("login-code", email, {
       firstName: this.greetingName(email),
       code,
       expiresInMinutes,
@@ -175,25 +171,23 @@ export class OutboxAuthEventPublisher implements AuthEventPublisher {
   private async enqueue(
     templateKey: "verify-email" | "reset-password" | "login-code",
     to: string,
-    locale: Locale,
     payload: Record<string, string | number>,
   ): Promise<void> {
     await this.prisma.outboxMessage.create({
       data: {
         topic: "email",
-        payload: { templateKey, to, locale, payload },
+        payload: { templateKey, to, payload },
       },
     });
     this.logger.info(
-      { templateKey, locale },
+      { templateKey },
       "Auth email enqueued to the outbox",
     );
   }
 
   /**
    * The app whose `/verify-email` or `/reset-password` page the mailed link
-   * opens. `en` is prefixed, `es` is the root — the storefront and the dashboard
-   * share that rule (`STOREFRONT_LOCALE_PREFIX` in `@akai/i18n`).
+   * opens, at its bare path (neither app has a locale prefix).
    *
    * Spec §8 said "auth lives in the dashboard" and this was hard-coded to
    * DASHBOARD_URL. It no longer does: the storefront hosts sign-up and
@@ -206,11 +200,10 @@ export class OutboxAuthEventPublisher implements AuthEventPublisher {
    * here — never a URL carried on the event, which would be an attacker-supplied
    * open redirect planted inside an email we sign our name to.
    */
-  private authBase(locale: Locale, origin: AuthEventOrigin | undefined): string {
-    const base = baseUrl(
+  private authBase(origin: AuthEventOrigin | undefined): string {
+    return baseUrl(
       origin === "storefront" ? this.config.STOREFRONT_URL : this.config.DASHBOARD_URL,
     );
-    return locale === "en" ? `${base}/en` : base;
   }
 
   /**

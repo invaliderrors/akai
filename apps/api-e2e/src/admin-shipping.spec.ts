@@ -95,7 +95,7 @@ describe.skipIf(!isDockerAvailable())("Admin shipping zones and rates", () => {
     return service.createRate(
       zoneId,
       createShippingRateSchema.parse({
-        name: { es: "Envío nacional", en: "National shipping" },
+        name: "Envío nacional",
         strategy: "FLAT",
         priceGross: 1_500_000,
         freeOverSubtotal,
@@ -118,12 +118,11 @@ describe.skipIf(!isDockerAvailable())("Admin shipping zones and rates", () => {
 
     const repriced = await service.updateRate(colombia.id, rate.id, {
       priceGross: toMinor(1_800_000),
-      name: { es: "Envío" },
+      name: "Envío",
     });
     expect(repriced.priceGross).toBe(1_800_000);
     expect(repriced.currency).toBe("COP");
-    // PATCHing the name replaces it: the English copy is gone, not merged back.
-    expect(repriced.name).toEqual({ es: "Envío" });
+    expect(repriced.name).toBe("Envío");
 
     const inactive = await service.updateRate(colombia.id, rate.id, { isActive: false });
     expect(inactive.isActive).toBe(false);

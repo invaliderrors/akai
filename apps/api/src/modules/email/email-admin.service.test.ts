@@ -11,7 +11,6 @@ interface Row {
   id: string;
   recipient: string;
   templateKey: string;
-  locale: string;
   status: string;
   providerMessageId: string | null;
   orderId: string | null;
@@ -26,7 +25,6 @@ function row(index: number, overrides: Partial<Row> = {}): Row {
     id: `0000000${index}-0000-4000-8000-000000000000`.slice(-36),
     recipient: "marta@example.com",
     templateKey: "order-confirmation",
-    locale: "es",
     status: "SENT",
     providerMessageId: `provider-${index}`,
     orderId: "11111111-1111-4111-8111-111111111111",

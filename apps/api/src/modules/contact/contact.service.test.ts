@@ -67,7 +67,6 @@ const config = { EMAIL_FROM: OPS_INBOX } as unknown as ServerEnv;
 const envelopeSchema = z.object({
   templateKey: z.string(),
   to: z.string(),
-  locale: z.string(),
   payload: z.record(z.string(), z.unknown()),
 });
 
@@ -80,7 +79,6 @@ const SUBMISSION = contactRequestSchema.parse({
   name: "Marta",
   email: "marta@example.com",
   message: "Which lot is currently shipping for AK-CRE-300?\nThanks.",
-  locale: "en",
   turnstileToken: "token-abc",
 });
 
@@ -159,12 +157,16 @@ describe("ContactService.submit", () => {
     expect(autoreply?.payload["referenceId"]).toBe(staff?.payload["referenceId"]);
   });
 
-  it("renders in the submitter's locale so staff know which language to reply in", async () => {
+  it("names no language on the envelopes — every mail renders in Spanish", async () => {
     const service = serviceWith(new FakeCaptcha(true));
 
     await service.submit(SUBMISSION, null);
 
-    expect(envelopesOf(prisma).map((envelope) => envelope.locale)).toEqual(["en", "en"]);
+    const [batch = []] = prisma.batches;
+    expect(batch).toHaveLength(2);
+    for (const row of batch) {
+      expect(row.payload).not.toHaveProperty("locale");
+    }
   });
 
   it("mints an unguessable, non-sequential reference", async () => {

@@ -24,9 +24,7 @@ const BASIS: CartShippingBasis = {
 
 const STANDARD: ShippingOption = {
   rateId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
-  // Per-locale, and carried across the wire unresolved: the quote is a function
-  // of destination and cart, so this endpoint has no locale to resolve it with.
-  name: { es: "Estándar", en: "Standard" },
+  name: "Estándar",
   currency: "EUR",
   priceGross: toMinor(495),
   isFree: false,
@@ -98,7 +96,7 @@ describe("ShippingController.quote", () => {
     expect(quote.options).toEqual([
       {
         rateId: STANDARD.rateId,
-        name: { es: "Estándar", en: "Standard" },
+        name: "Estándar",
         currency: "EUR",
         priceGross: 495,
         isFree: false,

@@ -19,8 +19,7 @@ import { BlogService } from "./blog.service";
  * loosening `MediaAsset` (which is product-bound: `productId` required, keys
  * `products/{productId}/…`). A cover is a key on the post, `blog/{postId}/…`.
  *
- * Mounts its own `/admin/*` controller, like TranslationModule and
- * SiteSettingsModule: the global RolesGuard is all it needs from the admin
+ * Mounts its own `/admin/*` controller, like SiteSettingsModule: the global RolesGuard is all it needs from the admin
  * graph.
  *
  * Storefront purges ride the EXISTING `storefront.revalidate` outbox topic with

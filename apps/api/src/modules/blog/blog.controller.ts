@@ -1,10 +1,8 @@
 import { Controller, Get, Param, Query, UseGuards } from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import {
-  blogPostDetailQuerySchema,
   blogPostListQuerySchema,
   slugSchema,
-  type BlogPostDetailQuery,
   type BlogPostListQuery,
   type PublicBlogPost,
   type PublicBlogPostListResponse,
@@ -49,8 +47,7 @@ export class BlogController {
   @ApiOperation({ summary: "One published blog post by slug" })
   async get(
     @Param("slug", new ZodValidationPipe(slugSchema)) slug: string,
-    @Query(new ZodValidationPipe(blogPostDetailQuerySchema)) query: BlogPostDetailQuery,
   ): Promise<PublicBlogPost> {
-    return this.blog.getPublished(slug, query.locale);
+    return this.blog.getPublished(slug);
   }
 }

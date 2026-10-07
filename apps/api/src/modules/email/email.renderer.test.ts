@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { emailTemplateKeySchema, type EmailTemplateKey, type Locale } from "@akai/contracts";
+import { emailTemplateKeySchema, type EmailTemplateKey } from "@akai/contracts";
 import { toMinor } from "@akai/money";
 import { escapeHtml, renderEmail, safeUrl } from "./email.renderer";
 import {
@@ -7,8 +7,6 @@ import {
   parseTemplatePayload,
   type EmailPayloadFor,
 } from "./email.templates";
-
-const LOCALES: readonly Locale[] = ["es", "en"];
 
 function eur(amount: number): { amount: ReturnType<typeof toMinor>; currency: string } {
   return { amount: toMinor(amount), currency: "EUR" };
@@ -142,44 +140,38 @@ const FIXTURES: { [K in EmailTemplateKey]: EmailPayloadFor<K> } = {
 const ALL_KEYS: readonly EmailTemplateKey[] = emailTemplateKeySchema.options;
 
 describe("renderEmail — coverage", () => {
-  it("renders every template in every locale with a non-empty subject and body", () => {
+  it("renders every template with a non-empty subject and body", () => {
     for (const key of ALL_KEYS) {
-      for (const locale of LOCALES) {
-        // Re-parse the fixture so the test also proves each fixture is a VALID
-        // payload, not merely one that happens to typecheck.
-        const payload = parseTemplatePayload(key, FIXTURES[key]);
-        const rendered = renderEmail(key, locale, payload);
+      // Re-parse the fixture so the test also proves each fixture is a VALID
+      // payload, not merely one that happens to typecheck.
+      const payload = parseTemplatePayload(key, FIXTURES[key]);
+      const rendered = renderEmail(key, payload);
 
-        expect(rendered.subject.length, `${key}/${locale} subject`).toBeGreaterThan(0);
-        expect(rendered.html, `${key}/${locale} html`).toContain("<html");
-        expect(rendered.text.length, `${key}/${locale} text`).toBeGreaterThan(0);
-        expect(rendered.html).not.toContain("undefined");
-        expect(rendered.text).not.toContain("undefined");
-      }
+      expect(rendered.subject.length, `${key} subject`).toBeGreaterThan(0);
+      expect(rendered.html, `${key} html`).toContain("<html");
+      expect(rendered.text.length, `${key} text`).toBeGreaterThan(0);
+      expect(rendered.html).not.toContain("undefined");
+      expect(rendered.text).not.toContain("undefined");
     }
   });
 
-  it("produces genuinely different Spanish and English copy", () => {
-    // Guards against a template that quietly falls back to one language —
-    // spec §10 calls an English-only confirmation for a Spanish-default store a
-    // launch blocker.
-    for (const key of ALL_KEYS) {
-      const payload = parseTemplatePayload(key, FIXTURES[key]);
-      const es = renderEmail(key, "es", payload);
-      const en = renderEmail(key, "en", payload);
+  it("writes the customer-facing copy in Spanish", () => {
+    const subject = (key: EmailTemplateKey): string =>
+      renderEmail(key, parseTemplatePayload(key, FIXTURES[key])).subject;
 
-      expect(es.text, `${key} is identical in both locales`).not.toEqual(en.text);
-    }
+    expect(subject("verify-email")).toBe("Confirma tu correo electrónico");
+    expect(subject("reset-password")).toBe("Restablecer tu contraseña");
+    expect(subject("order-confirmation")).toContain("Pedido confirmado");
+    expect(subject("shipping-confirmation")).toContain("está en camino");
+    expect(subject("order-cancelled")).toContain("cancelado");
   });
 
   it("opens and closes every mail with the brand wordmark, in both HTML and text", () => {
     for (const key of ALL_KEYS) {
       const payload = parseTemplatePayload(key, FIXTURES[key]);
-      for (const locale of LOCALES) {
-        const rendered = renderEmail(key, locale, payload);
-        expect(rendered.html, `${key}/${locale} html`).toContain("AKAI");
-        expect(rendered.text, `${key}/${locale} text`).toContain("AKAI");
-      }
+      const rendered = renderEmail(key, payload);
+      expect(rendered.html, `${key} html`).toContain("AKAI");
+      expect(rendered.text, `${key} text`).toContain("AKAI");
     }
   });
 
@@ -191,39 +183,33 @@ describe("renderEmail — coverage", () => {
     // render (the button, and nothing else).
     for (const key of ALL_KEYS) {
       const payload = parseTemplatePayload(key, FIXTURES[key]);
-      for (const locale of LOCALES) {
-        const html = renderEmail(key, locale, payload).html;
-        const backgroundDeclarations = html.match(/background(-color)?\s*:/g) ?? [];
-        const accentFills = html.match(/background:#2b2fd9/g) ?? [];
-        expect(
-          backgroundDeclarations.length,
-          `${key}/${locale} background declarations`,
-        ).toBe(accentFills.length);
-      }
+      const html = renderEmail(key, payload).html;
+      const backgroundDeclarations = html.match(/background(-color)?\s*:/g) ?? [];
+      const accentFills = html.match(/background:#2b2fd9/g) ?? [];
+      expect(backgroundDeclarations.length, `${key} background declarations`).toBe(
+        accentFills.length,
+      );
     }
   });
 
-  it("sets the html lang attribute to the rendered locale", () => {
+  it("declares the store locale on <html>", () => {
     const payload = parseTemplatePayload("verify-email", FIXTURES["verify-email"]);
-    expect(renderEmail("verify-email", "es", payload).html).toContain('lang="es"');
-    expect(renderEmail("verify-email", "en", payload).html).toContain('lang="en"');
+    expect(renderEmail("verify-email", payload).html).toContain('lang="es-CO"');
   });
 });
 
 describe("renderEmail — money", () => {
-  it("formats money per locale from integer minor units", () => {
+  it("formats money in es-CO from integer minor units", () => {
     const payload = parseTemplatePayload(
       "order-confirmation",
       FIXTURES["order-confirmation"],
     );
 
-    const es = renderEmail("order-confirmation", "es", payload).text;
-    const en = renderEmail("order-confirmation", "en", payload).text;
+    const text = renderEmail("order-confirmation", payload).text;
 
-    // 5493 minor units, never 54.93 floats. Spanish puts the symbol last.
-    expect(es).toContain("54,93");
-    expect(en).toContain("54.93");
-    expect(es).not.toContain("5493");
+    // 5493 minor units, never 54.93 floats, and a decimal COMMA.
+    expect(text).toContain("54,93");
+    expect(text).not.toContain("5493");
   });
 
   it("never renders a raw minor-unit integer to the customer", () => {
@@ -231,10 +217,25 @@ describe("renderEmail — money", () => {
       "payment-receipt",
       FIXTURES["payment-receipt"],
     );
-    const text = renderEmail("payment-receipt", "es", payload).text;
+    const text = renderEmail("payment-receipt", payload).text;
 
     expect(text).toContain("54,93");
     expect(text).not.toMatch(/\b5493\b/);
+  });
+});
+
+describe("renderEmail — dates", () => {
+  it("prints dates in Spanish, in Colombian time", () => {
+    // 03:00 UTC on the 21st is still the evening of the 20th in Bogotá
+    // (UTC-5); a UTC-pinned formatter would print the wrong day.
+    const payload = parseTemplatePayload("order-confirmation", {
+      ...FIXTURES["order-confirmation"],
+      placedAt: "2026-07-21T03:00:00.000Z",
+    });
+
+    const text = renderEmail("order-confirmation", payload).text;
+
+    expect(text).toContain("20 de julio de 2026");
   });
 });
 
@@ -245,7 +246,7 @@ describe("renderEmail — escaping is structural", () => {
       firstName: '<script>alert("xss")</script>',
     });
 
-    const html = renderEmail("order-confirmation", "es", payload).html;
+    const html = renderEmail("order-confirmation", payload).html;
 
     // The attack string must survive as TEXT, never as an element.
     expect(html).not.toContain("<script>");
@@ -265,7 +266,7 @@ describe("renderEmail — escaping is structural", () => {
       ],
     });
 
-    const html = renderEmail("order-confirmation", "es", payload).html;
+    const html = renderEmail("order-confirmation", payload).html;
 
     // The property is "no ELEMENT and no ATTRIBUTE was created", not "the
     // string onerror= is absent". `onerror=` surviving as escaped body text is
@@ -324,18 +325,16 @@ describe("renderEmail — shipping without tracking", () => {
     lines: LINES,
   };
 
-  it("renders in both locales with no tracking number and no tracking url", () => {
-    for (const locale of LOCALES) {
-      const payload = parseTemplatePayload("shipping-confirmation", untracked);
-      const rendered = renderEmail("shipping-confirmation", locale, payload);
+  it("renders with no tracking number and no tracking url", () => {
+    const payload = parseTemplatePayload("shipping-confirmation", untracked);
+    const rendered = renderEmail("shipping-confirmation", payload);
 
-      expect(rendered.subject.length).toBeGreaterThan(0);
-      expect(rendered.text).not.toContain("undefined");
-      expect(rendered.html).not.toContain("undefined");
-      // The button falls back to the order page rather than vanishing.
-      expect(rendered.text).toContain("https://akai.shop/orders/AK-2026-000123");
-      expect(rendered.text).toContain("Correos");
-    }
+    expect(rendered.subject.length).toBeGreaterThan(0);
+    expect(rendered.text).not.toContain("undefined");
+    expect(rendered.html).not.toContain("undefined");
+    // The button falls back to the order page rather than vanishing.
+    expect(rendered.text).toContain("https://akai.shop/orders/AK-2026-000123");
+    expect(rendered.text).toContain("Correos");
   });
 
   it("still shows the tracking number when there is one", () => {
@@ -343,21 +342,19 @@ describe("renderEmail — shipping without tracking", () => {
       "shipping-confirmation",
       FIXTURES["shipping-confirmation"],
     );
-    const text = renderEmail("shipping-confirmation", "es", payload).text;
+    const text = renderEmail("shipping-confirmation", payload).text;
     expect(text).toContain("SE123456789ES");
     expect(text).toContain("https://seur.com/track/SE123456789ES");
   });
 });
 
 describe("renderEmail — login-code", () => {
-  it("renders the code itself in both locales", () => {
-    for (const locale of LOCALES) {
-      const payload = parseTemplatePayload("login-code", FIXTURES["login-code"]);
-      const rendered = renderEmail("login-code", locale, payload);
-      expect(rendered.text).toContain("204815");
-      expect(rendered.html).toContain("204815");
-      expect(rendered.text).toContain("10");
-    }
+  it("renders the code itself", () => {
+    const payload = parseTemplatePayload("login-code", FIXTURES["login-code"]);
+    const rendered = renderEmail("login-code", payload);
+    expect(rendered.text).toContain("204815");
+    expect(rendered.html).toContain("204815");
+    expect(rendered.text).toContain("10");
   });
 
   it("carries NO link a phisher could repoint and no session material", () => {
@@ -365,10 +362,8 @@ describe("renderEmail — login-code", () => {
     // deliberately has no button: the code is typed into the tab the customer
     // already has open, so there is nothing in the mail to click.
     const payload = parseTemplatePayload("login-code", FIXTURES["login-code"]);
-    for (const locale of LOCALES) {
-      const html = renderEmail("login-code", locale, payload).html;
-      expect(html).not.toContain("<a href");
-    }
+    const html = renderEmail("login-code", payload).html;
+    expect(html).not.toContain("<a href");
   });
 
   it("is exempt from suppression, because a code is the only way back in", () => {

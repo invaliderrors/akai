@@ -591,7 +591,6 @@ export class WompiSettlementService {
       templateKey: "payment-failed",
       orderId: order.id,
       orderNumber: order.orderNumber,
-      locale: order.locale,
       recipient: order.email,
     });
   }

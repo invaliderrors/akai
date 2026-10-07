@@ -9,7 +9,7 @@ const MESSAGE: RenderedMessage = {
   subject: "Pedido confirmado AK-2026-000123",
   html: "<p>hola</p>",
   text: "hola",
-  tags: { template: "order-confirmation", locale: "es" },
+  tags: { template: "order-confirmation", order_id: "11111111-1111-4111-8111-111111111111" },
 };
 
 function jsonResponse(body: unknown, status: number): Response {
@@ -77,7 +77,7 @@ describe("ResendTransport — success path", () => {
       text: MESSAGE.text,
       tags: [
         { name: "template", value: "order-confirmation" },
-        { name: "locale", value: "es" },
+        { name: "order_id", value: "11111111-1111-4111-8111-111111111111" },
       ],
     });
   });

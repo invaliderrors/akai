@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { AddressType, Locale, Role } from "@akai/contracts";
+import type { AddressType, Role } from "@akai/contracts";
 import type {
   AddressInsert,
   AddressPatch,
@@ -125,9 +125,6 @@ export class FakeUsersRepository implements UsersRepository {
       ...(patch.firstName !== undefined ? { firstName: patch.firstName } : {}),
       ...(patch.lastName !== undefined ? { lastName: patch.lastName } : {}),
       ...(patch.phone !== undefined ? { phone: patch.phone } : {}),
-      ...(patch.preferredLocale !== undefined
-        ? { preferredLocale: patch.preferredLocale }
-        : {}),
       updatedAt: new Date(existing.updatedAt.getTime() + 1000),
     };
     this.customers[index] = updated;
@@ -466,7 +463,6 @@ function byNewestFirst(left: AddressRow, right: AddressRow): number {
 export function makeCustomerRow(overrides: Partial<CustomerRow> = {}): CustomerRow {
   const now = new Date("2026-07-20T10:00:00.000Z");
   const role: Role = "CUSTOMER";
-  const locale: Locale = "es";
   return {
     id: randomUUID(),
     email: `customer-${randomUUID().slice(0, 8)}@example.com`,
@@ -475,7 +471,6 @@ export function makeCustomerRow(overrides: Partial<CustomerRow> = {}): CustomerR
     lastName: "García",
     phone: null,
     role,
-    preferredLocale: locale,
     totpEnabledAt: null,
     marketingConsentAt: null,
     anonymisedAt: null,

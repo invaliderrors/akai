@@ -231,21 +231,11 @@ describe("PaymentsService.startCheckout", () => {
     expect(params.get("shipping-address:country")).toBe("CO");
   });
 
-  it("sends the browser to a PROCESSING screen, locale-correct", async () => {
-    const es = orderSnapshot();
-    repository.seedOrder(es, [orderLine()]);
-    expect((await checkoutParams(es.id)).get("redirect-url")).toBe(
+  it("sends the browser to a PROCESSING screen at its bare path", async () => {
+    const order = orderSnapshot();
+    repository.seedOrder(order, [orderLine()]);
+    expect((await checkoutParams(order.id)).get("redirect-url")).toBe(
       "http://localhost:3000/checkout/processing?order=AK-2026-000123",
-    );
-
-    const en = orderSnapshot({
-      id: "22222222-2222-4222-8222-222222222299",
-      orderNumber: "AK-2026-000124",
-      locale: "en",
-    });
-    repository.seedOrder(en, [orderLine()]);
-    expect((await checkoutParams(en.id)).get("redirect-url")).toBe(
-      "http://localhost:3000/en/checkout/processing?order=AK-2026-000124",
     );
   });
 

@@ -3,9 +3,8 @@ import { Prisma } from "@akai/db";
 import {
   REVALIDATE_TAG_BLOG,
   type BlogCategory,
+  type BlogPostCopy,
   type BlogPostStatus,
-  type BlogPostTranslationInput,
-  type Locale,
 } from "@akai/contracts";
 
 import { PrismaService } from "../prisma/prisma.service";
@@ -18,7 +17,7 @@ import type { BlogRevalidationReason } from "./blog.events";
  * A port, like CATEGORIES_REPOSITORY, so `BlogService`'s rules — sanitising,
  * cover-key ownership, error translation, which writes purge the storefront —
  * are unit-testable against an in-memory double. What only Postgres can prove
- * (published-only visibility, the locale filter, the unique slug, the outbox
+ * (published-only visibility, the unique slug, the outbox
  * row landing in the same transaction) is proven against a real database in
  * `apps/api-e2e/src/blog.spec.ts`.
  *
@@ -28,17 +27,7 @@ import type { BlogRevalidationReason } from "./blog.events";
  * ever notice. The reason travels as a parameter so the service decides WHY and
  * the adapter guarantees WHEN.
  */
-export interface BlogTranslationRecord {
-  readonly locale: Locale;
-  readonly title: string;
-  readonly excerpt: string;
-  readonly bodyHtml: string;
-  readonly metaTitle: string | null;
-  readonly metaDescription: string | null;
-  readonly coverAlt: string;
-}
-
-export interface BlogPostRecord {
+export interface BlogPostRecord extends Readonly<BlogPostCopy> {
   readonly id: string;
   readonly slug: string;
   readonly status: BlogPostStatus;
@@ -48,7 +37,6 @@ export interface BlogPostRecord {
   readonly authorId: string | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
-  readonly translations: readonly BlogTranslationRecord[];
 }
 
 export interface BlogPage {
@@ -57,25 +45,22 @@ export interface BlogPage {
   readonly nextCursor: string | null;
 }
 
-export interface NewBlogPost {
+export interface NewBlogPost extends Readonly<BlogPostCopy> {
   readonly slug: string;
   readonly category: BlogCategory;
   readonly authorId: string | null;
-  readonly translations: readonly BlogPostTranslationInput[];
 }
 
-export interface BlogPostPatch {
+/** Only the fields present change. */
+export interface BlogPostPatch extends Partial<Readonly<BlogPostCopy>> {
   readonly slug?: string;
   readonly category?: BlogCategory;
   readonly coverObjectKey?: string | null;
-  /** Full replacement of the translation set when present. */
-  readonly translations?: readonly BlogPostTranslationInput[];
 }
 
 export interface BlogRepository {
-  /** PUBLISHED only, newest first; with `locale`, only posts translated into it. */
+  /** PUBLISHED only, newest first. */
   listPublished(query: {
-    readonly locale?: Locale | undefined;
     readonly cursor?: string | undefined;
     readonly limit: number;
   }): Promise<BlogPage>;
@@ -112,31 +97,22 @@ export interface BlogRepository {
 
 export const BLOG_REPOSITORY = Symbol("BLOG_REPOSITORY");
 
-const INCLUDE_TRANSLATIONS = {
-  translations: { orderBy: { locale: "asc" } },
-} as const satisfies Prisma.BlogPostInclude;
-
-type BlogPostRow = Prisma.BlogPostGetPayload<{ include: typeof INCLUDE_TRANSLATIONS }>;
+type BlogPostRow = Prisma.BlogPostGetPayload<Record<string, never>>;
 
 @Injectable()
 export class PrismaBlogRepository implements BlogRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   async listPublished(query: {
-    readonly locale?: Locale | undefined;
     readonly cursor?: string | undefined;
     readonly limit: number;
   }): Promise<BlogPage> {
-    const where: Prisma.BlogPostWhereInput = {
-      status: "PUBLISHED",
-      ...(query.locale === undefined ? {} : { translations: { some: { locale: query.locale } } }),
-    };
+    const where: Prisma.BlogPostWhereInput = { status: "PUBLISHED" };
 
     // `id` breaks ties between posts published in the same millisecond, so the
     // order — and therefore the cursor — is total.
     const rows = await this.prisma.blogPost.findMany({
       where,
-      include: INCLUDE_TRANSLATIONS,
       orderBy: [{ publishedAt: "desc" }, { id: "desc" }],
       take: query.limit + 1,
       ...(query.cursor === undefined ? {} : { cursor: { id: query.cursor }, skip: 1 }),
@@ -148,7 +124,6 @@ export class PrismaBlogRepository implements BlogRepository {
   async findPublishedBySlug(slug: string): Promise<BlogPostRecord | null> {
     const row = await this.prisma.blogPost.findFirst({
       where: { slug, status: "PUBLISHED" },
-      include: INCLUDE_TRANSLATIONS,
     });
     return row === null ? null : toRecord(row);
   }
@@ -160,7 +135,6 @@ export class PrismaBlogRepository implements BlogRepository {
   }): Promise<BlogPage> {
     const rows = await this.prisma.blogPost.findMany({
       where: query.status === undefined ? {} : { status: query.status },
-      include: INCLUDE_TRANSLATIONS,
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: query.limit + 1,
       ...(query.cursor === undefined ? {} : { cursor: { id: query.cursor }, skip: 1 }),
@@ -172,7 +146,6 @@ export class PrismaBlogRepository implements BlogRepository {
   async findById(id: string): Promise<BlogPostRecord | null> {
     const row = await this.prisma.blogPost.findUnique({
       where: { id },
-      include: INCLUDE_TRANSLATIONS,
     });
     return row === null ? null : toRecord(row);
   }
@@ -187,9 +160,13 @@ export class PrismaBlogRepository implements BlogRepository {
         slug: input.slug,
         category: input.category,
         authorId: input.authorId,
-        translations: { create: input.translations.map(toTranslationData) },
+        title: input.title,
+        excerpt: input.excerpt,
+        bodyHtml: input.bodyHtml,
+        metaTitle: input.metaTitle,
+        metaDescription: input.metaDescription,
+        coverAlt: input.coverAlt,
       },
-      include: INCLUDE_TRANSLATIONS,
     });
     return toRecord(row);
   }
@@ -203,29 +180,15 @@ export class PrismaBlogRepository implements BlogRepository {
       const existing = await tx.blogPost.findUnique({ where: { id }, select: { id: true } });
       if (existing === null) return null;
 
-      if (patch.translations !== undefined) {
-        // Full replacement: a locale left out of the set is withdrawn (D8c).
-        await tx.blogPostTranslation.deleteMany({ where: { postId: id } });
-        await tx.blogPostTranslation.createMany({
-          data: patch.translations.map((translation) => ({
-            postId: id,
-            ...toTranslationData(translation),
-          })),
-        });
-      }
-
       const row = await tx.blogPost.update({
         where: { id },
         data: {
           ...(patch.slug === undefined ? {} : { slug: patch.slug }),
           ...(patch.category === undefined ? {} : { category: patch.category }),
           ...(patch.coverObjectKey === undefined ? {} : { coverObjectKey: patch.coverObjectKey }),
-          // Touch the row even for a translations-only edit, so `updatedAt`
-          // reflects the change an operator just made.
-          updatedAt: new Date(),
+          ...copyData(patch),
         },
-        include: INCLUDE_TRANSLATIONS,
-      });
+        });
 
       await enqueuePurge(tx, reason);
       return toRecord(row);
@@ -251,8 +214,7 @@ export class PrismaBlogRepository implements BlogRepository {
           status,
           ...(status === "PUBLISHED" && existing.publishedAt === null ? { publishedAt: now } : {}),
         },
-        include: INCLUDE_TRANSLATIONS,
-      });
+        });
 
       await enqueuePurge(tx, reason);
       return toRecord(row);
@@ -286,23 +248,15 @@ async function enqueuePurge(
   });
 }
 
-function toTranslationData(translation: BlogPostTranslationInput): {
-  locale: Locale;
-  title: string;
-  excerpt: string;
-  bodyHtml: string;
-  metaTitle: string | null;
-  metaDescription: string | null;
-  coverAlt: string;
-} {
+/** The copy fields a write carries, and only those. */
+function copyData(copy: Partial<Readonly<BlogPostCopy>>): Partial<BlogPostCopy> {
   return {
-    locale: translation.locale,
-    title: translation.title,
-    excerpt: translation.excerpt,
-    bodyHtml: translation.bodyHtml,
-    metaTitle: translation.metaTitle,
-    metaDescription: translation.metaDescription,
-    coverAlt: translation.coverAlt,
+    ...(copy.title === undefined ? {} : { title: copy.title }),
+    ...(copy.excerpt === undefined ? {} : { excerpt: copy.excerpt }),
+    ...(copy.bodyHtml === undefined ? {} : { bodyHtml: copy.bodyHtml }),
+    ...(copy.metaTitle === undefined ? {} : { metaTitle: copy.metaTitle }),
+    ...(copy.metaDescription === undefined ? {} : { metaDescription: copy.metaDescription }),
+    ...(copy.coverAlt === undefined ? {} : { coverAlt: copy.coverAlt }),
   };
 }
 
@@ -328,14 +282,11 @@ function toRecord(row: BlogPostRow): BlogPostRecord {
     authorId: row.authorId,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
-    translations: row.translations.map((translation) => ({
-      locale: translation.locale,
-      title: translation.title,
-      excerpt: translation.excerpt,
-      bodyHtml: translation.bodyHtml,
-      metaTitle: translation.metaTitle,
-      metaDescription: translation.metaDescription,
-      coverAlt: translation.coverAlt,
-    })),
+    title: row.title,
+    excerpt: row.excerpt,
+    bodyHtml: row.bodyHtml,
+    metaTitle: row.metaTitle,
+    metaDescription: row.metaDescription,
+    coverAlt: row.coverAlt,
   };
 }

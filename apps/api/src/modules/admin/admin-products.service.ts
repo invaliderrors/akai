@@ -136,7 +136,9 @@ export class AdminProductsService {
         slug: row.slug,
         status: row.status,
         taxClass: row.taxClass,
-        translations: row.translations,
+        name: row.name,
+        shortDescription: row.shortDescription,
+        description: row.description,
         variants: row.variants.map((variant) => ({
           sku: variant.sku,
           priceGross: variant.priceGross,
@@ -193,11 +195,8 @@ export class AdminProductsService {
       status: product.status,
       taxClass: product.taxClass,
       restrictedCountries: [...product.restrictedCountries],
-      translations: product.translations.map((translation) => ({
-        locale: translation.locale,
-        name: translation.name,
-        descriptionLength: translation.description.length,
-      })),
+      name: product.name,
+      descriptionLength: product.description.length,
       variants: product.variants.map((variant) => ({
         sku: variant.sku,
         priceGross: variant.priceGross,

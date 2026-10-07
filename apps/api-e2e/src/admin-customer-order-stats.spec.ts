@@ -47,7 +47,7 @@ describe.skipIf(!RUN)("aggregateOrderStats (real Postgres)", () => {
 
   async function seedCustomer(email: string): Promise<string> {
     const customer = await db.prisma.customer.create({
-      data: { email, role: "CUSTOMER", preferredLocale: "es" },
+      data: { email, role: "CUSTOMER" },
     });
     return customer.id;
   }
@@ -62,13 +62,13 @@ describe.skipIf(!RUN)("aggregateOrderStats (real Postgres)", () => {
   }): Promise<void> {
     await db.prisma.$executeRawUnsafe(
       `INSERT INTO "order" (
-         id, "orderNumber", "customerId", email, status, locale, currency,
+         id, "orderNumber", "customerId", email, status, currency,
          subtotal, "discountTotal", "shippingTotal", "taxTotal", "grandTotal", "refundedTotal",
          "shipFirstName","shipLastName","shipLine1","shipCity","shipRegion","shipCountryCode",
          "billFirstName","billLastName","billLine1","billCity","billRegion","billCountryCode",
          "documentType","documentNumber","placedAt","updatedAt",version
        ) VALUES (
-         gen_random_uuid(), $1, $2::uuid, 'buyer@akai.test', $3::"OrderStatus", 'es', 'COP',
+         gen_random_uuid(), $1, $2::uuid, 'buyer@akai.test', $3::"OrderStatus", 'COP',
          $4, 0, 0, 0, $4, $5,
          'A','B','Calle 10 # 43-21','Medellín','Antioquia','CO',
          'A','B','Calle 10 # 43-21','Medellín','Antioquia','CO',

@@ -120,14 +120,6 @@ describe("CartController", () => {
 
   const actor: CartActor = { customerId: null, cartToken: null };
 
-  /**
-   * The parsed `?locale=` query every cart route now takes.
-   *
-   * Spanish is the schema default (next-intl serves `es` at `/`), so this is
-   * what an unlabelled storefront request produces after validation.
-   */
-  const query = { locale: "es" } as const;
-
   // -------------------------------------------------------------------------
   // Guard behaviour
   // -------------------------------------------------------------------------
@@ -181,7 +173,7 @@ describe("CartController", () => {
       service.getOrCreateCart.mockResolvedValue(view("t".repeat(43)));
       const { response, headers } = responseDouble();
 
-      const body = await controller.getCart(actor, query, response);
+      const body = await controller.getCart(actor, response);
 
       expect(headers.get(CART_TOKEN_HEADER)).toBe("t".repeat(43));
       expect(JSON.stringify(body)).not.toContain("t".repeat(43));
@@ -191,7 +183,7 @@ describe("CartController", () => {
       service.getOrCreateCart.mockResolvedValue(view(null));
       const { response, headers } = responseDouble();
 
-      await controller.getCart(actor, query, response);
+      await controller.getCart(actor, response);
 
       expect(headers.has(CART_TOKEN_HEADER)).toBe(false);
     });
@@ -209,9 +201,9 @@ describe("CartController", () => {
       };
       const { response } = responseDouble();
 
-      await controller.getCart(signedIn, query, response);
+      await controller.getCart(signedIn, response);
 
-      expect(service.getOrCreateCart).toHaveBeenCalledWith(signedIn, "es");
+      expect(service.getOrCreateCart).toHaveBeenCalledWith(signedIn);
     });
 
     it("forwards the add-item body verbatim", async () => {
@@ -221,42 +213,22 @@ describe("CartController", () => {
         quantity: 2,
       };
 
-      await controller.addItem(actor, query, body, response);
+      await controller.addItem(actor, body, response);
 
-      expect(service.addItem).toHaveBeenCalledWith(actor, body, "es");
+      expect(service.addItem).toHaveBeenCalledWith(actor, body);
     });
 
     it("forwards the item id and quantity on update", async () => {
       const { response } = responseDouble();
       const itemId = "3f2504e0-4f89-11d3-9a0c-0305e82c3302";
 
-      await controller.updateItem(actor, itemId, query, { quantity: 0 }, response);
+      await controller.updateItem(actor, itemId, { quantity: 0 }, response);
 
       expect(service.updateItemQuantity).toHaveBeenCalledWith(
         actor,
         itemId,
         { quantity: 0 },
-        "es",
       );
-    });
-
-    /**
-     * The locale reaches the SERVICE, not just the response.
-     *
-     * Display names are resolved in the repository from the product's
-     * translations, so a locale that stopped at the controller would leave the
-     * cart labelled in Spanish for an English shopper — which is exactly the
-     * defect the parameter was added to fix, and it would be invisible to a test
-     * that only checked the route accepted the query.
-     */
-    it("threads the requested locale down to the service", async () => {
-      const { response } = responseDouble();
-
-      await controller.getCart(actor, { locale: "en" }, response);
-      await controller.clear(actor, { locale: "en" }, response);
-
-      expect(service.getOrCreateCart).toHaveBeenCalledWith(actor, "en");
-      expect(service.clearCart).toHaveBeenCalledWith(actor, "en");
     });
 
     it("forwards the guest token on merge", async () => {

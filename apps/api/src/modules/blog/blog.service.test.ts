@@ -7,12 +7,10 @@ import {
   publicBlogPostListResponseSchema,
   publicBlogPostSchema,
   type BlogPostStatus,
-  type Locale,
 } from "@akai/contracts";
 
 import type { Clock } from "../auth/ports/clock.port";
 import { MediaService } from "../media/media.service";
-import { BlogError } from "./blog.errors";
 import { BLOG_REVALIDATION_REASONS, type BlogRevalidationReason } from "./blog.events";
 import type {
   BlogPage,
@@ -37,19 +35,6 @@ const POST_ID = "7c9e6679-7425-40de-944b-e07fc1f90ae7";
 const OTHER_ID = "8d9e6679-7425-40de-944b-e07fc1f90ae8";
 const AUTHOR_ID = "11111111-1111-4111-8111-111111111111";
 
-function translation(locale: Locale, overrides: Partial<BlogPostRecord["translations"][number]> = {}) {
-  return {
-    locale,
-    title: `Title ${locale}`,
-    excerpt: `Excerpt ${locale}`,
-    bodyHtml: "<p>Body</p>",
-    metaTitle: null,
-    metaDescription: null,
-    coverAlt: "",
-    ...overrides,
-  };
-}
-
 function record(overrides: Partial<BlogPostRecord> = {}): BlogPostRecord {
   return {
     id: POST_ID,
@@ -61,7 +46,12 @@ function record(overrides: Partial<BlogPostRecord> = {}): BlogPostRecord {
     authorId: AUTHOR_ID,
     createdAt: new Date("2026-09-19T10:00:00.000Z"),
     updatedAt: new Date("2026-09-19T10:00:00.000Z"),
-    translations: [translation("es")],
+    title: "Cómo combinar un oversize",
+    excerpt: "Resumen",
+    bodyHtml: "<p>Body</p>",
+    metaTitle: null,
+    metaDescription: null,
+    coverAlt: "",
     ...overrides,
   };
 }
@@ -84,13 +74,9 @@ class FakeBlogRepository implements BlogRepository {
   readonly calls: Call[] = [];
   constructor(public posts: BlogPostRecord[] = [], private readonly failWith?: unknown) {}
 
-  listPublished(query: { locale?: Locale | undefined; limit: number }): Promise<BlogPage> {
+  listPublished(query: { limit: number }): Promise<BlogPage> {
     this.calls.push({ method: "listPublished" });
-    const rows = this.posts.filter(
-      (post) =>
-        post.status === "PUBLISHED" &&
-        (query.locale === undefined || post.translations.some((t) => t.locale === query.locale)),
-    );
+    const rows = this.posts.filter((post) => post.status === "PUBLISHED");
     return Promise.resolve({ rows: rows.slice(0, query.limit), hasMore: rows.length > query.limit, nextCursor: null });
   }
 
@@ -119,7 +105,12 @@ class FakeBlogRepository implements BlogRepository {
         publishedAt: null,
         slug: input.slug,
         authorId: input.authorId,
-        translations: input.translations,
+        title: input.title,
+        excerpt: input.excerpt,
+        bodyHtml: input.bodyHtml,
+        metaTitle: input.metaTitle,
+        metaDescription: input.metaDescription,
+        coverAlt: input.coverAlt,
       }),
     );
   }
@@ -133,7 +124,8 @@ class FakeBlogRepository implements BlogRepository {
       ...existing,
       ...(patch.slug === undefined ? {} : { slug: patch.slug }),
       ...(patch.coverObjectKey === undefined ? {} : { coverObjectKey: patch.coverObjectKey }),
-      ...(patch.translations === undefined ? {} : { translations: patch.translations }),
+      ...(patch.title === undefined ? {} : { title: patch.title }),
+      ...(patch.bodyHtml === undefined ? {} : { bodyHtml: patch.bodyHtml }),
     });
   }
 
@@ -172,21 +164,6 @@ describe("BlogService — public reads", () => {
     expect(result.items.map((item) => item.slug)).toEqual(["como-combinar-un-oversize"]);
   });
 
-  it("filters by locale — a Spanish-only post is absent from the English list (D8c)", async () => {
-    const repository = new FakeBlogRepository([
-      record(),
-      record({
-        id: OTHER_ID,
-        slug: "bilingual",
-        translations: [translation("es"), translation("en")],
-      }),
-    ]);
-
-    const english = await serviceWith(repository).listPublished({ limit: 12, locale: "en" });
-
-    expect(english.items.map((item) => item.slug)).toEqual(["bilingual"]);
-  });
-
   it("resolves the cover key to the public media URL and never exposes the key", async () => {
     const key = `blog/${POST_ID}/2026-09-24T10-00-00-000Z-abcd.webp`;
     const repository = new FakeBlogRepository([record({ coverObjectKey: key })]);
@@ -200,27 +177,18 @@ describe("BlogService — public reads", () => {
   it("serves a published post by slug with its full copy", async () => {
     const repository = new FakeBlogRepository([record()]);
 
-    const post = await serviceWith(repository).getPublished("como-combinar-un-oversize", undefined);
+    const post = await serviceWith(repository).getPublished("como-combinar-un-oversize");
 
     expect(publicBlogPostSchema.parse(post)).toEqual(post);
-    expect(post.translations[0]?.bodyHtml).toBe("<p>Body</p>");
+    expect(post.title).toBe("Cómo combinar un oversize");
+    expect(post.bodyHtml).toBe("<p>Body</p>");
   });
 
   it("404s a draft — the public read never reaches an unpublished post", async () => {
     const repository = new FakeBlogRepository([record({ status: "DRAFT", publishedAt: null })]);
 
-    await expect(serviceWith(repository).getPublished("como-combinar-un-oversize", undefined)).rejects.toMatchObject({
+    await expect(serviceWith(repository).getPublished("como-combinar-un-oversize")).rejects.toMatchObject({
       code: "NOT_FOUND",
-    });
-  });
-
-  it("404s a post in a locale it has no translation for (D8c)", async () => {
-    const repository = new FakeBlogRepository([record()]);
-    const service = serviceWith(repository);
-
-    await expect(service.getPublished("como-combinar-un-oversize", "en")).rejects.toBeInstanceOf(BlogError);
-    await expect(service.getPublished("como-combinar-un-oversize", "es")).resolves.toMatchObject({
-      slug: "como-combinar-un-oversize",
     });
   });
 });
@@ -229,14 +197,9 @@ describe("BlogService — admin writes", () => {
   const createInput = createBlogPostSchema.parse({
     slug: "nuevo",
     category: "NEWS",
-    translations: [
-      {
-        locale: "es",
-        title: "Nuevo",
-        excerpt: "Resumen",
-        bodyHtml: '<p onclick="steal()">Hola<script>alert(1)</script></p>',
-      },
-    ],
+    title: "Nuevo",
+    excerpt: "Resumen",
+    bodyHtml: '<p onclick="steal()">Hola<script>alert(1)</script></p>',
   });
 
   it("creates a DRAFT attributed to the operator, with the body sanitised", async () => {
@@ -248,14 +211,14 @@ describe("BlogService — admin writes", () => {
     expect(created.status).toBe("DRAFT");
     expect(created.authorId).toBe(AUTHOR_ID);
     const stored = repository.calls.find((call) => call.method === "create")?.input;
-    expect(stored?.translations[0]?.bodyHtml).toBe("<p>Hola</p>");
+    expect(stored?.bodyHtml).toBe("<p>Hola</p>");
   });
 
   it("refuses a body that sanitises to nothing", async () => {
     const repository = new FakeBlogRepository();
     const input = createBlogPostSchema.parse({
       ...createInput,
-      translations: [{ ...createInput.translations[0], bodyHtml: "<script>alert(1)</script>" }],
+      bodyHtml: "<script>alert(1)</script>",
     });
 
     await expect(serviceWith(repository).create(input, AUTHOR_ID)).rejects.toMatchObject({
@@ -279,15 +242,22 @@ describe("BlogService — admin writes", () => {
     });
   });
 
-  it("sanitises the bodies of an update's replacement translations", async () => {
+  it("sanitises the body of an update", async () => {
     const repository = new FakeBlogRepository([record()]);
 
-    await serviceWith(repository).update(POST_ID, {
-      translations: createInput.translations,
-    });
+    await serviceWith(repository).update(POST_ID, { bodyHtml: createInput.bodyHtml });
 
     const patch = repository.calls.find((call) => call.method === "update")?.patch;
-    expect(patch?.translations?.[0]?.bodyHtml).toBe("<p>Hola</p>");
+    expect(patch?.bodyHtml).toBe("<p>Hola</p>");
+  });
+
+  it("passes only the copy fields an update carries", async () => {
+    const repository = new FakeBlogRepository([record()]);
+
+    await serviceWith(repository).update(POST_ID, { title: "Otro título" });
+
+    const patch = repository.calls.find((call) => call.method === "update")?.patch;
+    expect(patch).toEqual({ title: "Otro título" });
   });
 
   it("accepts a cover key minted for this post and refuses any other", async () => {
@@ -357,7 +327,9 @@ describe("BlogService — storefront revalidation", () => {
       createBlogPostSchema.parse({
         slug: "draft",
         category: "NEWS",
-        translations: [{ locale: "es", title: "T", excerpt: "E", bodyHtml: "<p>B</p>" }],
+        title: "T",
+        excerpt: "E",
+        bodyHtml: "<p>B</p>",
       }),
       null,
     );

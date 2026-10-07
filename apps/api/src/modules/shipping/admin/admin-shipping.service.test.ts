@@ -39,7 +39,7 @@ function rateRow(overrides: Record<string, unknown> = {}): Record<string, unknow
   return {
     id: RATE_ID,
     zoneId: ZONE_ID,
-    name: { es: "Envío nacional", en: "National shipping" },
+    name: "Envío nacional",
     strategy: "FLAT",
     priceGross: 1_500_000,
     currency: "COP",
@@ -57,7 +57,7 @@ function rateRow(overrides: Record<string, unknown> = {}): Record<string, unknow
 }
 
 const newRate: CreateShippingRate = {
-  name: { es: "Envío express" },
+  name: "Envío express",
   strategy: "FLAT",
   minValue: null,
   maxValue: null,
@@ -250,14 +250,12 @@ describe("AdminShippingService — rates", () => {
     service = await build(f);
   });
 
-  it("stores a Spanish-only name without inventing an English one", async () => {
+  it("stores the name as the plain string staff typed", async () => {
     await service.createRate(ZONE_ID, newRate);
 
     expect(f.rate.create.mock.calls[0]?.[0]).toMatchObject({
-      data: { zoneId: ZONE_ID, name: { es: "Envío express" }, priceGross: 2_500_000 },
+      data: { zoneId: ZONE_ID, name: "Envío express", priceGross: 2_500_000 },
     });
-    const data = (f.rate.create.mock.calls[0]?.[0] as { data: { name: object } }).data;
-    expect(data.name).not.toHaveProperty("en");
   });
 
   it("re-checks the MERGED row: a PATCH of maxValue alone cannot invert the stored min", async () => {

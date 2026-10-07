@@ -1,5 +1,4 @@
-import { z } from "zod";
-import { localeSchema, type Category, type CategoryListItem } from "@akai/contracts";
+import type { Category, CategoryListItem } from "@akai/contracts";
 
 /**
  * Prisma `category` row → the public list shape.
@@ -13,25 +12,11 @@ import { localeSchema, type Category, type CategoryListItem } from "@akai/contra
  * read last.
  */
 
-/**
- * Per-locale JSON blobs are external data — parsed, never cast.
- *
- * Keyed on `z.string()` and filtered afterwards rather than on `localeSchema`
- * directly, and the difference is behavioural, not stylistic: a record keyed on
- * an enum REJECTS the whole object when it meets an unknown key, so one row
- * carrying a legacy `fr` name would degrade every name on that category to `{}`
- * — losing the Spanish and English copy that is perfectly valid. Filtering
- * instead keeps the locales we serve and drops the rest.
- */
-const rawTextSchema = z.record(z.string(), z.string());
-
-const SUPPORTED_LOCALES = localeSchema.options;
-
 /** The row shape this mapper needs, declared structurally rather than imported. */
 export interface CategoryRow {
   readonly id: string;
   readonly slug: string;
-  readonly name: unknown;
+  readonly name: string;
   readonly sortOrder: number;
 }
 
@@ -42,11 +27,6 @@ export interface CategoryRow {
  * result of a filtered aggregate (active, non-deleted, at least one purchasable
  * variant) that the repository computes in SQL. Passing it in keeps this
  * function pure and keeps the definition of "visible" in exactly one place.
- *
- * A malformed `name` JSON degrades to `{}` rather than throwing, matching
- * `product.mapper.ts`: one bad row must not take down the whole navigation for
- * every visitor, because the admin UI that could fix it is served by the same
- * failing query.
  */
 export function mapCategory(row: CategoryRow, productCount: number): CategoryListItem {
   return { ...mapCategoryEntity(row), productCount };
@@ -65,24 +45,7 @@ export function mapCategoryEntity(row: CategoryRow): Category {
   return {
     id: row.id,
     slug: row.slug,
-    name: narrowLocalisedText(row.name),
+    name: row.name,
     sortOrder: row.sortOrder,
   };
-}
-
-/** Keep the locales the store serves; drop anything else without failing. */
-function narrowLocalisedText(value: unknown): CategoryListItem["name"] {
-  const parsed = rawTextSchema.safeParse(value);
-  if (!parsed.success) {
-    return {};
-  }
-
-  const narrowed: Partial<Record<(typeof SUPPORTED_LOCALES)[number], string>> = {};
-  for (const locale of SUPPORTED_LOCALES) {
-    const text = parsed.data[locale];
-    if (text !== undefined) {
-      narrowed[locale] = text;
-    }
-  }
-  return narrowed;
 }

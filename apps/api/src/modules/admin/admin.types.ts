@@ -138,12 +138,9 @@ export interface ExportedProductRow {
   readonly slug: string;
   readonly status: string;
   readonly taxClass: string;
-  readonly translations: readonly {
-    readonly locale: string;
-    readonly name: string;
-    readonly shortDescription: string;
-    readonly description: string;
-  }[];
+  readonly name: string;
+  readonly shortDescription: string;
+  readonly description: string;
   readonly variants: readonly {
     readonly sku: string;
     readonly priceGross: number;
@@ -161,12 +158,9 @@ export interface UpsertProductInput {
   readonly slug: string;
   readonly status: string;
   readonly taxClass: string;
-  readonly translations: readonly {
-    readonly locale: string;
-    readonly name: string;
-    readonly shortDescription: string;
-    readonly description: string;
-  }[];
+  readonly name: string;
+  readonly shortDescription: string;
+  readonly description: string;
   readonly variants: readonly {
     readonly sku: string;
     readonly priceGross: number;

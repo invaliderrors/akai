@@ -58,7 +58,6 @@ function orderRow(overrides: OrderRowOverrides = {}): Record<string, unknown> {
     customerId: OWNER_ID,
     email: "cliente@example.com",
     status: overrides.status ?? "PAID",
-    locale: "es",
     currency: "EUR",
     subtotal: 8263,
     discountTotal: 0,
@@ -831,7 +830,7 @@ describe("OrdersService — recording a refund made in the Wompi dashboard", () 
 /**
  * REQUIREMENT 3 — "tell the customer about everything" — is a PRODUCER problem.
  * `shipping-confirmation`, `delivery-confirmation` and `order-cancelled` all had
- * a payload schema, a bilingual renderer and fixtures, and not one line of code
+ * a payload schema, a renderer and fixtures, and not one line of code
  * anywhere enqueued them. These tests are the producers.
  *
  * Every enqueue happens INSIDE the same transaction as the state change it
@@ -1138,11 +1137,11 @@ describe("OrdersService.createFromCart — packs", () => {
         currency: "EUR",
         isActive: true,
         deletedAt: null,
-        name: { es: "Variante" },
+        name: "Variante",
         product: {
           slug: `producto-${variantId.slice(-1)}`,
           taxClass: "STANDARD",
-          translations: [{ locale: "es", name: `Producto ${variantId.slice(-1)}` }],
+          name: `Producto ${variantId.slice(-1)}`,
           media: [],
         },
       },
@@ -1164,11 +1163,11 @@ describe("OrdersService.createFromCart — packs", () => {
         currency: "EUR",
         isActive: true,
         deletedAt: null,
-        name: { es: "Variante" },
+        name: "Variante",
         product: {
           slug: "producto-suelto",
           taxClass: "STANDARD",
-          translations: [{ locale: "es", name: "Producto suelto" }],
+          name: "Producto suelto",
           media: [],
         },
       },
@@ -1247,7 +1246,6 @@ describe("OrdersService.createFromCart — packs", () => {
       cartId,
       customerId: null,
       email: "cliente@example.com",
-      locale: "es" as const,
       shippingAddress: ADDRESS,
       billingAddress: ADDRESS,
       shipping: { net: toMinor(0), taxRateBps: 1900 },

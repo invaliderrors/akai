@@ -105,7 +105,6 @@ class InMemoryAuthRepository implements AuthRepository {
       lastName: "Mestra",
       phone: null,
       role: "CUSTOMER",
-      preferredLocale: "es",
       totpSecret: null,
       totpEnabledAt: null,
       anonymisedAt: null,
@@ -145,7 +144,6 @@ class InMemoryAuthRepository implements AuthRepository {
     readonly passwordHash: string;
     readonly firstName: string;
     readonly lastName: string;
-    readonly preferredLocale: "es" | "en";
     readonly marketingConsentAt: Date | null;
   }): Promise<AuthCustomer> {
     for (const customer of this.customers.values()) {
@@ -159,7 +157,6 @@ class InMemoryAuthRepository implements AuthRepository {
         passwordHash: input.passwordHash,
         firstName: input.firstName,
         lastName: input.lastName,
-        preferredLocale: input.preferredLocale,
         marketingConsentAt: input.marketingConsentAt,
         emailVerifiedAt: null,
       }),
@@ -594,7 +591,6 @@ describe("register", () => {
     password: "a-sufficiently-long-password",
     firstName: "Ana",
     lastName: "Mestra",
-    preferredLocale: "es" as const,
     marketingConsent: false,
   };
 
@@ -1243,7 +1239,6 @@ describe("email verification", () => {
       password: "a-sufficiently-long-password",
       firstName: "Ana",
       lastName: "Mestra",
-      preferredLocale: "es",
       marketingConsent: false,
     });
     const event = harness.events.eventsOfType("auth.customer.registered")[0];
@@ -1373,7 +1368,6 @@ describe("password reset", () => {
       password: "a-sufficiently-long-password",
       firstName: "Ana",
       lastName: "Mestra",
-      preferredLocale: "es",
       marketingConsent: false,
     });
     const verificationToken =
@@ -1833,7 +1827,6 @@ describe("per-email rate limiting", () => {
       password: "a-sufficiently-long-password",
       firstName: "Ana",
       lastName: "Mestra",
-      preferredLocale: "es" as const,
       marketingConsent: false,
     };
 

@@ -1,4 +1,3 @@
-import type { Locale } from "@akai/contracts";
 
 /**
  * Domain events the auth module emits for the email module to consume.
@@ -50,7 +49,6 @@ export type AuthEventOrigin = "storefront" | "dashboard";
 export interface AuthEventBase {
   readonly customerId: string;
   readonly email: string;
-  readonly locale: Locale;
   readonly occurredAt: Date;
   /** Absent means the dashboard — see `AuthEventOrigin`. */
   readonly origin?: AuthEventOrigin;

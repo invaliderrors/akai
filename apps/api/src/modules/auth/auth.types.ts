@@ -1,4 +1,4 @@
-import type { Locale, Role } from "@akai/contracts";
+import type { Role } from "@akai/contracts";
 
 /**
  * The auth module's own view of the data it touches.
@@ -35,7 +35,6 @@ export interface AuthCustomer {
   readonly lastName: string | null;
   readonly phone: string | null;
   readonly role: Role;
-  readonly preferredLocale: Locale;
   /** AES-256-GCM sealed. Never the raw base32 secret. */
   readonly totpSecret: string | null;
   readonly totpEnabledAt: Date | null;

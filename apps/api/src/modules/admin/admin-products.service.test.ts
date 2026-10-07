@@ -23,9 +23,7 @@ const ACTOR: AdminActor = {
 function validRow(slug: string) {
   return {
     slug,
-    translations: [
-      { locale: "es", name: "Hoodie Kumo", shortDescription: "", description: "" },
-    ],
+    name: "Hoodie Kumo",
     variants: [{ sku: `${slug}-10`, priceGross: 4999, currency: "EUR" }],
   };
 }
@@ -176,9 +174,9 @@ describe("AdminProductsService — import", () => {
         slug: input.slug,
         status: "ACTIVE",
         taxClass: "STANDARD",
-        translations: [
-          { locale: "es", name: "Old name", shortDescription: "", description: "" },
-        ],
+        name: "Old name",
+        shortDescription: "",
+        description: "",
         variants: [
           {
             sku: "hoodie-kumo-m",
@@ -294,7 +292,7 @@ describe("bulkImportRequestSchema", () => {
     expect(() => bulkImportRequestSchema.parse({ products })).toThrow();
   });
 
-  it("requires at least one variant and one translation", () => {
+  it("requires at least one variant and a name", () => {
     expect(() =>
       bulkImportRequestSchema.parse({
         products: [{ ...validRow("hoodie-kumo"), variants: [] }],
@@ -302,7 +300,7 @@ describe("bulkImportRequestSchema", () => {
     ).toThrow();
     expect(() =>
       bulkImportRequestSchema.parse({
-        products: [{ ...validRow("hoodie-kumo"), translations: [] }],
+        products: [{ ...validRow("hoodie-kumo"), name: "" }],
       }),
     ).toThrow();
   });

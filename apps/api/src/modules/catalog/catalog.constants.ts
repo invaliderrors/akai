@@ -2,7 +2,7 @@
  * Header announcing that the API stored something OTHER than what was submitted.
  *
  * WHY THE API HAS TO SAY SO AT ALL. Product descriptions are sanitised on the
- * way into the column (see `ProductsService.sanitizeTranslations`), which is a
+ * way into the column (see `ProductsService.sanitizeDescription`), which is a
  * silent rewrite of an operator's input. An admin who pastes a `<script>` and
  * watches it vanish with a cheerful 200 has learned nothing — not that the
  * paste was rejected, not that the store is protected, and not that the copy
@@ -25,12 +25,10 @@
  * `<span style>` and proprietary junk; refusing to save it makes the operator
  * hand-clean HTML, which is the job we just automated.
  *
- * THE VALUE IS A CLOSED SET, NOT PROSE. Comma-separated `Locale` codes — the
- * locales whose `description` the sanitiser rewrote — so a client branches on
- * them and renders its own translated notice, per the platform rule that a
- * server-supplied message is never shown to a user. Locales rather than a bare
- * boolean because an admin edits per-locale copy: "something changed" without
- * naming the language sends them hunting through both.
+ * THE VALUE IS A CLOSED SET, NOT PROSE: comma-separated names of the fields
+ * the sanitiser rewrote — today only `description` (`SANITIZED_DESCRIPTION`) —
+ * so a client renders its own notice, per the platform rule that a
+ * server-supplied message is never shown to a user.
  *
  * ABSENT means nothing was altered. Presence IS the signal, so there is no
  * "false" state to misread.
@@ -41,3 +39,6 @@
  * omission once broke the guest cart completely.
  */
 export const CONTENT_SANITIZED_HEADER = "x-content-sanitized";
+
+/** The `CONTENT_SANITIZED_HEADER` token for a rewritten product description. */
+export const SANITIZED_DESCRIPTION = "description";

@@ -78,7 +78,6 @@ const config = { EMAIL_FROM: OPS_INBOX } as unknown as ServerEnv;
 const envelopeSchema = z.object({
   templateKey: z.string(),
   to: z.string(),
-  locale: z.string(),
   payload: z.record(z.string(), z.unknown()),
 });
 
@@ -99,7 +98,6 @@ const APPLICATION = affiliateApplicationSchema.parse({
   country: "ES",
   socialHandle: "@marta.recovers",
   email: "marta@example.com",
-  locale: "en",
   turnstileToken: "token-abc",
 });
 
@@ -185,12 +183,17 @@ describe("AffiliateApplicationService.submit", () => {
     expect(autoreply?.payload["referenceId"]).toBe(staff?.payload["referenceId"]);
   });
 
-  it("renders in the applicant's locale", async () => {
+  it("names no language on the envelopes — every mail renders in Spanish", async () => {
     const service = serviceWith(new FakeCaptcha(true));
 
     await service.submit(APPLICATION, null);
 
-    expect(outboxEnvelopesOf(prisma).map((envelope) => envelope.locale)).toEqual(["en", "en"]);
+    const [batch = []] = prisma.batches;
+    const outbox = batch.filter((row): row is RecordedOutboxRow => row.kind === "outbox");
+    expect(outbox).toHaveLength(2);
+    for (const row of outbox) {
+      expect(row.payload).not.toHaveProperty("locale");
+    }
   });
 
   it("mints an unguessable, non-sequential reference", async () => {

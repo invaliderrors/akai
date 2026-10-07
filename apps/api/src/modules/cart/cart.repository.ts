@@ -309,17 +309,6 @@ export interface CartRepository {
    */
   loadVariants(
     variantIds: readonly string[],
-    /**
-     * Locale for the DISPLAY strings (`name`, `variantName`).
-     *
-     * Optional so existing in-memory doubles remain valid implementations, and
-     * because the correct fallback ("any translation") is the adapter's job, not
-     * every caller's. Before this parameter existed the adapter pinned Spanish,
-     * so an English-speaking customer's basket said "Camiseta Oversize" with
-     * no way for any client to ask otherwise — a translation rule violated in
-     * the API, not fixable in the storefront.
-     */
-    locale?: string,
   ): Promise<ReadonlyMap<string, VariantSnapshot>>;
 }
 

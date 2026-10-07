@@ -50,7 +50,7 @@ export class ProductsController {
     @Query(new ZodValidationPipe(publicProductListQuerySchema))
     query: PublicProductListQuery,
   ): Promise<Paginated<PublicProduct>> {
-    return this.products.listPublic(query, query.locale);
+    return this.products.listPublic(query);
   }
 
   /**
@@ -79,7 +79,7 @@ export class ProductsController {
     @Query(new ZodValidationPipe(publicAddOnListQuerySchema))
     query: PublicAddOnListQuery,
   ): Promise<Paginated<PublicProduct>> {
-    return this.products.listPublicAddOns(query, query.locale);
+    return this.products.listPublicAddOns(query);
   }
 
   /**

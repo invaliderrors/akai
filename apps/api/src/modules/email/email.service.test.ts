@@ -2,7 +2,6 @@ import "reflect-metadata";
 import { Test } from "@nestjs/testing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { toMinor } from "@akai/money";
-import type { Locale } from "@akai/contracts";
 import { LOGGER } from "../observability/logger.module";
 import { PrismaService } from "../prisma/prisma.service";
 import { InMemoryEmailTransport } from "./adapters/in-memory.transport";
@@ -26,7 +25,6 @@ interface StoredEvent {
   id: string;
   recipient: string;
   templateKey: string;
-  locale: string;
   status: string;
   providerMessageId: string | null;
   orderId: string | null;
@@ -41,7 +39,6 @@ interface CreateArgs {
   data: {
     recipient: string;
     templateKey: string;
-    locale: string;
     orderId: string | null;
     /**
      * NOT NULL in the DB with a '' default. Typed as a required string here so
@@ -107,7 +104,6 @@ class FakePrisma {
         id,
         recipient: args.data.recipient,
         templateKey: args.data.templateKey,
-        locale: args.data.locale,
         status: args.data.status,
         providerMessageId: null,
         orderId: args.data.orderId,
@@ -248,7 +244,6 @@ function resetPassword(): EmailPayloadFor<"reset-password"> {
   };
 }
 
-const LOCALE: Locale = "es";
 const ORDER_ID = "11111111-1111-4111-8111-111111111111";
 const SHIPMENT_A = "22222222-2222-4222-8222-222222222201";
 const SHIPMENT_B = "22222222-2222-4222-8222-222222222202";
@@ -264,7 +259,6 @@ describe("EmailService — idempotency", () => {
     const request = {
       templateKey: "order-confirmation",
       to: "marta@example.com",
-      locale: LOCALE,
       payload: orderConfirmation(),
       orderId: "11111111-1111-4111-8111-111111111111",
     } as const;
@@ -287,7 +281,6 @@ describe("EmailService — idempotency", () => {
     const result = await harness.service.send({
       templateKey: "order-confirmation",
       to: "marta@example.com",
-      locale: LOCALE,
       payload: orderConfirmation(),
       orderId: "11111111-1111-4111-8111-111111111111",
     });
@@ -306,7 +299,6 @@ describe("EmailService — idempotency", () => {
     const request = {
       templateKey: "reset-password",
       to: "marta@example.com",
-      locale: LOCALE,
       payload: resetPassword(),
     } as const;
 
@@ -324,14 +316,12 @@ describe("EmailService — idempotency", () => {
     const confirmation = await harness.service.send({
       templateKey: "order-confirmation",
       to: "marta@example.com",
-      locale: LOCALE,
       payload: orderConfirmation(),
       orderId,
     });
     const shipping = await harness.service.send({
       templateKey: "shipping-confirmation",
       to: "marta@example.com",
-      locale: LOCALE,
       payload: shippingConfirmation(),
       orderId,
       dedupeScope: SHIPMENT_A,
@@ -359,7 +349,6 @@ describe("EmailService — resilience", () => {
       harness.service.send({
         templateKey: "order-confirmation",
         to: "marta@example.com",
-        locale: LOCALE,
         payload: orderConfirmation(),
         orderId: "11111111-1111-4111-8111-111111111111",
       }),
@@ -372,7 +361,6 @@ describe("EmailService — resilience", () => {
     const result = await harness.service.send({
       templateKey: "order-confirmation",
       to: "marta@example.com",
-      locale: LOCALE,
       payload: orderConfirmation(),
       orderId: "11111111-1111-4111-8111-111111111111",
     });
@@ -389,7 +377,6 @@ describe("EmailService — resilience", () => {
     const result = await harness.service.send({
       templateKey: "order-confirmation",
       to: "marta@example.com",
-      locale: LOCALE,
       payload: orderConfirmation(),
       orderId: "11111111-1111-4111-8111-111111111111",
     });
@@ -412,7 +399,6 @@ describe("EmailService — resilience", () => {
     await harnessWithLongLadder.service.send({
       templateKey: "order-confirmation",
       to: "marta@example.com",
-      locale: LOCALE,
       payload: orderConfirmation(),
       orderId: "11111111-1111-4111-8111-111111111111",
     });
@@ -428,7 +414,6 @@ describe("EmailService — resilience", () => {
     const result = await harness.service.send({
       templateKey: "order-confirmation",
       to: "marta@example.com",
-      locale: LOCALE,
       payload: orderConfirmation(),
       orderId: "11111111-1111-4111-8111-111111111111",
     });
@@ -443,7 +428,6 @@ describe("EmailService — resilience", () => {
     const result = await harness.service.send({
       templateKey: "order-confirmation",
       to: "marta@example.com",
-      locale: LOCALE,
       payload: orderConfirmation(),
       orderId: "11111111-1111-4111-8111-111111111111",
     });
@@ -459,7 +443,6 @@ describe("EmailService — resilience", () => {
     const second = await failing.service.send({
       templateKey: "order-confirmation",
       to: "marta@example.com",
-      locale: LOCALE,
       payload: orderConfirmation(),
       orderId: "22222222-2222-4222-8222-222222222222",
     });
@@ -474,7 +457,6 @@ describe("EmailService — resilience", () => {
     const returned: void = harness.service.sendInBackground({
       templateKey: "order-confirmation",
       to: "marta@example.com",
-      locale: LOCALE,
       payload: orderConfirmation(),
       orderId: "11111111-1111-4111-8111-111111111111",
     });
@@ -497,7 +479,6 @@ describe("EmailService — suppression", () => {
     const result = await harness.service.send({
       templateKey: "order-confirmation",
       to: "bounced@example.com",
-      locale: LOCALE,
       payload: orderConfirmation(),
       orderId: "11111111-1111-4111-8111-111111111111",
     });
@@ -515,7 +496,6 @@ describe("EmailService — suppression", () => {
     const result = await harness.service.send({
       templateKey: "reset-password",
       to: "bounced@example.com",
-      locale: LOCALE,
       payload: resetPassword(),
     });
 
@@ -526,7 +506,6 @@ describe("EmailService — suppression", () => {
     const result = await harness.service.send({
       templateKey: "admin-new-order",
       to: "bounced@example.com",
-      locale: LOCALE,
       payload: {
         orderNumber: "AK-2026-000123",
         customerEmail: "marta@example.com",
@@ -546,7 +525,6 @@ describe("EmailService — suppression", () => {
     const result = await harness.service.send({
       templateKey: "order-confirmation",
       to: "marta@example.com",
-      locale: LOCALE,
       payload: orderConfirmation(),
       orderId: "11111111-1111-4111-8111-111111111111",
     });
@@ -571,7 +549,6 @@ describe("EmailService — payload validation", () => {
     const result = await harness.service.send({
       templateKey: "order-confirmation",
       to: "marta@example.com",
-      locale: LOCALE,
       payload: broken,
       orderId: "11111111-1111-4111-8111-111111111111",
     });
@@ -587,7 +564,6 @@ describe("EmailService — payload validation", () => {
     const result = await harness.service.send({
       templateKey: "order-confirmation",
       to: "not-an-email",
-      locale: LOCALE,
       payload: orderConfirmation(),
       orderId: "11111111-1111-4111-8111-111111111111",
     });
@@ -602,7 +578,6 @@ describe("EmailService — payload validation", () => {
     const result = await harness.service.send({
       templateKey: "order-confirmation",
       to: "marta@example.com",
-      locale: LOCALE,
       payload: smuggled,
       orderId: "11111111-1111-4111-8111-111111111111",
     });
@@ -617,7 +592,6 @@ describe("EmailService — payload validation", () => {
     await harness.service.send({
       templateKey: "order-confirmation",
       to: "Marta@Example.COM",
-      locale: LOCALE,
       payload: orderConfirmation(),
       orderId: "11111111-1111-4111-8111-111111111111",
     });
@@ -633,7 +607,6 @@ describe("EmailService — event log", () => {
     const result = await harness.service.send({
       templateKey: "order-confirmation",
       to: "marta@example.com",
-      locale: LOCALE,
       payload: orderConfirmation(),
       orderId: "11111111-1111-4111-8111-111111111111",
     });
@@ -657,7 +630,6 @@ describe("EmailService — event log", () => {
     await harness.service.send({
       templateKey: "order-confirmation",
       to: "marta@example.com",
-      locale: LOCALE,
       payload: orderConfirmation(),
       orderId: "11111111-1111-4111-8111-111111111111",
     });
@@ -681,7 +653,6 @@ describe("EmailService — admin retry", () => {
     await harness.service.send({
       templateKey: "order-confirmation",
       to: "marta@example.com",
-      locale: LOCALE,
       payload: orderConfirmation(),
       orderId: "11111111-1111-4111-8111-111111111111",
     });
@@ -701,7 +672,6 @@ describe("EmailService — admin retry", () => {
     await harness.service.send({
       templateKey: "order-confirmation",
       to: "marta@example.com",
-      locale: LOCALE,
       payload: orderConfirmation(),
       orderId: "11111111-1111-4111-8111-111111111111",
     });
@@ -724,7 +694,6 @@ describe("EmailService — admin retry", () => {
     await harness.service.send({
       templateKey: "order-confirmation",
       to: "marta@example.com",
-      locale: LOCALE,
       payload: orderConfirmation(),
       orderId: "11111111-1111-4111-8111-111111111111",
     });
@@ -748,7 +717,6 @@ describe("EmailService — admin retry", () => {
     await harness.service.send({
       templateKey: "order-confirmation",
       to: "marta@example.com",
-      locale: LOCALE,
       payload: orderConfirmation(),
       orderId: "11111111-1111-4111-8111-111111111111",
     });
@@ -789,7 +757,6 @@ describe("EmailService — per-parcel dedupe scope", () => {
     const first = await harness.service.send({
       templateKey: "shipping-confirmation",
       to: "marta@example.com",
-      locale: LOCALE,
       payload: shippingConfirmation(),
       orderId: ORDER_ID,
       dedupeScope: SHIPMENT_A,
@@ -797,7 +764,6 @@ describe("EmailService — per-parcel dedupe scope", () => {
     const second = await harness.service.send({
       templateKey: "shipping-confirmation",
       to: "marta@example.com",
-      locale: LOCALE,
       payload: shippingConfirmation(),
       orderId: ORDER_ID,
       dedupeScope: SHIPMENT_B,
@@ -817,7 +783,6 @@ describe("EmailService — per-parcel dedupe scope", () => {
     const request = {
       templateKey: "shipping-confirmation",
       to: "marta@example.com",
-      locale: LOCALE,
       payload: shippingConfirmation(),
       orderId: ORDER_ID,
       dedupeScope: SHIPMENT_A,
@@ -832,7 +797,6 @@ describe("EmailService — per-parcel dedupe scope", () => {
     const request = {
       templateKey: "order-confirmation",
       to: "marta@example.com",
-      locale: LOCALE,
       payload: orderConfirmation(),
       orderId: ORDER_ID,
     } as const;
@@ -852,7 +816,6 @@ describe("EmailService — per-parcel dedupe scope", () => {
     const result = await harness.service.send({
       templateKey: "shipping-confirmation",
       to: "marta@example.com",
-      locale: LOCALE,
       payload: shippingConfirmation(),
       orderId: ORDER_ID,
     });

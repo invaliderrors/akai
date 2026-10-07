@@ -14,7 +14,7 @@ const BASIS = {
 
 const NATIONAL: ShippingOption = {
   rateId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
-  name: { es: "Envío nacional", en: "National shipping" },
+  name: "Envío nacional",
   currency: "COP",
   priceGross: toMinor(1_500_000),
   isFree: false,
@@ -23,13 +23,13 @@ const NATIONAL: ShippingOption = {
 };
 
 describe("toShippingQuote", () => {
-  it("describes the method: per-locale name, price and transit days", () => {
+  it("describes the method: name, price and transit days", () => {
     const quote = toShippingQuote("CO", BASIS, [NATIONAL], true);
 
     expect(shippingQuoteResponseSchema.parse(quote)).toEqual(quote);
     expect(quote.options[0]).toEqual({
       rateId: NATIONAL.rateId,
-      name: { es: "Envío nacional", en: "National shipping" },
+      name: "Envío nacional",
       currency: "COP",
       priceGross: 1_500_000,
       isFree: false,

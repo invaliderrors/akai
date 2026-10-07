@@ -68,7 +68,7 @@ export class AdminCategoriesController {
    */
   @Get()
   async list(): Promise<CategoryListResponse> {
-    return this.categories.list("es");
+    return this.categories.list();
   }
 
   @Post()

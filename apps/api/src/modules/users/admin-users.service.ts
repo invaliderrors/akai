@@ -90,7 +90,6 @@ export class AdminUsersService {
       lastName: row.lastName,
       phone: row.phone,
       role: row.role,
-      preferredLocale: row.preferredLocale,
       twoFactorEnabled: row.totpEnabledAt !== null,
       anonymisedAt: row.anonymisedAt?.toISOString() ?? null,
       createdAt: row.createdAt.toISOString(),

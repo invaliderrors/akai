@@ -19,7 +19,6 @@ const MESSAGE: OutboxMessage = { id: "ob-1", topic: "email", payload: {}, attemp
 interface SendCall {
   readonly templateKey: string;
   readonly to: string;
-  readonly locale: string;
   readonly data: unknown;
   readonly orderId?: string;
   readonly dedupeScope?: string;
@@ -30,7 +29,6 @@ function buildOrder(overrides: Record<string, unknown> = {}): Record<string, unk
     id: "11111111-1111-4111-8111-111111111111",
     orderNumber: "AK-2026-000123",
     email: "buyer@example.com",
-    locale: "es",
     currency: "EUR",
     subtotal: 4999,
     discountTotal: 0,
@@ -116,7 +114,6 @@ describe("EmailOutboxHandler — hydrated (auth) rows", () => {
       {
         templateKey: "verify-email",
         to: "buyer@example.com",
-        locale: "en",
         payload: {
           firstName: "Marta",
           verifyUrl: "https://dash.akai.test/verify-email?token=abc",
@@ -138,7 +135,7 @@ describe("EmailOutboxHandler — reference (order) rows", () => {
   it("hydrates order-confirmation into a payload that satisfies the template schema", async () => {
     const { handler, sends } = makeHandler({});
     await handler.handle(
-      { templateKey: "order-confirmation", orderId: buildOrder()["id"], locale: "es" },
+      { templateKey: "order-confirmation", orderId: buildOrder()["id"] },
       MESSAGE,
     );
 
@@ -161,7 +158,7 @@ describe("EmailOutboxHandler — reference (order) rows", () => {
   it("routes admin-new-order to the ops inbox with a schema-valid payload", async () => {
     const { handler, sends } = makeHandler({});
     await handler.handle(
-      { templateKey: "admin-new-order", orderId: buildOrder()["id"], locale: "es" },
+      { templateKey: "admin-new-order", orderId: buildOrder()["id"] },
       MESSAGE,
     );
 
@@ -178,7 +175,6 @@ describe("EmailOutboxHandler — reference (order) rows", () => {
       {
         templateKey: "refund-confirmation",
         orderId: buildOrder()["id"],
-        locale: "es",
         amount: 2000,
         currency: "EUR",
       },
@@ -195,7 +191,7 @@ describe("EmailOutboxHandler — reference (order) rows", () => {
     const { handler, sends } = makeHandler({ order: buildOrder({ invoiceNumber: null }) });
     await expect(
       handler.handle(
-        { templateKey: "payment-receipt", orderId: buildOrder()["id"], locale: "es" },
+        { templateKey: "payment-receipt", orderId: buildOrder()["id"] },
         MESSAGE,
       ),
     ).rejects.toThrow(/invoice/i);
@@ -207,7 +203,7 @@ describe("EmailOutboxHandler — reference (order) rows", () => {
       order: buildOrder({ invoiceNumber: "INV-2026-000045" }),
     });
     await handler.handle(
-      { templateKey: "payment-receipt", orderId: buildOrder()["id"], locale: "es" },
+      { templateKey: "payment-receipt", orderId: buildOrder()["id"] },
       MESSAGE,
     );
     const parsed = parseTemplatePayload("payment-receipt", sends[0]?.data);
@@ -222,7 +218,7 @@ describe("EmailOutboxHandler — result mapping and validation", () => {
     });
     await expect(
       handler.handle(
-        { templateKey: "order-confirmation", orderId: buildOrder()["id"], locale: "es" },
+        { templateKey: "order-confirmation", orderId: buildOrder()["id"] },
         MESSAGE,
       ),
     ).resolves.toBeUndefined();
@@ -234,7 +230,7 @@ describe("EmailOutboxHandler — result mapping and validation", () => {
     });
     await expect(
       handler.handle(
-        { templateKey: "order-confirmation", orderId: buildOrder()["id"], locale: "es" },
+        { templateKey: "order-confirmation", orderId: buildOrder()["id"] },
         MESSAGE,
       ),
     ).resolves.toBeUndefined();
@@ -246,7 +242,7 @@ describe("EmailOutboxHandler — result mapping and validation", () => {
     });
     await expect(
       handler.handle(
-        { templateKey: "order-confirmation", orderId: buildOrder()["id"], locale: "es" },
+        { templateKey: "order-confirmation", orderId: buildOrder()["id"] },
         MESSAGE,
       ),
     ).rejects.toThrow(/delivery failed/i);
@@ -265,7 +261,6 @@ describe("EmailOutboxHandler — per-parcel dedupe scope", () => {
       {
         templateKey: "shipping-confirmation",
         to: "buyer@example.com",
-        locale: "es",
         orderId: buildOrder()["id"],
         dedupeScope: "33333333-3333-4333-8333-333333333301",
         payload: {
@@ -297,7 +292,7 @@ describe("EmailOutboxHandler — per-parcel dedupe scope", () => {
   it("leaves the scope unset for an order-scoped template", async () => {
     const { handler, sends } = makeHandler({});
     await handler.handle(
-      { templateKey: "order-confirmation", orderId: buildOrder()["id"], locale: "es" },
+      { templateKey: "order-confirmation", orderId: buildOrder()["id"] },
       MESSAGE,
     );
     expect(sends[0]?.dedupeScope).toBeUndefined();
@@ -319,7 +314,6 @@ describe("EmailOutboxHandler — delivery-confirmation", () => {
       {
         templateKey: "delivery-confirmation",
         orderId: buildOrder()["id"],
-        locale: "es",
       },
       MESSAGE,
     );
@@ -334,7 +328,7 @@ describe("EmailOutboxHandler — delivery-confirmation", () => {
   it("falls back to the order timestamp when no parcel carries a delivery time", async () => {
     const { handler, sends } = makeHandler({ order: buildOrder({ shipments: [] }) });
     await handler.handle(
-      { templateKey: "delivery-confirmation", orderId: buildOrder()["id"], locale: "en" },
+      { templateKey: "delivery-confirmation", orderId: buildOrder()["id"] },
       MESSAGE,
     );
     const parsed = parseTemplatePayload("delivery-confirmation", sends[0]?.data);
@@ -350,7 +344,7 @@ describe("EmailOutboxHandler — order-cancelled", () => {
     });
 
     await handler.handle(
-      { templateKey: "order-cancelled", orderId: buildOrder()["id"], locale: "es" },
+      { templateKey: "order-cancelled", orderId: buildOrder()["id"] },
       MESSAGE,
     );
 

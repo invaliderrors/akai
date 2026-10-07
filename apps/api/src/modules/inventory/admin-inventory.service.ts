@@ -58,7 +58,7 @@ export class AdminInventoryService {
     if (query.search !== undefined) {
       const pattern = `%${escapeLikePattern(query.search.trim())}%`;
       conditions.push(
-        Prisma.sql`(pv."sku" ILIKE ${pattern} OR pt_active."name" ILIKE ${pattern} OR pt_fallback."name" ILIKE ${pattern})`,
+        Prisma.sql`(pv."sku" ILIKE ${pattern} OR p."name" ILIKE ${pattern})`,
       );
     }
 
@@ -90,7 +90,7 @@ export class AdminInventoryService {
         pv."sku"                                            AS "sku",
         p."id"                                              AS "productId",
         p."slug"                                            AS "productSlug",
-        COALESCE(pt_active."name", pt_fallback."name")       AS "productName",
+        p."name"                                            AS "productName",
         (ii."variantId" IS NOT NULL)                         AS "tracked",
         COALESCE(ii."onHand", 0)                             AS "onHand",
         COALESCE(ii."reserved", 0)                           AS "reserved",
@@ -100,10 +100,6 @@ export class AdminInventoryService {
       FROM "product_variant" pv
       JOIN "product" p ON p."id" = pv."productId"
       LEFT JOIN "inventory_item" ii ON ii."variantId" = pv."id"
-      LEFT JOIN "product_translation" pt_active
-        ON pt_active."productId" = p."id" AND pt_active."locale" = ${query.locale}::"Locale"
-      LEFT JOIN "product_translation" pt_fallback
-        ON pt_fallback."productId" = p."id" AND pt_fallback."locale" = 'es'
       WHERE ${where}
       ORDER BY pv."sku" ASC
       LIMIT ${fetchLimit}

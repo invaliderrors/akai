@@ -518,7 +518,6 @@ class PrismaPaymentsWriter implements PaymentsWriter {
       orderNumber: string;
       status: OrderStatus;
       email: string;
-      locale: "es" | "en";
       currency: string;
       grandTotal: number;
       discountTotal: number;
@@ -536,7 +535,6 @@ class PrismaPaymentsWriter implements PaymentsWriter {
       orderNumber: row.orderNumber,
       status: row.status,
       email: row.email,
-      locale: row.locale,
       currency: row.currency,
       grandTotal: toMinor(row.grandTotal),
       discountTotal: toMinor(row.discountTotal),

@@ -15,7 +15,7 @@ import { PrismaService } from "../prisma/prisma.service";
 export interface CategoryWithCount {
   readonly id: string;
   readonly slug: string;
-  readonly name: unknown;
+  readonly name: string;
   readonly sortOrder: number;
   /** Products a SHOPPER would see under this category. See the SQL below. */
   readonly productCount: number;
@@ -37,9 +37,7 @@ const rowsSchema = z.array(
   z.object({
     id: z.string(),
     slug: z.string(),
-    // Json column: kept as unknown here and narrowed by the mapper, so a
-    // malformed blob degrades one category rather than the whole nav.
-    name: z.unknown(),
+    name: z.string(),
     sortOrder: z.coerce.number().int(),
     productCount: z.coerce.number().int().min(0),
   }),
@@ -95,11 +93,8 @@ export class PrismaCategoriesRepository implements CategoriesRepository {
       throw new Error("Category listing returned an unexpected row shape.");
     }
 
-    // Rebuilt field by field rather than returned wholesale. `z.unknown()` makes
-    // its key OPTIONAL in the inferred type (an `unknown` may legitimately be
-    // `undefined`), so the parsed row is `{ name?: unknown }` and does not
-    // satisfy the port. Naming each field also keeps a future column added to
-    // the SELECT from silently reaching the caller.
+    // Rebuilt field by field rather than returned wholesale, so a future column
+    // added to the SELECT does not silently reach the caller.
     return parsed.data.map((row) => ({
       id: row.id,
       slug: row.slug,

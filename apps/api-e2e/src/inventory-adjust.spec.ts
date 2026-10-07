@@ -48,7 +48,7 @@ describe.skipIf(!isDockerAvailable())("Inventory adjust — expectedOnHand and u
       data: { id: ACTOR_ID, email: "admin@example.com", role: "ADMIN" },
     });
     await db.prisma.product.create({
-      data: { id: PRODUCT_ID, slug: "oversized-tee", status: "ACTIVE" },
+      data: { id: PRODUCT_ID, slug: "oversized-tee", name: "Camiseta Oversize", status: "ACTIVE" },
     });
     await db.prisma.productVariant.create({
       data: {

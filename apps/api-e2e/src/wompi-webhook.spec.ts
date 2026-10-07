@@ -148,7 +148,7 @@ describe.skipIf(!isDockerAvailable())("Wompi settlement — real Postgres", () =
     const prisma = db.prisma;
 
     await prisma.product.create({
-      data: { id: PRODUCT_ID, slug: "oversized-tee", status: "ACTIVE" },
+      data: { id: PRODUCT_ID, slug: "oversized-tee", name: "Camiseta Oversize", status: "ACTIVE" },
     });
 
     await prisma.productVariant.create({
@@ -174,7 +174,6 @@ describe.skipIf(!isDockerAvailable())("Wompi settlement — real Postgres", () =
         orderNumber: ORDER_NUMBER,
         email: "customer@example.com",
         status: "AWAITING_PAYMENT",
-        locale: "es",
         currency: "COP",
         subtotal: NET,
         taxTotal: TAX,

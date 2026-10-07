@@ -29,7 +29,7 @@ import {
   type UpdateProduct,
 } from "@akai/contracts";
 import { ProductsService, type ProductWriteResult } from "./products.service";
-import { CONTENT_SANITIZED_HEADER } from "./catalog.constants";
+import { CONTENT_SANITIZED_HEADER, SANITIZED_DESCRIPTION } from "./catalog.constants";
 import { ProductInventoryService } from "./product-inventory.service";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
 
@@ -79,7 +79,7 @@ export interface HeaderSink {
  * stays exactly the `Product` resource — every admin client parses it against
  * the `.strict()` contract schema, so a warning field there would break them
  * all — and the notice rides beside it in a header whose value is a closed set
- * of `Locale` codes, never prose. `CONTENT_SANITIZED_HEADER` carries the full
+ * of field names (today only `description`), never prose. `CONTENT_SANITIZED_HEADER` carries the full
  * argument, including why this is not a 400.
  *
  * The header is set ONLY when something actually changed: its absence is the
@@ -90,8 +90,8 @@ export function reportSanitizedContent(
   result: ProductWriteResult,
   response: HeaderSink,
 ): Product {
-  if (result.sanitizedLocales.length > 0) {
-    response.setHeader(CONTENT_SANITIZED_HEADER, result.sanitizedLocales.join(","));
+  if (result.descriptionSanitized) {
+    response.setHeader(CONTENT_SANITIZED_HEADER, SANITIZED_DESCRIPTION);
   }
   return result.product;
 }
@@ -132,7 +132,7 @@ export class AdminProductsController {
     @Query(new ZodValidationPipe(adminProductListQuerySchema))
     query: AdminProductListQuery,
   ): Promise<Paginated<Product>> {
-    return this.products.listAdmin(query, query.locale);
+    return this.products.listAdmin(query);
   }
 
   @Get(":id")

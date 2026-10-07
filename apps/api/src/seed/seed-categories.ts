@@ -49,14 +49,14 @@ async function main(): Promise<void> {
         ? await prisma.category.create({
             data: {
               slug: category.slug,
-              name: { es: category.es, en: category.en },
+              name: category.name,
               sortOrder: category.sortOrder,
             },
           })
         : await prisma.category.update({
             where: { id: existing.id },
             data: {
-              name: { es: category.es, en: category.en },
+              name: category.name,
               sortOrder: category.sortOrder,
             },
           });

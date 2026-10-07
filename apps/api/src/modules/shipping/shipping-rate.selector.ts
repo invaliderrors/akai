@@ -1,7 +1,6 @@
 import type { CurrencyCode, Minor } from "@akai/contracts";
 import { ZERO, toMinor } from "@akai/money";
 
-import { hasLocalizedText, type LocalizedText } from "../../common/localized-text";
 
 /**
  * Shipping rate SELECTION — a PURE function over live rate rows.
@@ -36,10 +35,9 @@ import { hasLocalizedText, type LocalizedText } from "../../common/localized-tex
  * simply cannot be chosen) is safer than either charging its price under a
  * guessed rule or crashing a customer's checkout because one row is malformed.
  *
- * A rate with NO NAME IN ANY LOCALE is excluded for the same reason. `name` is a
- * locale-keyed record, so "unnamed" is now a representable state (an empty
- * record, a Json column that would not parse), and an option the customer cannot
- * read is an option they cannot meaningfully choose. Excluding it here is what
+ * A rate with a BLANK NAME is excluded for the same reason (the database
+ * refuses one with a CHECK, but the database is not the only writer): an option
+ * the customer cannot read is an option they cannot meaningfully choose. Excluding it here is what
  * lets every downstream consumer — the wire schema, the order's stamped
  * `shippingMethodName`, the invoice — treat a name as present.
  */
@@ -49,8 +47,8 @@ export type ShippingStrategy = "FLAT" | "WEIGHT" | "PRICE";
 /** A raw shipping_rate row, as read from the database. */
 export interface ShippingRateRow {
   readonly id: string;
-  /** Per-locale method name, already narrowed out of the Json column. */
-  readonly name: LocalizedText;
+  /** The method's display name. */
+  readonly name: string;
   /** Free text in the DB; narrowed to ShippingStrategy here, or excluded. */
   readonly strategy: string;
   /** VAT-inclusive price, minor units. */
@@ -79,12 +77,8 @@ export interface ShippingSelectionContext {
 /** A shipping method the customer may choose, with its computed price. */
 export interface ShippingOption {
   readonly rateId: string;
-  /**
-   * Per-locale name, carried UNRESOLVED. The selector has no locale and must
-   * not acquire one: it is the pricing rule, and which language a name is shown
-   * in has nothing to do with what a parcel costs.
-   */
-  readonly name: LocalizedText;
+  /** The method's display name. */
+  readonly name: string;
   readonly currency: CurrencyCode;
   /** VAT-inclusive price for THIS cart. Zero when the free-over threshold is met. */
   readonly priceGross: Minor;
@@ -124,7 +118,7 @@ function isOffered(rate: ShippingRateRow, context: ShippingSelectionContext): bo
   }
 
   // Fail closed on an unnameable rate, exactly as on an unrecognised strategy.
-  if (!hasLocalizedText(rate.name)) {
+  if (rate.name.trim().length === 0) {
     return false;
   }
 

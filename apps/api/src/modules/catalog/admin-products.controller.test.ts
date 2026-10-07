@@ -268,9 +268,9 @@ function headerSink(): HeaderSink & { readonly headers: Map<string, string> } {
 }
 
 /** The `Product` body is irrelevant here; only the header decision is under test. */
-function writeResult(sanitizedLocales: ProductWriteResult["sanitizedLocales"]): ProductWriteResult {
+function writeResult(descriptionSanitized: boolean): ProductWriteResult {
   const product = productFixture();
-  return { product, sanitizedLocales };
+  return { product, descriptionSanitized };
 }
 
 function productFixture(): ProductWriteResult["product"] {
@@ -279,7 +279,9 @@ function productFixture(): ProductWriteResult["product"] {
     slug: "camiseta",
     status: "ACTIVE",
     taxClass: "STANDARD",
-    translations: [],
+    name: "Camiseta",
+    shortDescription: "",
+    description: "",
     variants: [],
     media: [],
     categories: [],
@@ -304,12 +306,12 @@ describe("reportSanitizedContent", () => {
    * is the API saying out loud that it stored something other than what it was
    * given.
    */
-  it("names the locales whose copy was rewritten", () => {
+  it("names the field whose copy was rewritten", () => {
     const response = headerSink();
 
-    reportSanitizedContent(writeResult(["es", "en"]), response);
+    reportSanitizedContent(writeResult(true), response);
 
-    expect(response.headers.get(CONTENT_SANITIZED_HEADER)).toBe("es,en");
+    expect(response.headers.get(CONTENT_SANITIZED_HEADER)).toBe("description");
   });
 
   /**
@@ -319,13 +321,13 @@ describe("reportSanitizedContent", () => {
   it("sets no header at all when nothing was altered", () => {
     const response = headerSink();
 
-    reportSanitizedContent(writeResult([]), response);
+    reportSanitizedContent(writeResult(false), response);
 
     expect(response.headers.has(CONTENT_SANITIZED_HEADER)).toBe(false);
   });
 
   it("returns the product unchanged, so the body stays the resource", () => {
-    const result = writeResult(["es"]);
+    const result = writeResult(true);
 
     expect(reportSanitizedContent(result, headerSink())).toBe(result.product);
   });

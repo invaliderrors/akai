@@ -105,7 +105,6 @@ function request(overrides: Partial<CreateCheckoutSession> = {}): CreateCheckout
     shippingMethodId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
     documentType: "CC",
     documentNumber: "1020304050",
-    locale: "es",
     acceptedTermsVersion: "2026-01",
     ...overrides,
   };

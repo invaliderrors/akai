@@ -148,10 +148,6 @@ export class CheckoutService {
       subtotalGross: grossSubtotal,
       weightGrams: totalWeightGrams,
       shippingMethodId: request.shippingMethodId,
-      // The locale the customer is buying in, so the method name stamped onto
-      // the order — and inherited by the confirmation email and the invoice —
-      // is in their language rather than the database's authoring language.
-      locale: request.locale,
     });
 
     const reservationIds = await this.reserveAll(cart.id, cart.items);
@@ -192,7 +188,6 @@ export class CheckoutService {
         cartId: request.cartId,
         customerId: actor.customerId,
         email: request.email,
-        locale: request.locale,
         shippingAddress: request.shippingAddress,
         billingAddress: request.billingAddress ?? request.shippingAddress,
         shipping: shipping.charge,

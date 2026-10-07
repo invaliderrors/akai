@@ -1,5 +1,4 @@
 import { Injectable } from "@nestjs/common";
-import type { Locale } from "@akai/contracts";
 import { Prisma } from "@akai/db";
 import type {
   Customer as PrismaCustomer,
@@ -58,7 +57,6 @@ function toAuthCustomer(row: PrismaCustomer): AuthCustomer {
     lastName: row.lastName,
     phone: row.phone,
     role: row.role,
-    preferredLocale: row.preferredLocale,
     totpSecret: row.totpSecret,
     totpEnabledAt: row.totpEnabledAt,
     anonymisedAt: row.anonymisedAt,
@@ -161,7 +159,6 @@ export class PrismaAuthRepository implements AuthRepository {
     readonly passwordHash: string;
     readonly firstName: string;
     readonly lastName: string;
-    readonly preferredLocale: Locale;
     readonly marketingConsentAt: Date | null;
   }): Promise<AuthCustomer> {
     try {
@@ -171,7 +168,6 @@ export class PrismaAuthRepository implements AuthRepository {
           passwordHash: input.passwordHash,
           firstName: input.firstName,
           lastName: input.lastName,
-          preferredLocale: input.preferredLocale,
           marketingConsentAt: input.marketingConsentAt,
           // NEVER accepted from the request. Role escalation at signup would be
           // the single worst bug this module could ship, so the value is

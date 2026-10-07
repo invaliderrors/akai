@@ -1,13 +1,11 @@
 import { z } from "zod";
 import { Prisma } from "@akai/db";
 import {
-  localeSchema,
   type Category,
   type InventoryItem,
   type MediaAsset,
   type Price,
   type Product,
-  type ProductTranslation,
   type ProductVariant,
   type PublicProduct,
 } from "@akai/contracts";
@@ -38,7 +36,6 @@ import { toMinor } from "@akai/money";
  * which is external the moment a migration, a seed script or a manual UPDATE
  * can write to it.
  */
-const localizedTextSchema = z.record(localeSchema, z.string());
 const optionsSchema = z.record(z.string(), z.string());
 
 /**
@@ -72,7 +69,6 @@ function narrowJson<T>(value: Prisma.JsonValue | null, schema: z.ZodType<T>, fal
  * mapper reads `undefined` at runtime with no compile error.
  */
 export const productInclude = {
-  translations: true,
   // `variantId: null` PARTITIONS the one media table, in the query rather than
   // in the mapper. A variant image and a gallery image are rows on the same
   // table, so without this filter every variant image would also appear in the
@@ -193,13 +189,11 @@ function mapInventory(variant: HydratedVariant): InventoryItem {
 }
 
 export function mapVariant(variant: HydratedVariant): ProductVariant {
-  const name = variant.name === null ? null : narrowJson(variant.name, localizedTextSchema, {});
-
   return {
     id: variant.id,
     productId: variant.productId,
     sku: variant.sku,
-    name,
+    name: variant.name,
     options: narrowJson(variant.options, optionsSchema, {}),
     price: mapPrice(variant),
     weightGrams: variant.weightGrams,
@@ -218,17 +212,6 @@ export function mapVariant(variant: HydratedVariant): ProductVariant {
   };
 }
 
-function mapTranslation(
-  row: HydratedProduct["translations"][number],
-): ProductTranslation {
-  return {
-    locale: row.locale,
-    name: row.name,
-    shortDescription: row.shortDescription,
-    description: row.description,
-  };
-}
-
 /**
  * One media row → the wire shape, for BOTH scopes.
  *
@@ -240,7 +223,7 @@ function mapMedia(row: Prisma.MediaAssetGetPayload<Record<string, never>>): Medi
   return {
     id: row.id,
     url: row.url,
-    alt: narrowJson(row.alt, localizedTextSchema, {}),
+    alt: row.alt,
     width: row.width,
     height: row.height,
     sortOrder: row.sortOrder,
@@ -252,7 +235,7 @@ function mapCategory(row: HydratedProduct["categories"][number]): Category {
   return {
     id: row.category.id,
     slug: row.category.slug,
-    name: narrowJson(row.category.name, localizedTextSchema, {}),
+    name: row.category.name,
     sortOrder: row.sortOrder,
   };
 }
@@ -384,7 +367,9 @@ export function mapProduct(
     slug: product.slug,
     status: product.status,
     taxClass: product.taxClass,
-    translations: product.translations.map(mapTranslation),
+    name: product.name,
+    shortDescription: product.shortDescription,
+    description: product.description,
     variants: variants.map((variant) => mapVariant(variant)),
     media: product.media.map(mapMedia),
     categories: product.categories.map(mapCategory),

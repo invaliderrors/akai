@@ -21,7 +21,6 @@ describe("publicProductListQuerySchema", () => {
 
     expect(parsed.sort).toBe("newest");
     expect(parsed.limit).toBe(24);
-    expect(parsed.locale).toBe("es");
   });
 
   /**
@@ -340,36 +339,30 @@ describe("setCategoriesSchema", () => {
 });
 
 describe("createCategorySchema", () => {
-  it("accepts a slug and both locale names", () => {
-    const parsed = createCategorySchema.parse({
-      slug: "sudaderas",
-      name: { es: "Sudaderas", en: "Hoodies" },
-    });
+  it("accepts a slug and a trimmed name", () => {
+    const parsed = createCategorySchema.parse({ slug: "sudaderas", name: "  Sudaderas " });
 
-    expect(parsed).toEqual({ slug: "sudaderas", name: { es: "Sudaderas", en: "Hoodies" } });
+    expect(parsed).toEqual({ slug: "sudaderas", name: "Sudaderas" });
   });
 
-  it("rejects a name missing either locale — no half-bilingual category", () => {
+  it("rejects a per-language record — the name is one Spanish string", () => {
     expect(
       createCategorySchema.safeParse({ slug: "sudaderas", name: { es: "Sudaderas" } }).success,
     ).toBe(false);
-    expect(
-      createCategorySchema.safeParse({ slug: "sudaderas", name: { en: "Hoodies" } }).success,
-    ).toBe(false);
   });
 
-  it("rejects an empty name in either locale", () => {
-    expect(
-      createCategorySchema.safeParse({ slug: "sudaderas", name: { es: "", en: "Hoodies" } })
-        .success,
-    ).toBe(false);
+  it("rejects a blank name", () => {
+    expect(createCategorySchema.safeParse({ slug: "sudaderas", name: "" }).success).toBe(false);
+    expect(createCategorySchema.safeParse({ slug: "sudaderas", name: "   " }).success).toBe(
+      false,
+    );
   });
 
   it("rejects an unknown field — no sortOrder, no id, at create", () => {
     expect(
       createCategorySchema.safeParse({
         slug: "sudaderas",
-        name: { es: "Sudaderas", en: "Hoodies" },
+        name: "Sudaderas",
         sortOrder: 0,
       }).success,
     ).toBe(false);
@@ -379,28 +372,28 @@ describe("createCategorySchema", () => {
     expect(
       createCategorySchema.safeParse({
         slug: "../../etc/passwd",
-        name: { es: "Sudaderas", en: "Hoodies" },
+        name: "Sudaderas",
       }).success,
     ).toBe(false);
   });
 });
 
 describe("updateCategorySchema", () => {
-  it("accepts both locale names, and nothing else — slug and sortOrder are absent", () => {
-    const parsed = updateCategorySchema.parse({ name: { es: "Recuperación", en: "Recovery" } });
-    expect(parsed).toEqual({ name: { es: "Recuperación", en: "Recovery" } });
+  it("accepts the name, and nothing else — slug and sortOrder are absent", () => {
+    const parsed = updateCategorySchema.parse({ name: "Recuperación" });
+    expect(parsed).toEqual({ name: "Recuperación" });
   });
 
   it("rejects a slug or a sortOrder on the request — rename has its own reasons not to accept either", () => {
     expect(
       updateCategorySchema.safeParse({
-        name: { es: "Recuperación", en: "Recovery" },
+        name: "Recuperación",
         slug: "recovery",
       }).success,
     ).toBe(false);
     expect(
       updateCategorySchema.safeParse({
-        name: { es: "Recuperación", en: "Recovery" },
+        name: "Recuperación",
         sortOrder: 2,
       }).success,
     ).toBe(false);
@@ -434,7 +427,6 @@ describe("publicAddOnListQuerySchema", () => {
   it("applies the documented defaults", () => {
     const parsed = publicAddOnListQuerySchema.parse({});
 
-    expect(parsed.locale).toBe("es");
     expect(parsed.limit).toBe(12);
     expect(parsed.cursor).toBeUndefined();
   });

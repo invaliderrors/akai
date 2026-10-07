@@ -80,7 +80,6 @@ describe.skipIf(!RUN)("Resend delivery status (real Postgres)", () => {
       data: {
         recipient: RECIPIENT,
         templateKey: "order-confirmation",
-        locale: "es",
         status: status as never,
         providerMessageId,
         attempts: 1,
@@ -289,7 +288,6 @@ describe.skipIf(!RUN)("Resend delivery status (real Postgres)", () => {
       const result = await emails.send({
         templateKey: "contact-autoreply",
         to: RECIPIENT,
-        locale: "es",
         payload: { name: "Marta", subject: "Pedido", referenceId: "ref-1" },
       });
 
@@ -307,7 +305,6 @@ describe.skipIf(!RUN)("Resend delivery status (real Postgres)", () => {
       const result = await emails.send({
         templateKey: "reset-password",
         to: RECIPIENT,
-        locale: "es",
         payload: {
           firstName: "Marta",
           resetUrl: "https://akai.shop/reset?token=abc",

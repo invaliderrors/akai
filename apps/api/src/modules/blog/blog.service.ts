@@ -7,10 +7,8 @@ import {
   type AdminBlogPostListResponse,
   type BlogCoverUploadUrlRequest,
   type BlogPostListQuery,
-  type BlogPostTranslationInput,
   type CreateBlogPost,
   type ImageUploadUrlResponse,
-  type Locale,
   type PublicBlogPost,
   type PublicBlogPostListResponse,
   type UpdateBlogPost,
@@ -30,12 +28,6 @@ import { BLOG_REPOSITORY, type BlogPostRecord, type BlogRepository } from "./blo
  * PUBLIC READS SEE PUBLISHED POSTS ONLY, and that is decided in ONE place: the
  * repository's `listPublished` / `findPublishedBySlug`, which are the only
  * reads the public controller can reach. A draft has no public code path.
- *
- * D8c (Spanish-only posts) is decided here too: a list filtered by `locale`
- * returns only posts translated into it, and a detail read with a `locale` the
- * post lacks is a 404 — the same answer as a post that does not exist, so a
- * crawler on `/en/blog/<slug>` for a Spanish-only post gets a clean miss rather
- * than a page of Spanish under an English URL.
  *
  * BODIES ARE SANITISED ON WRITE with the same `sanitizeRichText` the product
  * description uses (D8a: the allow-list is unchanged, so no inline images).
@@ -60,7 +52,6 @@ export class BlogService {
 
   async listPublished(query: BlogPostListQuery): Promise<PublicBlogPostListResponse> {
     const page = await this.repository.listPublished({
-      locale: query.locale,
       cursor: query.cursor,
       limit: query.limit,
     });
@@ -71,12 +62,9 @@ export class BlogService {
     };
   }
 
-  async getPublished(slug: string, locale: Locale | undefined): Promise<PublicBlogPost> {
+  async getPublished(slug: string): Promise<PublicBlogPost> {
     const record = await this.repository.findPublishedBySlug(slug);
     if (record === null) throw BlogError.notFound();
-    if (locale !== undefined && !record.translations.some((entry) => entry.locale === locale)) {
-      throw BlogError.notFound();
-    }
     return toPublicPost(record, this.coverUrl);
   }
 
@@ -103,13 +91,17 @@ export class BlogService {
 
   /** Always a DRAFT; `authorId` is the operator's own id, never a body field. */
   async create(input: CreateBlogPost, authorId: string | null): Promise<AdminBlogPost> {
-    const translations = sanitizeTranslations(input.translations);
     const record = await translateWriteError(() =>
       this.repository.create({
         slug: input.slug,
         category: input.category,
         authorId,
-        translations,
+        title: input.title,
+        excerpt: input.excerpt,
+        bodyHtml: sanitizeBody(input.bodyHtml),
+        metaTitle: input.metaTitle,
+        metaDescription: input.metaDescription,
+        coverAlt: input.coverAlt,
       }),
     );
     return toAdminPost(record, this.coverUrl);
@@ -135,9 +127,14 @@ export class BlogService {
           ...(input.slug === undefined ? {} : { slug: input.slug }),
           ...(input.category === undefined ? {} : { category: input.category }),
           ...(input.coverObjectKey === undefined ? {} : { coverObjectKey: input.coverObjectKey }),
-          ...(input.translations === undefined
+          ...(input.title === undefined ? {} : { title: input.title }),
+          ...(input.excerpt === undefined ? {} : { excerpt: input.excerpt }),
+          ...(input.bodyHtml === undefined ? {} : { bodyHtml: sanitizeBody(input.bodyHtml) }),
+          ...(input.metaTitle === undefined ? {} : { metaTitle: input.metaTitle }),
+          ...(input.metaDescription === undefined
             ? {}
-            : { translations: sanitizeTranslations(input.translations) }),
+            : { metaDescription: input.metaDescription }),
+          ...(input.coverAlt === undefined ? {} : { coverAlt: input.coverAlt }),
         },
         BLOG_REVALIDATION_REASONS.postUpdated,
       ),
@@ -197,23 +194,17 @@ export class BlogService {
 }
 
 /**
- * Sanitise every body. A body that sanitises to NOTHING (it was entirely
+ * Sanitise the body. A body that sanitises to NOTHING (it was entirely
  * disallowed markup — a pasted `<script>`, an embed) is refused rather than
  * stored empty: the schema already refuses a blank body, and a body that is
  * blank after cleaning is the same half-written post.
  */
-function sanitizeTranslations(
-  translations: readonly BlogPostTranslationInput[],
-): BlogPostTranslationInput[] {
-  return translations.map((translation) => {
-    const bodyHtml = sanitizeRichText(translation.bodyHtml).trim();
-    if (bodyHtml.length === 0) {
-      throw BlogError.validation(
-        `The ${translation.locale} body contains no allowed content after sanitisation`,
-      );
-    }
-    return { ...translation, bodyHtml };
-  });
+function sanitizeBody(submitted: string): string {
+  const bodyHtml = sanitizeRichText(submitted).trim();
+  if (bodyHtml.length === 0) {
+    throw BlogError.validation("The body contains no allowed content after sanitisation");
+  }
+  return bodyHtml;
 }
 
 /** A duplicate slug is a 409 the operator can fix, not a 500 naming our schema. */

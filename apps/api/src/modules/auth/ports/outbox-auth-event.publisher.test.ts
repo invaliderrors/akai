@@ -19,7 +19,6 @@ interface CreateArgs {
     readonly payload: {
       readonly templateKey: string;
       readonly to: string;
-      readonly locale: string;
       readonly payload: Record<string, unknown>;
     };
   };
@@ -49,7 +48,6 @@ describe("OutboxAuthEventPublisher — verification", () => {
       type: "auth.customer.registered",
       customerId: "c-1",
       email: "buyer@example.com",
-      locale: "es",
       occurredAt: OCCURRED,
       verificationToken: "tok-abc-123",
       expiresAt: new Date(OCCURRED.getTime() + 24 * 60 * 60 * 1000),
@@ -62,6 +60,8 @@ describe("OutboxAuthEventPublisher — verification", () => {
     expect(args.data.topic).toBe("email");
     expect(args.data.payload.templateKey).toBe("verify-email");
     expect(args.data.payload.to).toBe("buyer@example.com");
+    // Spanish only: the row names no language, and the link has no locale prefix.
+    expect(args.data.payload).not.toHaveProperty("locale");
 
     const parsed = parseTemplatePayload("verify-email", args.data.payload.payload);
     expect(parsed.verifyUrl).toBe(
@@ -69,23 +69,6 @@ describe("OutboxAuthEventPublisher — verification", () => {
     );
     expect(parsed.expiresInHours).toBe(24);
     expect(parsed.firstName).toBe("buyer");
-  });
-
-  it("prefixes the link with /en for English recipients", async () => {
-    const { publisher, create } = build();
-    await publisher.publish({
-      type: "auth.email_verification.requested",
-      customerId: "c-1",
-      email: "user@example.com",
-      locale: "en",
-      occurredAt: OCCURRED,
-      verificationToken: "t2",
-      expiresAt: new Date(OCCURRED.getTime() + 60 * 60 * 1000),
-    });
-
-    const args = create.mock.calls[0]?.[0] as CreateArgs;
-    const parsed = parseTemplatePayload("verify-email", args.data.payload.payload);
-    expect(parsed.verifyUrl).toBe("https://dash.akai.test/en/verify-email?token=t2");
   });
 });
 
@@ -96,7 +79,6 @@ describe("OutboxAuthEventPublisher — password reset", () => {
       type: "auth.password_reset.requested",
       customerId: "c-1",
       email: "buyer@example.com",
-      locale: "es",
       occurredAt: OCCURRED,
       resetToken: "reset-xyz",
       expiresAt: new Date(OCCURRED.getTime() + 30 * 60 * 1000),
@@ -119,7 +101,6 @@ describe("OutboxAuthEventPublisher — non-templated events", () => {
       type: "auth.password.changed",
       customerId: "c-1",
       email: "buyer@example.com",
-      locale: "es",
       occurredAt: OCCURRED,
     });
     expect(create).not.toHaveBeenCalled();
@@ -131,7 +112,6 @@ describe("OutboxAuthEventPublisher — non-templated events", () => {
       type: "auth.password_reset.requested",
       customerId: "c-1",
       email: "buyer@example.com",
-      locale: "es",
       occurredAt: OCCURRED,
       resetToken: "super-secret-token",
       expiresAt: new Date(OCCURRED.getTime() + 30 * 60 * 1000),
@@ -156,7 +136,6 @@ describe("OutboxAuthEventPublisher — link origin", () => {
       type: "auth.customer.registered",
       customerId: "c-1",
       email: "buyer@example.com",
-      locale: "es",
       origin: "storefront",
       occurredAt: OCCURRED,
       verificationToken: "shop-token",
@@ -168,31 +147,12 @@ describe("OutboxAuthEventPublisher — link origin", () => {
     expect(parsed.verifyUrl).toBe("https://shop.akai.test/verify-email?token=shop-token");
   });
 
-  it("keeps the locale prefix rule on the storefront origin too", async () => {
-    const { publisher, create } = build();
-    await publisher.publish({
-      type: "auth.email_verification.requested",
-      customerId: "c-1",
-      email: "buyer@example.com",
-      locale: "en",
-      origin: "storefront",
-      occurredAt: OCCURRED,
-      verificationToken: "t3",
-      expiresAt: new Date(OCCURRED.getTime() + 60 * 60 * 1000),
-    });
-
-    const args = create.mock.calls[0]?.[0] as CreateArgs;
-    const parsed = parseTemplatePayload("verify-email", args.data.payload.payload);
-    expect(parsed.verifyUrl).toBe("https://shop.akai.test/en/verify-email?token=t3");
-  });
-
   it("sends a storefront password reset to the storefront as well", async () => {
     const { publisher, create } = build();
     await publisher.publish({
       type: "auth.password_reset.requested",
       customerId: "c-1",
       email: "buyer@example.com",
-      locale: "es",
       origin: "storefront",
       occurredAt: OCCURRED,
       resetToken: "r1",
@@ -212,7 +172,6 @@ describe("OutboxAuthEventPublisher — link origin", () => {
       type: "auth.customer.registered",
       customerId: "c-1",
       email: "buyer@example.com",
-      locale: "es",
       occurredAt: OCCURRED,
       verificationToken: "legacy",
       expiresAt: new Date(OCCURRED.getTime() + 24 * 60 * 60 * 1000),
@@ -229,7 +188,6 @@ describe("OutboxAuthEventPublisher — link origin", () => {
       type: "auth.email_verification.requested",
       customerId: "c-1",
       email: "buyer@example.com",
-      locale: "es",
       origin: "dashboard",
       occurredAt: OCCURRED,
       verificationToken: "d1",

@@ -10,7 +10,7 @@ import {
 import { CategoriesService } from "./categories.service";
 
 /**
- * CategoriesModule — collections, their per-locale names and their ordering.
+ * CategoriesModule — collections, their names and their ordering.
  *
  * OWNS exactly one thing: READING the category list for navigation. That is a
  * narrow charter and it is deliberate, because this directory was an empty

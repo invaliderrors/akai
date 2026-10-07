@@ -1,7 +1,6 @@
 import { Prisma } from "@akai/db";
 import {
   MIN_SEARCH_TERM_LENGTH,
-  type Locale,
   type ProductKind,
   type ProductStatus,
 } from "@akai/contracts";
@@ -96,7 +95,6 @@ export interface ProductQueryFilters {
 
 export interface ProductQueryOptions extends ProductQueryFilters {
   readonly sort: ProductSort;
-  readonly locale: Locale;
   readonly cursor?: string | undefined;
   /** Rows to fetch. The service asks for limit+1 to detect a next page. */
   readonly take: number;
@@ -128,9 +126,6 @@ const PRICE_SENTINEL_DESC = -1;
 export function escapeLikePattern(input: string): string {
   return input.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
 }
-
-/** The locale every catalog read falls back to when the active one is missing. */
-const FALLBACK_LOCALE: Locale = "es";
 
 /**
  * THE one place a raw `?search=` becomes a term the query uses, or nothing.
@@ -186,25 +181,25 @@ function searchTermCte(term: string): Prisma.Sql {
  * Tier 1 splits the prefix tier so that "kumo" puts "KUMO Hoodie" ahead of
  * "Kumogata Tee": both are prefixes, but only one is the word typed.
  *
- * Name tiers read the SAME translation row the filter does (`t`, active locale
- * → es → first). Descriptions match on WORD STARTS (`\m`), never substrings,
+ * Name tiers read the same product columns the filter does. Descriptions
+ * match on WORD STARTS (`\m`), never substrings,
  * which is the whole point: "tee" must find "Tee" and "Teeshirt", not every
  * page that says "Yankee", "settee" or "coteen".
  */
 const SEARCH_RANK = Prisma.sql`CASE
-        WHEN lower(unaccent(t.name)) = st.folded
+        WHEN lower(unaccent(p.name)) = st.folded
           OR EXISTS (
             SELECT 1 FROM "product_variant" vx
             WHERE vx."productId" = p.id
               AND vx."deletedAt" IS NULL
               AND lower(vx.sku) = st.lowered
           )                                                        THEN 0
-        WHEN unaccent(t.name) ~* ('^' || st.esc || '\\M')             THEN 1
-        WHEN unaccent(t.name) ILIKE (st.esc || '%') ESCAPE '\\'      THEN 2
-        WHEN unaccent(t.name) ~* ('\\m' || st.esc)                   THEN 3
-        WHEN unaccent(t.name) ILIKE ('%' || st.esc || '%') ESCAPE '\\' THEN 4
-        WHEN unaccent(t."shortDescription") ~* ('\\m' || st.esc)     THEN 5
-        WHEN unaccent(t.description) ~* ('\\m' || st.esc)            THEN 6
+        WHEN unaccent(p.name) ~* ('^' || st.esc || '\\M')             THEN 1
+        WHEN unaccent(p.name) ILIKE (st.esc || '%') ESCAPE '\\'      THEN 2
+        WHEN unaccent(p.name) ~* ('\\m' || st.esc)                   THEN 3
+        WHEN unaccent(p.name) ILIKE ('%' || st.esc || '%') ESCAPE '\\' THEN 4
+        WHEN unaccent(p."shortDescription") ~* ('\\m' || st.esc)     THEN 5
+        WHEN unaccent(p.description) ~* ('\\m' || st.esc)            THEN 6
         ELSE 7
       END`;
 
@@ -242,16 +237,14 @@ function buildFilters(options: ProductQueryFilters): Prisma.Sql[] {
   }
 
   if (normaliseSearchTerm(options.search) !== undefined) {
-    // The ACTIVE locale's translation (the `t` lateral: active → es → first),
-    // not every locale: a Spanish HTML description must not pull a product
-    // into an English visitor's results. SKU stays in because it is how staff
-    // and repeat customers actually search. `st` is the `search_term` CTE,
+    // The product's own copy (name, summary, description). SKU stays in
+    // because it is how staff and repeat customers actually search. `st` is the `search_term` CTE,
     // cross-joined only when a search is active. Every predicate here has a
     // tier in SEARCH_RANK; the two lists must stay in step.
     conditions.push(Prisma.sql`(
-      unaccent(t.name) ILIKE ('%' || st.esc || '%') ESCAPE '\\'
-      OR unaccent(t."shortDescription") ~* ('\\m' || st.esc)
-      OR unaccent(t.description) ~* ('\\m' || st.esc)
+      unaccent(p.name) ILIKE ('%' || st.esc || '%') ESCAPE '\\'
+      OR unaccent(p."shortDescription") ~* ('\\m' || st.esc)
+      OR unaccent(p.description) ~* ('\\m' || st.esc)
       OR EXISTS (
         SELECT 1 FROM "product_variant" vs
         WHERE vs."productId" = p.id
@@ -396,28 +389,13 @@ export function buildProductPageQuery(options: ProductQueryOptions): Prisma.Sql 
       SELECT
         p.id                                            AS id,
         p."createdAt"                                   AS created_at,
-        COALESCE(t.name, '')                            AS sort_name,
+        p.name                                          AS sort_name,
         COALESCE(pv.min_price, ${plan.priceSentinel})   AS sort_price,
         COALESCE(sold.units, 0)                         AS sort_units,
         p."sortOrder"                                    AS sort_order
         ${searchTerm === undefined ? Prisma.empty : Prisma.sql`, ${SEARCH_RANK} AS sort_rank`}
       FROM "product" p
       ${searchTerm === undefined ? Prisma.empty : Prisma.sql`CROSS JOIN search_term st`}
-      LEFT JOIN LATERAL (
-        -- Prefer the requested locale, then es, then any translation rather
-        -- than sorting the product to the top under an empty name — the same
-        -- chain the storefront's view.ts applies. ORDER BY on a boolean puts
-        -- TRUE first under DESC; the locale tiebreak keeps the fallback
-        -- deterministic across replicas. The search predicates and rank read
-        -- this SAME row, so a product is matched in the language it is shown in.
-        SELECT tt.name, tt."shortDescription", tt.description
-        FROM "product_translation" tt
-        WHERE tt."productId" = p.id
-        ORDER BY (tt.locale = ${options.locale}::"Locale") DESC,
-                 (tt.locale = ${FALLBACK_LOCALE}::"Locale") DESC,
-                 tt.locale ASC
-        LIMIT 1
-      ) t ON TRUE
       LEFT JOIN LATERAL (
         SELECT MIN(v."priceGross") AS min_price
         FROM "product_variant" v

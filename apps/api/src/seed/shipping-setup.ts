@@ -18,7 +18,7 @@
  * carrier mapping. Prices are placeholders, editable in /admin/shipping.
  */
 
-import { type Locale, type PrismaClient, TaxClass } from "@prisma/client";
+import { type PrismaClient, TaxClass } from "@prisma/client";
 
 import { FREE_SHIPPING_THRESHOLD_MINOR } from "./free-shipping-threshold";
 
@@ -27,14 +27,10 @@ export const SEED_CURRENCY = "COP";
 
 export interface SeedRate {
   /**
-   * Per-locale name. BOTH locales are seeded deliberately: the storefront falls
-   * back to Spanish, so an English-only rate would silently look correct in the
-   * default locale while being wrong for the language it was written for.
-   *
-   * `en` is also the seed's match key for an existing rate — a seed-local
-   * convention, nothing at runtime depends on it.
+   * The rate's display name. Also the seed's match key for an existing rate in
+   * the zone — a seed-local convention, nothing at runtime depends on it.
    */
-  readonly name: Readonly<Record<Locale, string>>;
+  readonly name: string;
   readonly strategy: "FLAT";
   /** Centavos: 1_500_000 is $ 15.000. */
   readonly priceGross: number;
@@ -61,7 +57,7 @@ export const SHIPPING_ZONES: readonly SeedZone[] = [
     sortOrder: 0,
     rates: [
       {
-        name: { es: "Envío nacional", en: "National shipping" },
+        name: "Envío nacional",
         strategy: "FLAT",
         priceGross: NATIONAL_SHIPPING_PRICE_MINOR,
         freeOverSubtotal: FREE_SHIPPING_THRESHOLD_MINOR,
@@ -91,19 +87,6 @@ export const STORE_COUNTRY = "CO";
 /** `validFrom` is part of the tax rate's natural key, so it is pinned. */
 export const TAX_VALID_FROM = new Date("2020-01-01T00:00:00.000Z");
 
-/**
- * The English name of a persisted rate, or null if the column holds anything
- * else. NARROWED, not cast: a Json column is external data like any other, and
- * a row this cannot read simply does not match, so a fresh rate is created.
- */
-function englishNameOf(value: unknown): string | null {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    return null;
-  }
-  const en: unknown = Reflect.get(value, "en");
-  return typeof en === "string" ? en : null;
-}
-
 async function upsertZone(prisma: PrismaClient, zone: SeedZone): Promise<void> {
   const existing = await prisma.shippingZone.findFirst({ where: { name: zone.name } });
 
@@ -132,10 +115,10 @@ async function upsertZone(prisma: PrismaClient, zone: SeedZone): Promise<void> {
 
   for (const rate of zone.rates) {
     const match =
-      existingRates.find((candidate) => englishNameOf(candidate.name) === rate.name.en) ?? null;
+      existingRates.find((candidate) => candidate.name === rate.name) ?? null;
 
     const data = {
-      name: { ...rate.name },
+      name: rate.name,
       strategy: rate.strategy,
       priceGross: rate.priceGross,
       currency: SEED_CURRENCY,
@@ -158,7 +141,7 @@ async function upsertZone(prisma: PrismaClient, zone: SeedZone): Promise<void> {
 
 /**
  * Write the whole setup. IDEMPOTENT: every write is an upsert keyed on a natural
- * key (country + class + validFrom, zone name, rate English name), so a second
+ * key (country + class + validFrom, zone name, rate name), so a second
  * run is a no-op.
  */
 export async function applyShippingSetup(prisma: PrismaClient): Promise<void> {

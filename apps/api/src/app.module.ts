@@ -44,7 +44,6 @@ import { AdminShippingModule } from "./modules/shipping/admin/admin-shipping.mod
 import { SiteSettingsModule } from "./modules/site-settings/site-settings.module";
 import { TaxModule } from "./modules/tax/tax.module";
 import { ThrottlerModule } from "./modules/throttler/throttler.module";
-import { TranslationModule } from "./modules/translation/translation.module";
 import { UsersModule } from "./modules/users/users.module";
 
 /**
@@ -113,22 +112,17 @@ import { UsersModule } from "./modules/users/users.module";
     // The affiliate application form and its admin screen — same abuse
     // shape as ContactModule immediately above (anonymous POST, outbound
     // email), and its admin surface mounts its own /admin/* controller for
-    // the same reason TranslationModule/SiteSettingsModule below do.
+    // the same reason SiteSettingsModule below does.
     AffiliatesModule,
     MetricsModule,
     RevalidationModule,
-    // The DeepL vendor layer behind the admin product form. Mounts its own
-    // /admin/* controller rather than joining AdminModule, because it needs
-    // that module's guard and nothing else from its graph — see the note in
-    // translation.module.ts.
-    TranslationModule,
     // Maintenance mode, and — one day — whatever else joins it on the same
-    // singleton row. Mounts its own /admin/* controller for the identical
-    // reason TranslationModule does: it needs RolesGuard and nothing else
-    // from AdminModule's graph.
+    // singleton row. Mounts its own /admin/* controller rather than joining
+    // AdminModule: it needs RolesGuard and nothing else from AdminModule's
+    // graph.
     SiteSettingsModule,
     // The blog (spec 2026-09-24 §8): public list/detail plus its own
-    // /admin/blog/* controller, same self-mounting reason as the two above.
+    // /admin/blog/* controller, same self-mounting reason as the one above.
     BlogModule,
 
     // Admin composition layer LAST: it mounts every /admin/* controller behind

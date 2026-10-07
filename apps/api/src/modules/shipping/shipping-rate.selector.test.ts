@@ -13,7 +13,7 @@ const EUR = "EUR" as CurrencyCode;
 function rate(overrides: Partial<ShippingRateRow> = {}): ShippingRateRow {
   return {
     id: "rate-flat",
-    name: { es: "Estándar", en: "Standard" },
+    name: "Estándar",
     strategy: "FLAT",
     priceGross: 495,
     currency: "EUR",
@@ -62,27 +62,17 @@ describe("selectShippingOptions", () => {
     );
   });
 
-  it("excludes a rate with no name in any locale — an unreadable method is unbuyable", () => {
-    // `name` is a locale record, so "unnamed" is representable: an empty column,
-    // or one the repository could not parse. Failing closed here is what lets
-    // the wire schema, the order's stamped method name and the invoice all treat
-    // a name as present.
-    expect(selectShippingOptions([rate({ name: {} })], context())).toHaveLength(0);
+  it("excludes a rate with a blank name — an unreadable method is unbuyable", () => {
+    // The database refuses a blank name with a CHECK, but it is not the only
+    // writer. Failing closed here is what lets the wire schema, the order's
+    // stamped method name and the invoice all treat a name as present.
+    expect(selectShippingOptions([rate({ name: "" })], context())).toHaveLength(0);
+    expect(selectShippingOptions([rate({ name: "   " })], context())).toHaveLength(0);
   });
 
-  it("still offers a rate named in only one locale", () => {
-    // A translation gap is a content problem for an editor, not a reason to stop
-    // selling delivery. The storefront's fallback chain names it.
-    const options = selectShippingOptions([rate({ name: { es: "Estándar" } })], context());
-    expect(options.map((o) => o.name)).toEqual([{ es: "Estándar" }]);
-  });
-
-  it("carries the whole locale record through, unresolved", () => {
-    // The selector is the PRICING rule and has no locale. A name resolved here
-    // would pin the label to a guess made where the shopper's language is not
-    // known.
+  it("carries the rate's name through as is", () => {
     const [option] = selectShippingOptions([rate()], context());
-    expect(option?.name).toEqual({ es: "Estándar", en: "Standard" });
+    expect(option?.name).toEqual("Estándar");
   });
 
   describe("WEIGHT brackets", () => {

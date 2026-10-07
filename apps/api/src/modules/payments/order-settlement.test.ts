@@ -41,7 +41,6 @@ function order(): OrderSnapshot {
     id: "8f1f2c1e-1f3a-4c6e-9b2a-2f7f5c4d3e21",
     orderNumber: "AK-2026-000001",
     email: "buyer@akai.test",
-    locale: "es",
   } as OrderSnapshot;
 }
 

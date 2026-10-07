@@ -8,7 +8,6 @@ import {
   emailSchema,
   idSchema,
   isoDateTimeSchema,
-  localeSchema,
   paginationQuerySchema,
   roleSchema,
 } from "@akai/contracts";
@@ -46,7 +45,6 @@ export const updateProfileSchema = z
     firstName: z.string().min(1).max(80),
     lastName: z.string().min(1).max(80),
     phone: z.string().max(32).nullable(),
-    preferredLocale: localeSchema,
   })
   .partial()
   .strict();

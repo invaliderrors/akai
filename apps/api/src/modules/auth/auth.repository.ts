@@ -1,4 +1,4 @@
-import type { Locale, Role } from "@akai/contracts";
+import type { Role } from "@akai/contracts";
 import type {
   AuthCustomer,
   AuthTokenPurpose,
@@ -36,7 +36,6 @@ export interface AuthRepository {
     readonly passwordHash: string;
     readonly firstName: string;
     readonly lastName: string;
-    readonly preferredLocale: Locale;
     readonly marketingConsentAt: Date | null;
   }): Promise<AuthCustomer>;
 

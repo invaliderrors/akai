@@ -18,7 +18,7 @@ export const REVALIDATION_TOPIC = "storefront.revalidate";
  * What to invalidate.
  *
  * TAGS, not paths. The storefront's ISR entries are tagged (`revalidateTag`),
- * and a path list would have to enumerate every locale of every page a product
+ * and a path list would have to enumerate every page a product
  * appears on — home, catalog, category, PDP, bundles — and would go stale the
  * moment a page was added. `reason` is carried for the log line only; nothing
  * branches on it.

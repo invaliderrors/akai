@@ -178,7 +178,6 @@ export function toOrderDto(row: OrderWithDetail, view: OrderView): Order {
     customerId: row.customerId,
     email: row.email,
     status: row.status,
-    locale: row.locale,
     currency: row.currency,
     items: row.items.map(toOrderItemDto),
     subtotal: toMinor(row.subtotal),

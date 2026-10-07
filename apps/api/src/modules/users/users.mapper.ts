@@ -32,7 +32,6 @@ export function toCustomer(row: CustomerRow): Customer {
     lastName: row.lastName,
     phone: row.phone,
     role: row.role,
-    preferredLocale: row.preferredLocale,
     // Derived, never stored twice. `totpSecret` is not on CustomerRow at all,
     // so "is 2FA on" cannot be answered by leaking the secret's presence.
     twoFactorEnabled: row.totpEnabledAt !== null,

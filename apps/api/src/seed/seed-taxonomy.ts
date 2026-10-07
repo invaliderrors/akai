@@ -14,14 +14,13 @@
  */
 export interface SeedCategory {
   readonly slug: string;
-  readonly es: string;
-  readonly en: string;
+  readonly name: string;
   readonly sortOrder: number;
 }
 
 export const CATEGORIES: readonly SeedCategory[] = [
-  { slug: "tops", es: "Camisetas y sudaderas", en: "Tops", sortOrder: 0 },
-  { slug: "outerwear", es: "Chaquetas", en: "Outerwear", sortOrder: 1 },
-  { slug: "bottoms", es: "Pantalones", en: "Bottoms", sortOrder: 2 },
-  { slug: "accessories", es: "Accesorios", en: "Accessories", sortOrder: 3 },
+  { slug: "tops", name: "Camisetas y sudaderas", sortOrder: 0 },
+  { slug: "outerwear", name: "Chaquetas", sortOrder: 1 },
+  { slug: "bottoms", name: "Pantalones", sortOrder: 2 },
+  { slug: "accessories", name: "Accesorios", sortOrder: 3 },
 ];

@@ -126,7 +126,7 @@ describe("AffiliateLinksService.create", () => {
     expect(fakes.affiliateLink.create).not.toHaveBeenCalled();
   });
 
-  it("refuses a slug that collides with a locale prefix", async () => {
+  it("refuses a slug that collides with a former locale prefix (/en still redirects)", async () => {
     const { service } = await buildService();
 
     await expect(service.create(AFFILIATE_ID, { slug: "en" })).rejects.toBeInstanceOf(

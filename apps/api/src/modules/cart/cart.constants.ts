@@ -61,15 +61,3 @@ export const CART_TOKEN_ENCODED_LENGTH = 43;
  * exists in libs/config. See followUps.
  */
 export const DEFAULT_CART_CURRENCY = "COP";
-
-/**
- * Locale a cart is presented in when the caller names none.
- *
- * Matches the storefront's default route (next-intl serves `es` at `/`). It is a
- * FALLBACK, not a fixed setting: every cart route accepts `?locale=`, and the
- * repository resolves display names against it. The previous behaviour — Spanish
- * pinned inside the Prisma adapter with no request-level override — meant an
- * English shopper's basket was labelled in Spanish and no client could ask
- * otherwise, which made a translation defect unfixable from the storefront.
- */
-export const DEFAULT_CART_LOCALE = "es";

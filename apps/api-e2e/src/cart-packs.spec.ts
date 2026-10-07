@@ -116,7 +116,9 @@ describe.skipIf(!isDockerAvailable())("Cart packs — stored rows, codes and ava
         slug,
         status: "ACTIVE",
         kind,
-        translations: { create: [{ locale: "es", name: slug, shortDescription: slug, description: slug }] },
+        name: slug,
+        shortDescription: slug,
+        description: slug,
       },
     });
     await db.prisma.productVariant.create({

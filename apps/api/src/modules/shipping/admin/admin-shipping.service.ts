@@ -207,7 +207,7 @@ export class AdminShippingService {
     const row = await this.prisma.shippingRate.create({
       data: {
         zoneId,
-        name: nameJson(input.name),
+        name: input.name,
         strategy: input.strategy,
         minValue: input.minValue,
         maxValue: input.maxValue,
@@ -242,7 +242,7 @@ export class AdminShippingService {
     const row = await this.prisma.shippingRate.update({
       where: { id: rateId },
       data: {
-        ...(input.name === undefined ? {} : { name: nameJson(input.name) }),
+        ...(input.name === undefined ? {} : { name: input.name }),
         ...(input.strategy === undefined ? {} : { strategy: input.strategy }),
         ...(input.minValue === undefined ? {} : { minValue: input.minValue }),
         ...(input.maxValue === undefined ? {} : { maxValue: input.maxValue }),
@@ -353,12 +353,4 @@ export class AdminShippingService {
     }
     return rate;
   }
-}
-
-/** The Json column's value. English only when given — see `shippingRateNameSchema`. */
-function nameJson(name: { readonly es: string; readonly en?: string | undefined }): {
-  es: string;
-  en?: string;
-} {
-  return name.en === undefined ? { es: name.es } : { es: name.es, en: name.en };
 }

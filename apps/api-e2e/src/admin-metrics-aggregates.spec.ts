@@ -57,13 +57,13 @@ describe.skipIf(!RUN)("admin metrics aggregates (real Postgres)", () => {
     sequence += 1;
     await db.prisma.$executeRawUnsafe(
       `INSERT INTO "order" (
-         id, "orderNumber", email, status, locale, currency,
+         id, "orderNumber", email, status, currency,
          subtotal, "discountTotal", "shippingTotal", "taxTotal", "grandTotal", "refundedTotal",
          "shipFirstName","shipLastName","shipLine1","shipCity","shipRegion","shipCountryCode",
          "billFirstName","billLastName","billLine1","billCity","billRegion","billCountryCode",
          "documentType","documentNumber","placedAt","updatedAt",version
        ) VALUES (
-         gen_random_uuid(), $1, 'buyer@akai.test', $2::"OrderStatus", 'es', $3,
+         gen_random_uuid(), $1, 'buyer@akai.test', $2::"OrderStatus", $3,
          $4, 0, 0, 0, $4, $5,
          'A','B','Calle 10 # 43-21','Medellín','Antioquia','CO',
          'A','B','Calle 10 # 43-21','Medellín','Antioquia','CO',

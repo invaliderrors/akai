@@ -3,7 +3,6 @@ import {
   countryCodeSchema,
   createVariantSchema,
   idSchema,
-  localeSchema,
   nonNegativeMinorSchema,
   priceTierSchema,
   productAddOnInputSchema,
@@ -48,7 +47,7 @@ export const updateVariantSchema = z
   .object({
     version: z.number().int().min(0),
     sku: z.string().min(1).max(64).optional(),
-    name: z.record(localeSchema, z.string().max(120)).nullable().optional(),
+    name: z.string().max(120).nullable().optional(),
     options: z.record(z.string().max(40), z.string().max(80)).optional(),
     priceGross: nonNegativeMinorSchema.optional(),
     compareAtGross: nonNegativeMinorSchema.nullable().optional(),
@@ -176,7 +175,7 @@ export const addMediaSchema = z
   .object({
     objectKey: z.string().min(1).max(512),
     url: httpUrlSchema,
-    alt: z.record(localeSchema, z.string().max(300)).default({}),
+    alt: z.string().max(300).default(""),
     width: z.number().int().positive(),
     height: z.number().int().positive(),
     sortOrder: z.number().int().min(0).default(0),
@@ -208,21 +207,10 @@ export const setCategoriesSchema = z
 export type SetCategories = z.infer<typeof setCategoriesSchema>;
 
 /**
- * Both locale names, required, for a category admin CRUD write.
- *
- * STRICTER than `categorySchema.name` (a `z.record` in @akai/contracts, which
- * tolerates a partial or malformed blob on READ so one bad row degrades rather
- * than takes the whole nav down). A WRITE has no such excuse: the two locales
- * this store serves are a closed set, and an admin creating or renaming a
- * category with only one filled in would ship a storefront that switches
- * languages mid-navigation.
+ * A category's name on an admin write: trimmed and non-blank, because it is
+ * rendered as a navigation label and a heading.
  */
-export const categoryNameSchema = z
-  .object({
-    es: z.string().min(1).max(120),
-    en: z.string().min(1).max(120),
-  })
-  .strict();
+export const categoryNameSchema = z.string().trim().min(1).max(120);
 
 export type CategoryName = z.infer<typeof categoryNameSchema>;
 
@@ -351,20 +339,11 @@ export type SetAddOns = z.infer<typeof setAddOnsSchema>;
  * fields, so a crafted query string cannot reach them.
  */
 /**
- * The public listing query plus the display locale.
- *
- * `productListQuerySchema` is `.strict()`, so a request carrying `?locale=en`
- * would be REJECTED by it — the locale has to be a declared member rather than a
- * second, separately-parsed query parameter. Extending preserves strictness, so
- * the privileged filters (`status`, `includeDeleted`) remain absent and
+ * The public listing query: exactly `productListQuerySchema`. It is `.strict()`,
+ * so the privileged filters (`status`, `includeDeleted`) remain absent and
  * therefore unreachable from a public URL.
- *
- * The locale drives name sorting and translation fallback only; it never affects
- * WHICH products are visible.
  */
-export const publicProductListQuerySchema = productListQuerySchema
-  .extend({ locale: localeSchema.default("es") })
-  .strict();
+export const publicProductListQuerySchema = productListQuerySchema;
 
 export type PublicProductListQuery = z.infer<typeof publicProductListQuerySchema>;
 
@@ -393,7 +372,6 @@ export type PublicProductListQuery = z.infer<typeof publicProductListQuerySchema
  */
 export const publicAddOnListQuerySchema = z
   .object({
-    locale: localeSchema.default("es"),
     cursor: idSchema.optional(),
     // A lower ceiling than the main listing's 100: this feeds a strip, and an
     // add-on page of a hundred products is not a request any honest client makes.
@@ -412,7 +390,6 @@ export const adminProductListQuerySchema = z
     search: z.string().max(120).optional(),
     sort: z.enum(["newest", "price_asc", "price_desc", "name", "manual"]).default("newest"),
     includeDeleted: z.coerce.boolean().default(false),
-    locale: localeSchema.default("es"),
     cursor: idSchema.optional(),
     limit: z.coerce.number().int().min(1).max(100).default(24),
   })

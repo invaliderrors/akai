@@ -31,7 +31,6 @@ const FOREIGN_VARIANT_ID = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
 interface Recorded {
   outbox: { topic: string; payload: Record<string, unknown> }[];
   productCreates: Record<string, unknown>[];
-  translationUpserts: Record<string, unknown>[];
   priceHistory: Record<string, unknown>[];
   ledger: Record<string, unknown>[];
   variantCreates: Record<string, unknown>[];
@@ -93,12 +92,6 @@ function buildTx(recorded: Recorded, overrides: Record<string, unknown> = {}) {
       createMany: vi.fn(async (args: { data: Record<string, unknown>[] }) => {
         recorded.priceTierCreateManyData.push(...args.data);
         return { count: args.data.length };
-      }),
-    },
-    productTranslation: {
-      upsert: vi.fn(async (args: Record<string, unknown>) => {
-        recorded.translationUpserts.push(args);
-        return {};
       }),
     },
     productCategory: {
@@ -199,7 +192,7 @@ function buildTx(recorded: Recorded, overrides: Record<string, unknown> = {}) {
           return {
             id: CATEGORY_ID,
             slug: "recuperacion",
-            name: args.data["name"] ?? { es: "Recuperación", en: "Recovery" },
+            name: args.data["name"] ?? "Recuperación",
             sortOrder: args.data["sortOrder"] ?? 0,
           };
         },
@@ -213,7 +206,6 @@ function emptyRecorded(): Recorded {
   return {
     outbox: [],
     productCreates: [],
-    translationUpserts: [],
     priceHistory: [],
     ledger: [],
     variantCreates: [],
@@ -290,14 +282,9 @@ function createInput(overrides: Partial<CreateProduct> = {}): CreateProduct {
     slug: "camiseta",
     status: "DRAFT",
     taxClass: "STANDARD",
-    translations: [
-      {
-        locale: "es",
-        name: "Camiseta",
-        shortDescription: "corta",
-        description: "larga",
-      },
-    ],
+    name: "Camiseta",
+    shortDescription: "corta",
+    description: "larga",
     variants: [
       {
         sku: "AK-1",
@@ -338,7 +325,9 @@ describe("ProductsService.create", () => {
           createdAt: new Date("2026-03-01T00:00:00.000Z"),
           updatedAt: new Date("2026-03-01T00:00:00.000Z"),
           deletedAt: null,
-          translations: [],
+          name: "Camiseta",
+          shortDescription: "",
+          description: "",
           media: [],
           categories: [],
           addOns: [],
@@ -646,24 +635,6 @@ describe("ProductsService.setPublished", () => {
           id: PRODUCT_ID,
           slug: "camiseta",
           variants: [],
-          translations: [{ id: "t1" }],
-        })),
-      },
-    });
-
-    await expect(harness.service.setPublished(PRODUCT_ID, true)).rejects.toThrow(
-      CatalogError,
-    );
-  });
-
-  it("refuses to publish a product with no translations", async () => {
-    const harness = await buildHarness({
-      product: {
-        findFirst: vi.fn(async () => ({
-          id: PRODUCT_ID,
-          slug: "camiseta",
-          variants: [{ id: VARIANT_ID }],
-          translations: [],
         })),
       },
     });
@@ -680,7 +651,9 @@ describe("ProductsService.setPublished", () => {
           id: PRODUCT_ID,
           slug: "camiseta",
           variants: [],
-          translations: [],
+          name: "Camiseta",
+          shortDescription: "",
+          description: "",
         })),
         findUnique: vi.fn(async () => ({
           id: PRODUCT_ID,
@@ -691,7 +664,9 @@ describe("ProductsService.setPublished", () => {
           createdAt: new Date(),
           updatedAt: new Date(),
           deletedAt: null,
-          translations: [],
+          name: "Camiseta",
+          shortDescription: "",
+          description: "",
           media: [],
           categories: [],
           addOns: [],
@@ -799,7 +774,9 @@ describe("ProductsService.updateVariant", () => {
       createdAt: new Date(),
       updatedAt: new Date(),
       deletedAt: null,
-      translations: [],
+      name: "Camiseta",
+      shortDescription: "",
+      description: "",
       media: [],
       categories: [],
       addOns: [],
@@ -1108,7 +1085,9 @@ describe("ProductsService.addVariant", () => {
       createdAt: new Date("2026-03-01T00:00:00.000Z"),
       updatedAt: new Date("2026-03-01T00:00:00.000Z"),
       deletedAt: null,
-      translations: [],
+      name: "Camiseta",
+      shortDescription: "",
+      description: "",
       media: [],
       categories: [],
       addOns: [],
@@ -1405,7 +1384,9 @@ describe("ProductsService.getBySlugPublic", () => {
       createdAt: new Date(),
       updatedAt: new Date(),
       deletedAt: null,
-      translations: [],
+      name: "Camiseta",
+      shortDescription: "",
+      description: "",
       media: [],
       categories: [],
       addOns: [],
@@ -1490,10 +1471,7 @@ describe("ProductsService.listPublic", () => {
   it("returns an empty page without hydrating when nothing matches", async () => {
     const harness = await buildHarness();
 
-    const page = await harness.service.listPublic(
-      { sort: "newest", limit: 24 },
-      "es",
-    );
+    const page = await harness.service.listPublic({ sort: "newest", limit: 24 });
 
     expect(page.items).toEqual([]);
     expect(page.hasMore).toBe(false);
@@ -1526,7 +1504,9 @@ describe("ProductsService.listPublic", () => {
             createdAt: new Date(),
             updatedAt: new Date(),
             deletedAt: null,
-            translations: [],
+            name: "Camiseta",
+            shortDescription: "",
+            description: "",
             media: [],
             categories: [],
             addOns: [],
@@ -1559,7 +1539,7 @@ describe("ProductsService.listPublic", () => {
       },
     });
 
-    const page = await harness.service.listPublic({ sort: "newest", limit: 2 }, "es");
+    const page = await harness.service.listPublic({ sort: "newest", limit: 2 });
 
     expect(page.items).toHaveLength(2);
     expect(page.hasMore).toBe(true);
@@ -1573,7 +1553,7 @@ describe("ProductsService.listPublic", () => {
 
     // Raw query output is external data: parsed, never cast.
     await expect(
-      harness.service.listPublic({ sort: "newest", limit: 24 }, "es"),
+      harness.service.listPublic({ sort: "newest", limit: 24 }),
     ).rejects.toThrow();
   });
 });
@@ -1596,7 +1576,9 @@ function hydratedProduct() {
     createdAt: new Date("2026-03-01T00:00:00.000Z"),
     updatedAt: new Date("2026-03-01T00:00:00.000Z"),
     deletedAt: null,
-    translations: [],
+    name: "Camiseta",
+    shortDescription: "",
+    description: "",
     media: [],
     categories: [],
     addOns: [],
@@ -1610,7 +1592,7 @@ function mediaInput(overrides: Partial<AddMedia> = {}): AddMedia {
   return {
     objectKey: "products/camiseta/hero.jpg",
     url: "https://cdn.example.test/camiseta/hero.jpg",
-    alt: { es: "Camiseta doblada" },
+    alt: "Camiseta doblada",
     width: 1200,
     height: 1200,
     sortOrder: 0,
@@ -1792,15 +1774,9 @@ describe("ProductsService.removeMedia", () => {
  * back what the service wrote: a `as { description: string }` would keep passing
  * after the write shape changed underneath it.
  */
-const createdTranslationsSchema = z.object({
-  translations: z.object({
-    create: z.array(z.object({ locale: z.string(), description: z.string() })),
-  }),
-});
-
-const translationUpsertSchema = z.object({
-  create: z.object({ locale: z.string(), description: z.string() }),
-  update: z.object({ description: z.string() }),
+const writtenCopySchema = z.object({
+  description: z.string(),
+  shortDescription: z.string(),
 });
 
 /** Everything an admin could paste that must not survive into the column. */
@@ -1821,7 +1797,9 @@ function addOnHydratedProduct() {
     createdAt: new Date("2026-03-01T00:00:00.000Z"),
     updatedAt: new Date("2026-03-01T00:00:00.000Z"),
     deletedAt: null,
-    translations: [],
+    name: "Camiseta",
+    shortDescription: "",
+    description: "",
     media: [],
     categories: [],
     addOns: [],
@@ -1870,22 +1848,9 @@ describe("ProductsService — description sanitisation on write", () => {
   it("stores a description stripped of script, event handlers and javascript: hrefs", async () => {
     const harness = await harnessReadingBack();
 
-    await harness.service.create(
-      createInput({
-        translations: [
-          {
-            locale: "es",
-            name: "Camiseta",
-            shortDescription: "corta",
-            description: HOSTILE_DESCRIPTION,
-          },
-        ],
-      }),
-      ACTOR_ID,
-    );
+    await harness.service.create(createInput({ description: HOSTILE_DESCRIPTION }), ACTOR_ID);
 
-    const data = createdTranslationsSchema.parse(harness.recorded.productCreates[0]);
-    const stored = data.translations.create[0]?.description ?? "";
+    const stored = writtenCopySchema.parse(harness.recorded.productCreates[0]).description;
 
     expect(stored).not.toContain("<script");
     // The CONTENTS go too, not just the tag — otherwise the payload survives as
@@ -1898,76 +1863,53 @@ describe("ProductsService — description sanitisation on write", () => {
     expect(stored).toContain("<strong>pura</strong>");
   });
 
-  it("names the locales it rewrote, so the change is not silent", async () => {
+  it("reports the rewrite, so the change is not silent", async () => {
     const harness = await harnessReadingBack();
 
     const result = await harness.service.create(
-      createInput({
-        translations: [
-          {
-            locale: "es",
-            name: "Camiseta",
-            shortDescription: "corta",
-            description: HOSTILE_DESCRIPTION,
-          },
-          {
-            locale: "en",
-            name: "Tee",
-            shortDescription: "short",
-            description: "<p>Nothing to remove</p>",
-          },
-        ],
-      }),
+      createInput({ description: HOSTILE_DESCRIPTION }),
       ACTOR_ID,
     );
 
-    // Only the locale that actually changed. Reporting both would send an admin
-    // hunting through copy the sanitiser never touched.
-    expect(result.sanitizedLocales).toEqual(["es"]);
+    expect(result.descriptionSanitized).toBe(true);
   });
 
   it("reports nothing when the submitted description was already safe", async () => {
     const harness = await harnessReadingBack();
 
     const result = await harness.service.create(
-      createInput({
-        translations: [
-          {
-            locale: "es",
-            name: "Camiseta",
-            shortDescription: "corta",
-            description: "<p>Camiseta oversize de algodón</p>",
-          },
-        ],
-      }),
+      createInput({ description: "<p>Camiseta oversize de algodón</p>" }),
       ACTOR_ID,
     );
 
-    // Absence is the signal the controller relies on: no locales, no header.
-    expect(result.sanitizedLocales).toEqual([]);
+    // Absence is the signal the controller relies on: nothing rewritten, no header.
+    expect(result.descriptionSanitized).toBe(false);
   });
 
   it("sanitises on update too, not only on create", async () => {
     const harness = await harnessReadingBack();
 
     const result = await harness.service.update(PRODUCT_ID, {
-      translations: [
-        {
-          locale: "es",
-          name: "Camiseta",
-          shortDescription: "corta",
-          description: HOSTILE_DESCRIPTION,
-        },
-      ],
+      description: HOSTILE_DESCRIPTION,
     });
 
-    const upsert = translationUpsertSchema.parse(harness.recorded.translationUpserts[0]);
+    const written = z
+      .object({ description: z.string() })
+      .parse(harness.recorded.productUpdates.at(-1));
 
-    expect(upsert.create.description).not.toContain("<script");
-    // BOTH branches of the upsert. Sanitising only `create` leaves every EDIT of
-    // an existing translation unguarded, which is the common path.
-    expect(upsert.update.description).not.toContain("<script");
-    expect(result.sanitizedLocales).toEqual(["es"]);
+    expect(written.description).not.toContain("<script");
+    expect(result.descriptionSanitized).toBe(true);
+  });
+
+  it("leaves the copy alone on an update that does not carry it", async () => {
+    const harness = await harnessReadingBack();
+
+    const result = await harness.service.update(PRODUCT_ID, { listed: false });
+
+    const written = harness.recorded.productUpdates.at(-1) ?? {};
+    expect(written).not.toHaveProperty("description");
+    expect(written).not.toHaveProperty("name");
+    expect(result.descriptionSanitized).toBe(false);
   });
 
   /**
@@ -1979,28 +1921,13 @@ describe("ProductsService — description sanitisation on write", () => {
     const harness = await harnessReadingBack();
 
     await harness.service.create(
-      createInput({
-        translations: [
-          {
-            locale: "es",
-            name: "Camiseta",
-            shortDescription: "10 < 20 & 5 > 1",
-            description: "<p>ok</p>",
-          },
-        ],
-      }),
+      createInput({ shortDescription: "10 < 20 & 5 > 1", description: "<p>ok</p>" }),
       ACTOR_ID,
     );
 
-    const data = z
-      .object({
-        translations: z.object({
-          create: z.array(z.object({ shortDescription: z.string() })),
-        }),
-      })
-      .parse(harness.recorded.productCreates[0]);
-
-    expect(data.translations.create[0]?.shortDescription).toBe("10 < 20 & 5 > 1");
+    expect(writtenCopySchema.parse(harness.recorded.productCreates[0]).shortDescription).toBe(
+      "10 < 20 & 5 > 1",
+    );
   });
 });
 
@@ -2034,7 +1961,7 @@ describe("ProductsService.listPublic — the add-on exclusion", () => {
   it("asks Postgres for listed products only", async () => {
     const { harness, queryRaw } = await harnessCapturingSql();
 
-    await harness.service.listPublic({ sort: "newest", limit: 24 }, "es");
+    await harness.service.listPublic({ sort: "newest", limit: 24 });
 
     const statement = boundQuerySchema.parse(queryRaw.mock.calls[0]?.[0]);
 
@@ -2053,10 +1980,12 @@ describe("ProductsService.listPublic — the add-on exclusion", () => {
   it("pins the audience regardless of what the caller sent", async () => {
     const { harness, queryRaw } = await harnessCapturingSql();
 
-    await harness.service.listPublic(
-      { sort: "price_asc", limit: 5, search: "shaker", category: "accesorios" },
-      "en",
-    );
+    await harness.service.listPublic({
+      sort: "price_asc",
+      limit: 5,
+      search: "shaker",
+      category: "accesorios",
+    });
 
     const statement = boundQuerySchema.parse(queryRaw.mock.calls[0]?.[0]);
 
@@ -2069,7 +1998,7 @@ describe("ProductsService.listPublicAddOns", () => {
   it("returns add-ons and nothing else", async () => {
     const { harness, queryRaw } = await harnessCapturingSql();
 
-    await harness.service.listPublicAddOns({ locale: "es", limit: 12 }, "es");
+    await harness.service.listPublicAddOns({ limit: 12 });
 
     const statement = boundQuerySchema.parse(queryRaw.mock.calls[0]?.[0]);
 
@@ -2085,7 +2014,7 @@ describe("ProductsService.listPublicAddOns", () => {
   it("orders by name rather than by recency, so the strip does not reshuffle", async () => {
     const { harness, queryRaw } = await harnessCapturingSql();
 
-    await harness.service.listPublicAddOns({ locale: "es", limit: 12 }, "es");
+    await harness.service.listPublicAddOns({ limit: 12 });
 
     const statement = boundQuerySchema.parse(queryRaw.mock.calls[0]?.[0]);
 
@@ -2098,7 +2027,7 @@ describe("ProductsService.listPublicAddOns", () => {
       product: { findMany: vi.fn(async () => [addOnHydratedProduct()]) },
     });
 
-    const page = await harness.service.listPublicAddOns({ locale: "es", limit: 12 }, "es");
+    const page = await harness.service.listPublicAddOns({ limit: 12 });
     const [item] = page.items;
 
     expect(item?.slug).toBe("shaker");
@@ -2329,7 +2258,9 @@ describe("ProductsService.create — add-ons that asked for new products", () =>
       createdAt: new Date("2026-03-01T00:00:00.000Z"),
       updatedAt: new Date("2026-03-01T00:00:00.000Z"),
       deletedAt: null,
-      translations: [],
+      name: "Camiseta",
+      shortDescription: "",
+      description: "",
       media: [],
       categories: [],
       addOns: [],
@@ -2587,7 +2518,9 @@ describe("ProductsService.setAddOns", () => {
       createdAt: new Date("2026-03-01T00:00:00.000Z"),
       updatedAt: new Date("2026-03-01T00:00:00.000Z"),
       deletedAt: null,
-      translations: [],
+      name: "Camiseta",
+      shortDescription: "",
+      description: "",
       media: [],
       categories: [],
       addOns: [],
@@ -2749,11 +2682,11 @@ describe("ProductsService.createCategory", () => {
 
     const created = await harness.service.createCategory({
       slug: "sudaderas",
-      name: { es: "Sudaderas", en: "Hoodies" },
+      name: "Sudaderas",
     });
 
     expect(harness.recorded.categoryCreates).toEqual([
-      { slug: "sudaderas", name: { es: "Sudaderas", en: "Hoodies" }, sortOrder: 4 },
+      { slug: "sudaderas", name: "Sudaderas", sortOrder: 4 },
     ]);
     expect(created.sortOrder).toBe(4);
   });
@@ -2766,7 +2699,7 @@ describe("ProductsService.createCategory", () => {
 
     const created = await harness.service.createCategory({
       slug: "sudaderas",
-      name: { es: "Sudaderas", en: "Hoodies" },
+      name: "Sudaderas",
     });
 
     expect(created.sortOrder).toBe(0);
@@ -2777,7 +2710,7 @@ describe("ProductsService.createCategory", () => {
 
     await harness.service.createCategory({
       slug: "sudaderas",
-      name: { es: "Sudaderas", en: "Hoodies" },
+      name: "Sudaderas",
     });
 
     const purges = harness.recorded.outbox.filter(
@@ -2805,7 +2738,7 @@ describe("ProductsService.createCategory", () => {
     );
 
     await expect(
-      harness.service.createCategory({ slug: "sudaderas", name: { es: "Sudaderas", en: "Hoodies" } }),
+      harness.service.createCategory({ slug: "sudaderas", name: "Sudaderas" }),
     ).rejects.toMatchObject({ code: "CONFLICT" });
   });
 });
@@ -2815,21 +2748,21 @@ describe("ProductsService.updateCategory", () => {
     const harness = await buildHarness();
 
     const updated = await harness.service.updateCategory(CATEGORY_ID, {
-      name: { es: "Recuperación", en: "Recovery" },
+      name: "Recuperación",
     });
 
     expect(harness.recorded.categoryUpdateWheres).toEqual([{ id: CATEGORY_ID }]);
     expect(harness.recorded.categoryUpdates).toEqual([
-      { name: { es: "Recuperación", en: "Recovery" } },
+      { name: "Recuperación" },
     ]);
-    expect(updated.name).toEqual({ es: "Recuperación", en: "Recovery" });
+    expect(updated.name).toEqual("Recuperación");
   });
 
   it("refuses to rename a category that does not exist, or is already deleted", async () => {
     const harness = await buildHarness({}, { category: { findFirst: vi.fn(async () => null) } });
 
     await expect(
-      harness.service.updateCategory(CATEGORY_ID, { name: { es: "X", en: "Y" } }),
+      harness.service.updateCategory(CATEGORY_ID, { name: "X" }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
     expect(harness.recorded.categoryUpdates).toEqual([]);
   });
@@ -2837,7 +2770,7 @@ describe("ProductsService.updateCategory", () => {
   it("purges the storefront's category navigation on rename", async () => {
     const harness = await buildHarness();
 
-    await harness.service.updateCategory(CATEGORY_ID, { name: { es: "X", en: "Y" } });
+    await harness.service.updateCategory(CATEGORY_ID, { name: "X" });
 
     const purges = harness.recorded.outbox.filter(
       (message) => message.topic === REVALIDATION_TOPIC,

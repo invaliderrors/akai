@@ -29,21 +29,6 @@ import type {
  * assemble those facts differently at two call sites.
  */
 
-/**
- * Locale used for the display name on a cart line when the caller names none.
- *
- * The store's default is Spanish (next-intl serves `es` at `/`). This used to be
- * the ONLY locale the cart could ever produce — pinned here with no request-level
- * override — so an English shopper's basket read "Camiseta Oversize". The
- * cart routes now accept `?locale=`, and this constant is what an unlabelled
- * caller still gets, which is the documented default rather than a silent
- * assumption.
- */
-const DEFAULT_DISPLAY_LOCALE = "es";
-
-/** Per-locale JSON blobs (`variant.name`) are external data — parsed, not cast. */
-const localisedTextSchema = z.record(z.string(), z.string());
-
 @Injectable()
 export class PrismaCartRepository implements CartRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -334,7 +319,6 @@ export class PrismaCartRepository implements CartRepository {
 
   async loadVariants(
     variantIds: readonly string[],
-    locale: string = DEFAULT_DISPLAY_LOCALE,
   ): Promise<ReadonlyMap<string, VariantSnapshot>> {
     if (variantIds.length === 0) {
       // `IN ()` is a needless round trip, and an empty cart is the common case
@@ -349,7 +333,6 @@ export class PrismaCartRepository implements CartRepository {
         priceTiers: { orderBy: { minQuantity: "asc" } },
         product: {
           include: {
-            translations: true,
             media: { orderBy: { sortOrder: "asc" }, take: 1 },
           },
         },
@@ -361,24 +344,12 @@ export class PrismaCartRepository implements CartRepository {
     for (const variant of variants) {
       const { product, inventory } = variant;
 
-      // Requested locale first, then ANY translation. Falling back to the slug
-      // is the last resort only — a line reading "oversized-tee" is
-      // strictly worse than the same product named in the other language.
-      const translation =
-        product.translations.find((entry) => entry.locale === locale) ??
-        product.translations.find(
-          (entry) => entry.locale === DEFAULT_DISPLAY_LOCALE,
-        ) ??
-        product.translations[0];
-
       snapshots.set(variant.id, {
         variantId: variant.id,
         productId: product.id,
         productSlug: product.slug,
-        name: translation?.name ?? product.slug,
-        variantName:
-          pickLocalisedText(variant.name, locale) ??
-          pickLocalisedText(variant.name, DEFAULT_DISPLAY_LOCALE),
+        name: product.name,
+        variantName: variant.name,
         sku: variant.sku,
         imageUrl: toDisplayableUrl(product.media[0]?.url),
         currency: variant.currency,
@@ -487,15 +458,6 @@ function toCartRecord(row: CartRowLike): CartRecord {
       packInstanceId: item.packInstanceId,
     })),
   };
-}
-
-/** Parse a per-locale JSON column without ever casting it. */
-function pickLocalisedText(value: unknown, locale: string): string | null {
-  const parsed = localisedTextSchema.safeParse(value);
-  if (!parsed.success) {
-    return null;
-  }
-  return parsed.data[locale] ?? null;
 }
 
 /**

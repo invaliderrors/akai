@@ -89,7 +89,6 @@ export class AffiliateApplicationService {
           payload: {
             templateKey: "affiliate-application-received",
             to: this.config.CONTACT_INBOX_EMAIL ?? this.config.EMAIL_FROM,
-            locale: request.locale,
             payload: {
               referenceId,
               name: request.name,
@@ -107,7 +106,6 @@ export class AffiliateApplicationService {
           payload: {
             templateKey: "affiliate-application-autoreply",
             to: request.email,
-            locale: request.locale,
             payload: { name: request.name, referenceId },
           },
         },

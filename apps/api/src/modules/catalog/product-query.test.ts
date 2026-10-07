@@ -23,7 +23,6 @@ function options(overrides: Partial<ProductQueryOptions> = {}): ProductQueryOpti
     includeDeleted: false,
     requirePurchasableVariant: true,
     sort: "newest",
-    locale: "es",
     take: 25,
     ...overrides,
   };
@@ -86,13 +85,10 @@ describe("buildProductPageQuery — parameterisation", () => {
     expect(query.values).toContain(injection);
   });
 
-  it("binds the category slug, the locale, the status and the limit", () => {
-    const query = buildProductPageQuery(
-      options({ categorySlug: "recuperacion", locale: "en", take: 7 }),
-    );
+  it("binds the category slug, the status and the limit", () => {
+    const query = buildProductPageQuery(options({ categorySlug: "recuperacion", take: 7 }));
 
     expect(query.values).toContain("recuperacion");
-    expect(query.values).toContain("en");
     expect(query.values).toContain("ACTIVE");
     expect(query.values).toContain(7);
   });
@@ -175,7 +171,6 @@ describe("buildProductPageQuery — audience filters", () => {
     // ProductStatus = text" at runtime — a failure no unit test would otherwise
     // see, because the statement is only type-checked by the database.
     expect(sql).toContain('::"ProductStatus"');
-    expect(sql).toContain('::"Locale"');
   });
 
   it("ignores a whitespace-only search instead of matching nothing", () => {
@@ -210,26 +205,21 @@ describe("buildProductPageQuery — search matching", () => {
     expect(sql).toContain("'\\\\\\1', 'g'");
   });
 
-  it("matches the active locale's translation (with the es → first fallback), not every locale", () => {
-    const sql = normalise(buildProductPageQuery(options({ search: "reta", locale: "en" })).sql);
+  it("matches the product's own copy columns — there is no translation table to join", () => {
+    const sql = normalise(buildProductPageQuery(options({ search: "reta" })).sql);
 
-    // The old per-locale EXISTS scan is gone: a Spanish description can no
-    // longer drag a product into an English search.
-    expect(sql).not.toContain('"product_translation" ts');
-    // Active locale first, then es, then the first row — the storefront's
-    // `view.ts` fallback chain, applied once here for both sort and search.
-    expect(sql.split('(tt.locale = ?::"Locale") DESC')).toHaveLength(3);
-    expect(sql).toContain("unaccent(t.name) ILIKE");
+    expect(sql).not.toContain("product_translation");
+    expect(sql).toContain("unaccent(p.name) ILIKE");
   });
 
   it("matches descriptions on WORD STARTS, never raw substrings", () => {
     const sql = normalise(buildProductPageQuery(options({ search: "reta" })).sql);
 
     // `\m` is the Postgres word-start anchor: "reta" must not hit "secretagogo".
-    expect(sql).toContain("unaccent(t.\"shortDescription\") ~* ('\\m' || st.esc)");
-    expect(sql).toContain("unaccent(t.description) ~* ('\\m' || st.esc)");
-    expect(sql).not.toContain("t.description ILIKE");
-    expect(sql).not.toContain('t."shortDescription" ILIKE');
+    expect(sql).toContain("unaccent(p.\"shortDescription\") ~* ('\\m' || st.esc)");
+    expect(sql).toContain("unaccent(p.description) ~* ('\\m' || st.esc)");
+    expect(sql).not.toContain("p.description ILIKE");
+    expect(sql).not.toContain('p."shortDescription" ILIKE');
   });
 
   it("still matches SKUs on a contains, so staff can look a product up by code", () => {
@@ -239,7 +229,7 @@ describe("buildProductPageQuery — search matching", () => {
 
   it("accent-folds both sides of every comparison", () => {
     const sql = normalise(buildProductPageQuery(options({ search: "básica" })).sql);
-    expect(sql).toContain("unaccent(t.name)");
+    expect(sql).toContain("unaccent(p.name)");
     // The bound term itself goes through unaccent before it is escaped.
     expect(sql).toContain("unaccent(s.raw)");
   });
@@ -254,11 +244,11 @@ describe("buildProductPageQuery — relevance ranking", () => {
     const tiers = [
       "st.lowered ) THEN 0", // exact name or SKU
       "'\\M') THEN 1", // name starts with the whole word
-      "unaccent(t.name) ILIKE (st.esc || '%') ESCAPE '\\' THEN 2", // name prefix
-      "unaccent(t.name) ~* ('\\m' || st.esc) THEN 3", // name word start
-      "unaccent(t.name) ILIKE ('%' || st.esc || '%') ESCAPE '\\' THEN 4", // name contains
-      "unaccent(t.\"shortDescription\") ~* ('\\m' || st.esc) THEN 5", // short description word start
-      "unaccent(t.description) ~* ('\\m' || st.esc) THEN 6", // description word start
+      "unaccent(p.name) ILIKE (st.esc || '%') ESCAPE '\\' THEN 2", // name prefix
+      "unaccent(p.name) ~* ('\\m' || st.esc) THEN 3", // name word start
+      "unaccent(p.name) ILIKE ('%' || st.esc || '%') ESCAPE '\\' THEN 4", // name contains
+      "unaccent(p.\"shortDescription\") ~* ('\\m' || st.esc) THEN 5", // short description word start
+      "unaccent(p.description) ~* ('\\m' || st.esc) THEN 6", // description word start
       "ELSE 7", // SKU contains
     ];
     let last = -1;
@@ -367,11 +357,11 @@ describe("buildProductPageQuery — keyset pagination", () => {
     expect(sql).toContain('v."isActive" = TRUE');
   });
 
-  it("falls back to another locale's name rather than sorting under an empty string", () => {
+  it("sorts by the product's own name column", () => {
     const sql = normalise(buildProductPageQuery(options({ sort: "name" })).sql);
 
-    expect(sql).toContain("COALESCE(t.name, '')");
-    expect(sql).toContain("ORDER BY (tt.locale =");
+    expect(sql).toContain("p.name AS sort_name");
+    expect(sql).toContain("ORDER BY candidate.sort_name ASC, candidate.id ASC");
   });
 
   describe("manual sort", () => {

@@ -95,7 +95,6 @@ interface RegisterInput {
   readonly password: string;
   readonly firstName: string;
   readonly lastName: string;
-  readonly preferredLocale: "es" | "en";
   readonly marketingConsent: boolean;
 }
 
@@ -176,7 +175,6 @@ export class AuthService {
         type: "auth.registration.duplicate_attempt",
         customerId: existing.id,
         email: existing.email,
-        locale: existing.preferredLocale,
         occurredAt: this.clock.now(),
       });
       return ACKNOWLEDGEMENT;
@@ -192,7 +190,6 @@ export class AuthService {
         passwordHash,
         firstName: input.firstName,
         lastName: input.lastName,
-        preferredLocale: input.preferredLocale,
         marketingConsentAt: input.marketingConsent ? now : null,
       });
     } catch (error: unknown) {
@@ -216,7 +213,6 @@ export class AuthService {
       type: "auth.customer.registered",
       customerId: customer.id,
       email: customer.email,
-      locale: customer.preferredLocale,
       occurredAt: now,
       verificationToken: rawToken,
       expiresAt,
@@ -447,7 +443,6 @@ export class AuthService {
       type: "auth.login_code.requested",
       customerId: customer.id,
       email: customer.email,
-      locale: customer.preferredLocale,
       occurredAt: now,
       code,
       expiresAt,
@@ -769,7 +764,6 @@ export class AuthService {
         type: "auth.refresh_token.reuse_detected",
         customerId,
         email: customer.email,
-        locale: customer.preferredLocale,
         occurredAt: now,
         familyId,
       });
@@ -893,7 +887,6 @@ export class AuthService {
       type: "auth.email_verification.completed",
       customerId: customer.id,
       email: customer.email,
-      locale: customer.preferredLocale,
       occurredAt: now,
     });
 
@@ -926,7 +919,6 @@ export class AuthService {
         type: "auth.email_verification.requested",
         customerId: customer.id,
         email: customer.email,
-        locale: customer.preferredLocale,
         occurredAt: this.clock.now(),
         verificationToken: rawToken,
         expiresAt,
@@ -961,7 +953,6 @@ export class AuthService {
         type: "auth.password_reset.requested",
         customerId: customer.id,
         email: customer.email,
-        locale: customer.preferredLocale,
         occurredAt: now,
         resetToken: rawToken,
         expiresAt,
@@ -1006,7 +997,6 @@ export class AuthService {
       type: "auth.password_reset.completed",
       customerId: customer.id,
       email: customer.email,
-      locale: customer.preferredLocale,
       occurredAt: now,
     });
 
@@ -1046,7 +1036,6 @@ export class AuthService {
       type: "auth.password.changed",
       customerId: customer.id,
       email: customer.email,
-      locale: customer.preferredLocale,
       occurredAt: now,
     });
 
@@ -1111,7 +1100,6 @@ export class AuthService {
         type: "auth.two_factor.enabled",
         customerId: customer.id,
         email: customer.email,
-        locale: customer.preferredLocale,
         occurredAt: now,
       });
     }
@@ -1143,7 +1131,6 @@ export class AuthService {
       type: "auth.two_factor.disabled",
       customerId: customer.id,
       email: customer.email,
-      locale: customer.preferredLocale,
       occurredAt: now,
     });
 
@@ -1303,7 +1290,6 @@ export class AuthService {
         type: "auth.account.locked",
         customerId: customer.id,
         email: customer.email,
-        locale: customer.preferredLocale,
         occurredAt: now,
         lockedUntil,
       });
@@ -1505,7 +1491,6 @@ export function toPublicCustomer(customer: AuthCustomer): Customer {
     lastName: customer.lastName,
     phone: customer.phone,
     role: customer.role,
-    preferredLocale: customer.preferredLocale,
     twoFactorEnabled: customer.totpEnabledAt !== null,
     anonymisedAt: customer.anonymisedAt?.toISOString() ?? null,
     createdAt: customer.createdAt.toISOString(),

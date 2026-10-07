@@ -58,7 +58,6 @@ function orderRow(overrides: Partial<OrderWithDetail> = {}): OrderWithDetail {
     customerId: "eeeeeeee-0000-4000-8000-000000000001",
     email: "cliente@example.com",
     status: "PAID",
-    locale: "es",
     currency: "COP",
     subtotal: 8263,
     discountTotal: 0,

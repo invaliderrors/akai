@@ -10,7 +10,6 @@ import {
   Patch,
   Post,
   Put,
-  Query,
   Res,
   UseGuards,
 } from "@nestjs/common";
@@ -27,14 +26,12 @@ import {
   addCartItemSchema,
   addPackToCartSchema,
   applyDiscountSchema,
-  cartLocaleQuerySchema,
   mergeCartSchema,
   updateCartItemSchema,
   validateCartSchema,
   type AddCartItemDto,
   type AddPackToCartDto,
   type ApplyDiscountDto,
-  type CartLocaleQueryDto,
   type MergeCartDto,
   type UpdateCartItemDto,
   type ValidateCartDto,
@@ -65,10 +62,6 @@ import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
  * verbs per client. An unauthenticated endpoint is exactly the surface where a
  * limiter matters most, and until ThrottlerModule was implemented there was no
  * limit of any kind on this controller.
- *
- * EVERY route takes `?locale=`. It is a presentation concern — nothing about it
- * is stored — but it has to be honoured on the writes as well as the reads,
- * because every mutation returns the whole re-rendered cart.
  */
 @ApiTags("cart")
 @Controller("cart")
@@ -80,11 +73,10 @@ export class CartController {
   @ApiOperation({ summary: "Fetch the current cart, creating one if needed" })
   async getCart(
     @CurrentCartActor() actor: CartActor,
-    @Query(new ZodValidationPipe(cartLocaleQuerySchema)) query: CartLocaleQueryDto,
     @Res({ passthrough: true }) response: Response,
   ): Promise<Cart> {
     return this.respond(
-      await this.cart.getOrCreateCart(actor, query.locale),
+      await this.cart.getOrCreateCart(actor),
       response,
     );
   }
@@ -97,11 +89,10 @@ export class CartController {
   @ApiOperation({ summary: "Add a variant to the cart (increments an existing line)" })
   async addItem(
     @CurrentCartActor() actor: CartActor,
-    @Query(new ZodValidationPipe(cartLocaleQuerySchema)) query: CartLocaleQueryDto,
     @Body(new ZodValidationPipe(addCartItemSchema)) body: AddCartItemDto,
     @Res({ passthrough: true }) response: Response,
   ): Promise<Cart> {
-    return this.respond(await this.cart.addItem(actor, body, query.locale), response);
+    return this.respond(await this.cart.addItem(actor, body), response);
   }
 
   /**
@@ -116,13 +107,12 @@ export class CartController {
   async updateItem(
     @CurrentCartActor() actor: CartActor,
     @Param("itemId", ParseUUIDPipe) itemId: string,
-    @Query(new ZodValidationPipe(cartLocaleQuerySchema)) query: CartLocaleQueryDto,
     @Body(new ZodValidationPipe(updateCartItemSchema))
     body: UpdateCartItemDto,
     @Res({ passthrough: true }) response: Response,
   ): Promise<Cart> {
     return this.respond(
-      await this.cart.updateItemQuantity(actor, itemId, body, query.locale),
+      await this.cart.updateItemQuantity(actor, itemId, body),
       response,
     );
   }
@@ -135,11 +125,10 @@ export class CartController {
   async removeItem(
     @CurrentCartActor() actor: CartActor,
     @Param("itemId", ParseUUIDPipe) itemId: string,
-    @Query(new ZodValidationPipe(cartLocaleQuerySchema)) query: CartLocaleQueryDto,
     @Res({ passthrough: true }) response: Response,
   ): Promise<Cart> {
     return this.respond(
-      await this.cart.removeItem(actor, itemId, query.locale),
+      await this.cart.removeItem(actor, itemId),
       response,
     );
   }
@@ -158,11 +147,10 @@ export class CartController {
   @ApiOperation({ summary: "Add a pack to the cart (writes its real components as real lines)" })
   async addPack(
     @CurrentCartActor() actor: CartActor,
-    @Query(new ZodValidationPipe(cartLocaleQuerySchema)) query: CartLocaleQueryDto,
     @Body(new ZodValidationPipe(addPackToCartSchema)) body: AddPackToCartDto,
     @Res({ passthrough: true }) response: Response,
   ): Promise<Cart> {
-    return this.respond(await this.cart.addPack(actor, body, query.locale), response);
+    return this.respond(await this.cart.addPack(actor, body), response);
   }
 
   /**
@@ -178,11 +166,10 @@ export class CartController {
   async removePack(
     @CurrentCartActor() actor: CartActor,
     @Param("packInstanceId", ParseUUIDPipe) packInstanceId: string,
-    @Query(new ZodValidationPipe(cartLocaleQuerySchema)) query: CartLocaleQueryDto,
     @Res({ passthrough: true }) response: Response,
   ): Promise<Cart> {
     return this.respond(
-      await this.cart.removePack(actor, packInstanceId, query.locale),
+      await this.cart.removePack(actor, packInstanceId),
       response,
     );
   }
@@ -194,10 +181,9 @@ export class CartController {
   @ApiOperation({ summary: "Empty the cart without deleting it" })
   async clear(
     @CurrentCartActor() actor: CartActor,
-    @Query(new ZodValidationPipe(cartLocaleQuerySchema)) query: CartLocaleQueryDto,
     @Res({ passthrough: true }) response: Response,
   ): Promise<Cart> {
-    return this.respond(await this.cart.clearCart(actor, query.locale), response);
+    return this.respond(await this.cart.clearCart(actor), response);
   }
 
   /**
@@ -220,10 +206,9 @@ export class CartController {
   @ApiOperation({ summary: "Validate the cart for checkout and surface line problems" })
   async validate(
     @CurrentCartActor() actor: CartActor,
-    @Query(new ZodValidationPipe(cartLocaleQuerySchema)) query: CartLocaleQueryDto,
     @Body(new ZodValidationPipe(validateCartSchema)) body: ValidateCartDto,
   ): Promise<Cart> {
-    return this.cart.validateCart(actor, body.countryCode ?? null, query.locale);
+    return this.cart.validateCart(actor, body.countryCode ?? null);
   }
 
   /**
@@ -244,10 +229,9 @@ export class CartController {
   @ApiOperation({ summary: "Apply a discount code to the cart" })
   async applyDiscount(
     @CurrentCartActor() actor: CartActor,
-    @Query(new ZodValidationPipe(cartLocaleQuerySchema)) query: CartLocaleQueryDto,
     @Body(new ZodValidationPipe(applyDiscountSchema)) body: ApplyDiscountDto,
   ): Promise<Cart> {
-    return this.cart.applyDiscountCode(actor, body.code, query.locale);
+    return this.cart.applyDiscountCode(actor, body.code);
   }
 
   @Public()
@@ -255,9 +239,8 @@ export class CartController {
   @ApiOperation({ summary: "Remove the applied discount code from the cart" })
   async removeDiscount(
     @CurrentCartActor() actor: CartActor,
-    @Query(new ZodValidationPipe(cartLocaleQuerySchema)) query: CartLocaleQueryDto,
   ): Promise<Cart> {
-    return this.cart.removeDiscountCode(actor, query.locale);
+    return this.cart.removeDiscountCode(actor);
   }
 
   /**

@@ -2139,7 +2139,6 @@ describe("CartService", () => {
           shippingMethodId: randomUUID(),
           documentType: "CC",
           documentNumber: "1020304050",
-          locale: "es",
           acceptedTermsVersion: "2026-01",
         }),
       ).rejects.toBeInstanceOf(StopAfterShipping);

@@ -82,7 +82,7 @@ describe("LoggingTransport", () => {
       subject: "Pedido confirmado",
       html: "<p>reset link https://akai.shop/reset?token=SECRET</p>",
       text: "reset link https://akai.shop/reset?token=SECRET",
-      tags: { template: "reset-password", locale: "es" },
+      tags: { template: "reset-password" },
     });
 
     expect(result.providerMessageId).toMatch(/^local-/);
@@ -139,7 +139,6 @@ async function buildAdapter(): Promise<AdapterHarness> {
 const PORT_INPUT = {
   to: "marta@example.com",
   templateKey: "verify-email",
-  locale: "es",
   data: {
     firstName: "Marta",
     verifyUrl: "https://akai.shop/verify?token=abc",

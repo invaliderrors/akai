@@ -22,7 +22,7 @@
  * The NODE_ENV check is the guard, and it fails closed.
  */
 
-import { PrismaClient, Locale, ProductStatus, Role, TaxClass } from "@prisma/client";
+import { PrismaClient, ProductStatus, Role, TaxClass } from "@prisma/client";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -98,10 +98,10 @@ function splitGross(gross: number, rateBps: number): {
 
 interface SeedVariant {
   readonly sku: string;
-  /** Clothing size label, identical in both locales ("M", "One size" is `oneSize`). */
+  /** Clothing size label ("M", or "Talla única"). */
   readonly size: string;
-  /** Optional colour, per locale. The `options` key is the English word, lower-cased. */
-  readonly color?: { readonly es: string; readonly en: string };
+  /** Optional colour ("Negro"). The `options` value is the same word, lower-cased. */
+  readonly color?: string;
   /** IVA-inclusive price in MINOR units (centavos): 8_900_000 is $ 89.000. */
   readonly grossMinor: number;
   readonly stock: number;
@@ -111,8 +111,9 @@ interface SeedVariant {
 
 interface SeedProduct {
   readonly slug: string;
-  readonly es: { name: string; short: string; long: string };
-  readonly en: { name: string; short: string; long: string };
+  readonly name: string;
+  readonly short: string;
+  readonly long: string;
   readonly variants: readonly SeedVariant[];
   /** Category slugs this product belongs to. Must exist in CATEGORIES. */
   readonly categories: readonly string[];
@@ -135,15 +136,15 @@ interface SeedProduct {
 // taxonomy (`seed-categories.ts`) can import it without triggering this
 // file's `main()`, which runs unconditionally on import.
 
-const BLACK = { es: "Negro", en: "Black" } as const;
-const WHITE = { es: "Blanco", en: "White" } as const;
-const OLIVE = { es: "Oliva", en: "Olive" } as const;
-const NAVY = { es: "Marino", en: "Navy" } as const;
+const BLACK = "Negro";
+const WHITE = "Blanco";
+const OLIVE = "Oliva";
+const NAVY = "Marino";
 
 /** S–XL in one colour, same price — the common shape of a garment's variants. */
 function sized(
   skuPrefix: string,
-  color: { readonly es: string; readonly en: string } | undefined,
+  color: string | undefined,
   grossMinor: number,
   weightGrams: number,
   stock: readonly [number, number, number, number],
@@ -172,16 +173,9 @@ function sized(
 const PRODUCTS: readonly SeedProduct[] = [
   {
     slug: "oversized-tee",
-    es: {
-      name: "Camiseta Oversize",
-      short: "Algodón grueso de 240 g, corte amplio y hombro caído.",
-      long: "Camiseta de algodón peinado de 240 g/m² con corte oversize, hombro caído y cuello canalé. Estampado frontal en serigrafía. Lavar del revés a 30 °C.",
-    },
-    en: {
-      name: "Oversized Tee",
-      short: "Heavyweight 240 gsm cotton, boxy fit, dropped shoulder.",
-      long: "240 gsm combed-cotton tee with a boxy oversized fit, dropped shoulders and a ribbed collar. Screen-printed chest graphic. Wash inside out at 30 °C.",
-    },
+    name: "Camiseta Oversize",
+    short: "Algodón grueso de 240 g, corte amplio y hombro caído.",
+    long: "Camiseta de algodón peinado de 240 g/m² con corte oversize, hombro caído y cuello canalé. Estampado frontal en serigrafía. Lavar del revés a 30 °C.",
     variants: [
       ...sized("AK-TEE-BLK", BLACK, 8_900_000, 280, [40, 60, 60, 30]),
       ...sized("AK-TEE-WHT", WHITE, 8_900_000, 280, [30, 50, 50, 20]),
@@ -191,48 +185,27 @@ const PRODUCTS: readonly SeedProduct[] = [
   },
   {
     slug: "box-logo-hoodie",
-    es: {
-      name: "Sudadera Box Logo",
-      short: "Felpa perchada de 400 g con capucha de doble capa.",
-      long: "Sudadera con capucha en felpa perchada de 400 g/m², capucha de doble capa, bolsillo canguro y logo bordado en el pecho.",
-    },
-    en: {
-      name: "Box Logo Hoodie",
-      short: "400 gsm brushed fleece with a double-layer hood.",
-      long: "Hooded sweatshirt in 400 gsm brushed fleece with a double-layer hood, kangaroo pocket and an embroidered chest logo.",
-    },
+    name: "Sudadera Box Logo",
+    short: "Felpa perchada de 400 g con capucha de doble capa.",
+    long: "Sudadera con capucha en felpa perchada de 400 g/m², capucha de doble capa, bolsillo canguro y logo bordado en el pecho.",
     variants: sized("AK-HOOD-BLK", BLACK, 21_900_000, 750, [20, 35, 35, 15]),
     categories: ["tops"],
     images: ["box-logo-hoodie-1.png"],
   },
   {
     slug: "cargo-pants",
-    es: {
-      name: "Pantalón Cargo",
-      short: "Sarga de algodón con bolsillos laterales y bajo ajustable.",
-      long: "Pantalón cargo de sarga de algodón, corte recto relajado, bolsillos laterales con fuelle y bajo ajustable con cordón.",
-    },
-    en: {
-      name: "Cargo Pants",
-      short: "Cotton twill with side pockets and an adjustable hem.",
-      long: "Cotton-twill cargo pants with a relaxed straight fit, bellowed side pockets and a drawcord-adjustable hem.",
-    },
+    name: "Pantalón Cargo",
+    short: "Sarga de algodón con bolsillos laterales y bajo ajustable.",
+    long: "Pantalón cargo de sarga de algodón, corte recto relajado, bolsillos laterales con fuelle y bajo ajustable con cordón.",
     variants: sized("AK-CARGO-OLV", OLIVE, 23_900_000, 850, [15, 25, 25, 10]),
     categories: ["bottoms"],
     images: ["cargo-pants-1.png"],
   },
   {
     slug: "coach-jacket",
-    es: {
-      name: "Chaqueta Coach",
-      short: "Nailon cortavientos con forro de malla y cierre de corchetes.",
-      long: "Chaqueta coach de nailon cortavientos con forro de malla, cierre de corchetes y bajo con cordón. Estampado en la espalda.",
-    },
-    en: {
-      name: "Coach Jacket",
-      short: "Windproof nylon, mesh lining, snap-button front.",
-      long: "Windproof nylon coach jacket with a mesh lining, snap-button front and drawcord hem. Printed back graphic.",
-    },
+    name: "Chaqueta Coach",
+    short: "Nailon cortavientos con forro de malla y cierre de corchetes.",
+    long: "Chaqueta coach de nailon cortavientos con forro de malla, cierre de corchetes y bajo con cordón. Estampado en la espalda.",
     // Low stock on XL on purpose: exercises the low-stock UI without selling out.
     variants: sized("AK-COACH-NVY", NAVY, 28_900_000, 650, [10, 18, 18, 4]),
     categories: ["outerwear"],
@@ -240,19 +213,12 @@ const PRODUCTS: readonly SeedProduct[] = [
   },
   {
     slug: "six-panel-cap",
-    es: {
-      name: "Gorra Seis Paneles",
-      short: "Algodón lavado, visera curva y cierre de hebilla.",
-      long: "Gorra de seis paneles en algodón lavado con visera curva, ojales bordados y cierre trasero de hebilla metálica. Talla única ajustable.",
-    },
-    en: {
-      name: "Six-Panel Cap",
-      short: "Washed cotton, curved brim, buckle strap.",
-      long: "Six-panel cap in washed cotton with a curved brim, embroidered eyelets and a metal-buckle back strap. One adjustable size.",
-    },
+    name: "Gorra Seis Paneles",
+    short: "Algodón lavado, visera curva y cierre de hebilla.",
+    long: "Gorra de seis paneles en algodón lavado con visera curva, ojales bordados y cierre trasero de hebilla metálica. Talla única ajustable.",
     variants: [
-      { sku: "AK-CAP-BLK", size: "One size", color: BLACK, grossMinor: 7_900_000, stock: 60, weightGrams: 150 },
-      { sku: "AK-CAP-OLV", size: "One size", color: OLIVE, grossMinor: 7_900_000, stock: 40, weightGrams: 150 },
+      { sku: "AK-CAP-BLK", size: "Talla única", color: BLACK, grossMinor: 7_900_000, stock: 60, weightGrams: 150 },
+      { sku: "AK-CAP-OLV", size: "Talla única", color: OLIVE, grossMinor: 7_900_000, stock: 40, weightGrams: 150 },
     ],
     categories: ["accessories"],
     images: ["six-panel-cap-1.png"],
@@ -265,18 +231,11 @@ const PRODUCTS: readonly SeedProduct[] = [
   // `offerOnNewProducts: true` covers whatever is created after it.
   {
     slug: "canvas-tote",
-    es: {
-      name: "Bolsa Tote de Lona",
-      short: "Lona de algodón de 340 g con asas largas.",
-      long: "Bolsa tote de lona de algodón de 340 g/m² con asas largas y estampado frontal. Cabe un portátil de 15 pulgadas.",
-    },
-    en: {
-      name: "Canvas Tote",
-      short: "340 gsm cotton canvas with long handles.",
-      long: "Tote bag in 340 gsm cotton canvas with long handles and a front print. Fits a 15-inch laptop.",
-    },
+    name: "Bolsa Tote de Lona",
+    short: "Lona de algodón de 340 g con asas largas.",
+    long: "Bolsa tote de lona de algodón de 340 g/m² con asas largas y estampado frontal. Cabe un portátil de 15 pulgadas.",
     variants: [
-      { sku: "AK-TOTE-NAT", size: "One size", grossMinor: 5_900_000, stock: 200, weightGrams: 200 },
+      { sku: "AK-TOTE-NAT", size: "Talla única", grossMinor: 5_900_000, stock: 200, weightGrams: 200 },
     ],
     categories: ["accessories"],
     images: ["canvas-tote-1.png"],
@@ -287,19 +246,16 @@ const PRODUCTS: readonly SeedProduct[] = [
   },
 ];
 
-/** The per-locale variant name: the size, or "size / colour" when it has one. */
-function variantName(variant: SeedVariant): { es: string; en: string } {
-  const size = { es: variant.size === "One size" ? "Talla única" : variant.size, en: variant.size };
-  return variant.color === undefined
-    ? size
-    : { es: `${size.es} / ${variant.color.es}`, en: `${size.en} / ${variant.color.en}` };
+/** The variant name: the size, or "size / colour" when it has one. */
+function variantName(variant: SeedVariant): string {
+  return variant.color === undefined ? variant.size : `${variant.size} / ${variant.color}`;
 }
 
 /** Option values, e.g. {"size":"M","color":"black"} — unique per product. */
 function variantOptions(variant: SeedVariant): Record<string, string> {
   return variant.color === undefined
     ? { size: variant.size }
-    : { size: variant.size, color: variant.color.en.toLowerCase() };
+    : { size: variant.size, color: variant.color.toLowerCase() };
 }
 
 /**
@@ -332,7 +288,7 @@ async function seedCategories(): Promise<void> {
       await prisma.category.create({
         data: {
           slug: category.slug,
-          name: { es: category.es, en: category.en },
+          name: category.name,
           sortOrder: category.sortOrder,
         },
       });
@@ -340,7 +296,7 @@ async function seedCategories(): Promise<void> {
       await prisma.category.update({
         where: { id: existing.id },
         data: {
-          name: { es: category.es, en: category.en },
+          name: category.name,
           sortOrder: category.sortOrder,
         },
       });
@@ -392,7 +348,6 @@ async function seedAccounts(): Promise<void> {
       firstName: "Akai",
       lastName: "Admin",
       role: Role.ADMIN,
-      preferredLocale: Locale.es,
     },
   });
 
@@ -406,7 +361,6 @@ async function seedAccounts(): Promise<void> {
       firstName: "Ana",
       lastName: "García",
       role: Role.CUSTOMER,
-      preferredLocale: Locale.es,
     },
   });
 }
@@ -428,6 +382,9 @@ async function seedCatalog(publisher: MediaPublisher): Promise<void> {
         ? await prisma.product.create({
             data: {
               slug: product.slug,
+              name: product.name,
+              shortDescription: product.short,
+              description: product.long,
               status: ProductStatus.ACTIVE,
               taxClass: TaxClass.STANDARD,
               listed: product.listed ?? true,
@@ -437,32 +394,14 @@ async function seedCatalog(publisher: MediaPublisher): Promise<void> {
         : await prisma.product.update({
             where: { id: existingProduct.id },
             data: {
+              name: product.name,
+              shortDescription: product.short,
+              description: product.long,
               status: ProductStatus.ACTIVE,
               listed: product.listed ?? true,
               offerOnNewProducts: product.offerOnNewProducts ?? false,
             },
           });
-
-    for (const [locale, copy] of [
-      [Locale.es, product.es],
-      [Locale.en, product.en],
-    ] as const) {
-      await prisma.productTranslation.upsert({
-        where: { productId_locale: { productId: row.id, locale } },
-        update: {
-          name: copy.name,
-          shortDescription: copy.short,
-          description: copy.long,
-        },
-        create: {
-          productId: row.id,
-          locale,
-          name: copy.name,
-          shortDescription: copy.short,
-          description: copy.long,
-        },
-      });
-    }
 
     for (const variant of product.variants) {
       const price = splitGross(variant.grossMinor, CO_STANDARD_VAT_BPS);
@@ -721,7 +660,7 @@ async function linkMedia(
 
     const data = {
       url,
-      alt: { es: product.es.name, en: product.en.name },
+      alt: product.name,
       width: 1200,
       height: 1200,
       sortOrder: index,

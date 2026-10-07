@@ -46,7 +46,7 @@ class FakeTaxResolver implements ShippingTaxResolverPort {
 function flatRate(overrides: Partial<ShippingRateRow> = {}): ShippingRateRow {
   return {
     id: "standard",
-    name: { es: "Estándar (2-3 días)", en: "Standard (2-3 days)" },
+    name: "Estándar (2-3 días)",
     strategy: "FLAT",
     priceGross: 605,
     currency: "EUR",
@@ -77,8 +77,8 @@ const baseInput = {
   weightGrams: 250,
 } as const;
 
-/** `resolveCharge` freezes ONE name onto the order, so it needs the buyer's locale. */
-const chargeInput = { ...baseInput, locale: "es" } as const;
+/** `resolveCharge` takes the quote inputs plus the chosen method. */
+const chargeInput = baseInput;
 
 describe("ShippingService", () => {
   let h: ReturnType<typeof harness>;
@@ -127,37 +127,9 @@ describe("ShippingService", () => {
       expect(resolved.taxRateBps).toBe(2100);
       expect(resolved.net).toBe(500);
       expect(resolved.charge).toEqual({ net: 500, taxRateBps: 2100 });
-      // Stamped in the BUYER'S language. The order is immutable and the
-      // confirmation email and invoice reproduce this string, so an English
-      // name here is an English name in a Spanish customer's inbox forever.
+      // The order is immutable and the confirmation email and invoice
+      // reproduce this string, so it is the rate's name at checkout time.
       expect(resolved.methodName).toBe("Estándar (2-3 días)");
-    });
-
-    it("stamps the method name in the order's locale, not the database's", async () => {
-      const resolved = await h.service.resolveCharge({
-        ...chargeInput,
-        locale: "en",
-        shippingMethodId: "standard",
-      });
-
-      expect(resolved.methodName).toBe("Standard (2-3 days)");
-    });
-
-    it("falls back to Spanish when the order's locale has no name", async () => {
-      h.repo.zones.set("ES", {
-        zoneId: "zone-es",
-        zoneName: "Spain",
-        rates: [flatRate({ name: { es: "Estándar" } })],
-      });
-
-      const resolved = await h.service.resolveCharge({
-        ...chargeInput,
-        locale: "en",
-        shippingMethodId: "standard",
-      });
-
-      // A translation gap must not produce a blank line on an invoice.
-      expect(resolved.methodName).toBe("Estándar");
     });
 
     it("never trusts a method id that is not offered for the destination", async () => {

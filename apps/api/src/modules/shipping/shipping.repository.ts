@@ -1,6 +1,5 @@
 import { Injectable } from "@nestjs/common";
 
-import { narrowLocalizedText } from "../../common/localized-text";
 import { PrismaService } from "../prisma/prisma.service";
 import type { ShippingRateRow } from "./shipping-rate.selector";
 
@@ -67,13 +66,7 @@ export class PrismaShippingRepository implements ShippingRepository {
       zoneName: zone.name,
       rates: zone.rates.map((row) => ({
         id: row.id,
-        // PARSED, never cast. Prisma types a Json column as a union that
-        // includes null, arrays and nested objects; asserting it into a locale
-        // record would typecheck and then render `undefined` at the checkout on
-        // the first row a migration or a manual UPDATE wrote badly. An
-        // unparseable name degrades to `{}`, and the selector refuses to offer
-        // a rate nobody can read.
-        name: narrowLocalizedText(row.name),
+        name: row.name,
         strategy: row.strategy,
         priceGross: row.priceGross,
         currency: row.currency,
