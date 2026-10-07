@@ -29,7 +29,7 @@ CREATE TYPE "TaxClass" AS ENUM ('STANDARD', 'REDUCED', 'ZERO_RATED');
 CREATE TYPE "OrderStatus" AS ENUM ('PENDING', 'AWAITING_PAYMENT', 'PAID', 'PAYMENT_MISMATCH', 'FULFILLING', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'REFUNDED', 'PARTIALLY_REFUNDED', 'FAILED');
 
 -- CreateEnum
-CREATE TYPE "PaymentProvider" AS ENUM ('WHOP');
+CREATE TYPE "PaymentProvider" AS ENUM ('WOMPI');
 
 -- CreateEnum
 CREATE TYPE "PaymentStatus" AS ENUM ('REQUIRES_PAYMENT_METHOD', 'REQUIRES_ACTION', 'PROCESSING', 'SUCCEEDED', 'FAILED', 'CANCELLED');
@@ -565,7 +565,6 @@ CREATE TABLE "order" (
     "shippingMethodName" VARCHAR(120),
     "acceptedTermsVersion" VARCHAR(32),
     "shippingRateId" UUID,
-    "providerCheckoutId" TEXT,
     "placedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "paidAt" TIMESTAMP(3),
     "cancelledAt" TIMESTAMP(3),
@@ -615,10 +614,11 @@ CREATE TABLE "order_event" (
 CREATE TABLE "payment" (
     "id" UUID NOT NULL,
     "orderId" UUID NOT NULL,
-    "provider" "PaymentProvider" NOT NULL DEFAULT 'WHOP',
+    "provider" "PaymentProvider" NOT NULL DEFAULT 'WOMPI',
     "status" "PaymentStatus" NOT NULL DEFAULT 'REQUIRES_PAYMENT_METHOD',
     "amount" INTEGER NOT NULL,
     "currency" CHAR(3) NOT NULL,
+    "providerReference" VARCHAR(64),
     "providerPaymentId" TEXT,
     "providerTransactionId" TEXT,
     "cardBrand" VARCHAR(32),
@@ -1032,9 +1032,6 @@ CREATE UNIQUE INDEX "order_orderNumber_key" ON "order"("orderNumber");
 CREATE UNIQUE INDEX "order_invoiceNumber_key" ON "order"("invoiceNumber");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "order_providerCheckoutId_key" ON "order"("providerCheckoutId");
-
--- CreateIndex
 CREATE INDEX "order_customerId_placedAt_idx" ON "order"("customerId", "placedAt");
 
 -- CreateIndex
@@ -1069,6 +1066,9 @@ CREATE INDEX "payment_orderId_idx" ON "payment"("orderId");
 
 -- CreateIndex
 CREATE INDEX "payment_status_idx" ON "payment"("status");
+
+-- CreateIndex
+CREATE INDEX "payment_providerReference_idx" ON "payment"("providerReference");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "refund_providerRefundId_key" ON "refund"("providerRefundId");

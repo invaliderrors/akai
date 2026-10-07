@@ -91,7 +91,7 @@ enum OrderStatus {
 enum PaymentProvider {
   /// ONE MEMBER, ON PURPOSE. A value no code can produce is a value that only
   /// ever appears in a query someone forgot to update.
-  WHOP
+  WOMPI
 }
 
 enum PaymentStatus {
@@ -1326,17 +1326,6 @@ model Order {
   /// order — the charge and the method name are already snapshotted above.
   shippingRateId String? @db.Uuid
 
-  /// Correlation rank 2: the `ch_…` checkout configuration this order was sent
-  /// to. Persisted BEFORE the customer reaches the payment page, so it cannot
-  /// lose a race with the webhook that settles the order.
-  ///
-  /// Rank 1 is `metadata.order_id`, which is this row's own `id` round-tripped
-  /// through the provider — see the integration contract §4. There is no rank 3
-  /// and no backfilled provider order id: those existed because TagadaPay's
-  /// payload might have carried none of our keys, and Whop documents metadata
-  /// inheritance.
-  providerCheckoutId String? @unique
-
   placedAt    DateTime  @default(now())
   paidAt      DateTime?
   cancelledAt DateTime?
@@ -1427,13 +1416,22 @@ model Payment {
   id      String @id @default(uuid()) @db.Uuid
   orderId String @db.Uuid
 
-  provider PaymentProvider @default(WHOP)
+  provider PaymentProvider @default(WOMPI)
   status   PaymentStatus   @default(REQUIRES_PAYMENT_METHOD)
 
   amount   Int
   currency String @db.Char(3)
 
-  /// The provider's payment id — the handle a refund is issued against.
+  /// The Wompi `reference` this attempt was sent to checkout with:
+  /// `<orderNumber>-<attempt>` (e.g. `AK-2026-000123-1`). Minted by
+  /// `startCheckout` under the order row lock, so it is unique per attempt, and
+  /// persisted BEFORE the shopper is redirected — an event can never arrive for
+  /// a reference we have not stored. It is how a Wompi transaction is correlated
+  /// back to its order. NOT unique: Web Checkout may create more than one
+  /// transaction (a decline, then a retry) under one reference, and each gets
+  /// its own row keyed by `providerPaymentId`.
+  providerReference     String? @db.VarChar(64)
+  /// The Wompi transaction id (`1234-1610641025-49201`).
   providerPaymentId     String? @unique
   /// The provider's underlying transaction/charge id, where one is exposed.
   providerTransactionId String? @unique
@@ -1454,6 +1452,7 @@ model Payment {
 
   @@index([orderId])
   @@index([status])
+  @@index([providerReference])
   @@map("payment")
 }
 
@@ -1663,20 +1662,16 @@ model IdempotencyRecord {
 /// strictly stronger than a check-then-write, which races against the vendor's
 /// own retries.
 ///
-/// Whop signs `{webhook-id}.{webhook-timestamp}.{body}` and enforces a 5-minute
-/// tolerance, so the transport already closes the replay window this table used
-/// to hold alone. It stays as defence in depth AND as the thing that makes a
-/// redelivery — which Whop performs up to 12 times over ~71 hours — idempotent.
+/// Wompi's event checksum binds no delivery id and Wompi retries an
+/// unacknowledged event (30 min, 3 h, 24 h), so this table is what makes a
+/// redelivery idempotent. The key is `wompi:<transactionId>:<status>` — one row
+/// per state a transaction reaches, shared by the webhook, the return-page
+/// confirmation and the reconciliation sweep, so whichever sees a state first
+/// applies it and the others are no-ops.
 model ProviderEvent {
-  /// The `webhook-id` header Whop sends on every delivery (`msg_…`), or an
-  /// `unparsable:<sha256>` synthetic key. 128 chars, not 64: silent truncation
-  /// of a dedupe key is a duplicate payment.
-  ///
-  /// THE `derived` COLUMN IS GONE, with the content-fingerprint fallback it
-  /// audited. TagadaPay might supply no event id at all, so a composite hash of
-  /// the event's financial fields had to stand in and the column existed to
-  /// report, from production, how often that weaker path was live. Whop assigns
-  /// a real id on every delivery, so there is no fallback and nothing to audit.
+  /// `wompi:<transactionId>:<status>`, or an `unparsable:<checksum>` synthetic
+  /// key. 128 chars, not 64: silent truncation of a dedupe key is a duplicate
+  /// payment.
   id   String @id @db.VarChar(128)
   type String @db.VarChar(64)
 

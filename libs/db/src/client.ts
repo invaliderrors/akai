@@ -89,14 +89,14 @@ export function createPrismaClient(options: PrismaClientOptions): PrismaClient {
     datasources: { db: { url: options.databaseUrl } },
     log: options.logQueries === true ? ["query", "warn", "error"] : ["warn", "error"],
     // Interactive-transaction budgets, raised from Prisma's defaults (2 s maxWait,
-    // 5 s timeout). The Whop webhook transaction is DELIBERATELY serialised on
-    // a `SELECT … FOR UPDATE` order-row lock (see PaymentsWriter.findOrderByProvider
-    // Reference): when `payment/succeeded` and `order/paid` race for one order, the
-    // loser BLOCKS on that lock, and the block time counts against maxWait/timeout.
-    // A large order (per-reservation commit issues 2+ queries) under that contention
-    // can exceed 5 s, raising P2028 — which is not a unique violation, so it escapes
-    // `runOnceForEvent`, rolls the transaction back, and surfaces as a 500 that the
-    // webhook's own contract forbids (a non-2xx makes Whop retry). Widening the
+    // 5 s timeout). The Wompi settlement transaction is DELIBERATELY serialised on
+    // a `SELECT … FOR UPDATE` order-row lock (see PaymentsWriter.findOrderByPayment
+    // Reference): when the webhook and the return-page confirmation race for one
+    // order, the loser BLOCKS on that lock, and the block time counts against
+    // maxWait/timeout. A large order (per-reservation commit issues 2+ queries)
+    // under that contention can exceed 5 s, raising P2028 — which is not a unique
+    // violation, so it escapes `runOnceForEvent`, rolls the transaction back, and
+    // surfaces as a 500 (a non-200 makes Wompi retry). Widening the
     // budget removes that failure mode without weakening the lock, which is what
     // actually provides the serialisation.
     transactionOptions: { maxWait: 10_000, timeout: 30_000 },

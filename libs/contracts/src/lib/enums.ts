@@ -120,11 +120,11 @@ export type PaymentStatus = z.infer<typeof paymentStatusSchema>;
  * The payment providers a `Payment` row can name.
  *
  * BROWSER-REACHABLE, so widening it is a client-visible change. One member is
- * correct: the Stripe adapter is gone, and leaving `STRIPE` here would let a
+ * correct: the Whop adapter is gone, and leaving `WHOP` here would let a
  * dashboard fixture or an API response carry a value nothing can produce and
  * nothing knows how to refund against.
  */
-export const paymentProviderSchema = z.enum(["WHOP"]);
+export const paymentProviderSchema = z.enum(["WOMPI"]);
 export type PaymentProvider = z.infer<typeof paymentProviderSchema>;
 
 export const refundStatusSchema = z.enum([

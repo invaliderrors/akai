@@ -365,6 +365,35 @@ export const orderStatusResponseSchema = z
   })
   .strict();
 
+export type OrderStatusResponse = z.infer<typeof orderStatusResponseSchema>;
+
+/**
+ * A Wompi transaction id, as Wompi appends it to the return URL (`?id=…`).
+ *
+ * Documented ids look like `1234-1610641025-49201`; the shape is kept to
+ * alphanumerics and hyphens rather than that exact pattern so an id format
+ * change degrades to "the webhook settles it" instead of a rejected return.
+ * It is only ever used as a path segment of OUR private-key lookup, encoded.
+ */
+export const wompiTransactionIdSchema = z
+  .string()
+  .regex(/^[A-Za-z0-9][A-Za-z0-9-]{0,63}$/, "Expected a Wompi transaction id");
+
+/**
+ * The return page hands back the transaction id Wompi put on the redirect.
+ *
+ * THE ID IS THE ONLY THING TRUSTED FROM THE BROWSER, and only as a pointer: the
+ * API fetches that transaction from Wompi with the PRIVATE key and settles from
+ * Wompi's answer, after checking its reference belongs to this order.
+ */
+export const confirmPaymentRequestSchema = z
+  .object({
+    transactionId: wompiTransactionIdSchema,
+  })
+  .strict();
+
+export type ConfirmPaymentRequest = z.infer<typeof confirmPaymentRequestSchema>;
+
 // ---------------------------------------------------------------------------
 // Checkout — note the absence of any amount field.
 // ---------------------------------------------------------------------------
@@ -493,6 +522,12 @@ export const createRefundSchema = z
     amount: nonNegativeMinorSchema.optional(),
     reason: refundReasonSchema,
     note: z.string().max(1000).optional(),
+    /**
+     * The refund's id/reference in the Wompi dashboard, when the operator has
+     * one. Refunds are issued THERE (Wompi has no refund API for Web Checkout
+     * payments); this endpoint records what was done.
+     */
+    providerRefundId: z.string().trim().min(1).max(128).optional(),
     /** Per-line restock decision; writes a RETURN movement to the inventory ledger. */
     restockVariantIds: z.array(idSchema).default([]),
   })
