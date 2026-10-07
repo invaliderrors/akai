@@ -21,6 +21,11 @@ const ADDRESS = {
   phone: "300 123 4567",
 };
 
+/** A copy of `value` without `key` — what a client that forgot the field sends. */
+function without(value: object, key: string): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(value).filter(([entry]) => entry !== key));
+}
+
 const CHECKOUT = {
   cartId: "3f2504e0-4f89-41d3-9a0c-0305e82c3301",
   email: "valentina@example.com",
@@ -53,8 +58,7 @@ describe("the Colombian address", () => {
   });
 
   it("makes the postal code optional, and six digits when given", () => {
-    const { postalCode: _omitted, ...withoutPostalCode } = ADDRESS;
-    expect(addressFieldsSchema.parse(withoutPostalCode).postalCode).toBeNull();
+    expect(addressFieldsSchema.parse(without(ADDRESS, "postalCode")).postalCode).toBeNull();
     expect(addressFieldsSchema.parse({ ...ADDRESS, postalCode: "050021" }).postalCode).toBe("050021");
     expect(addressFieldsSchema.safeParse({ ...ADDRESS, postalCode: "28013" }).success).toBe(false);
   });
@@ -111,10 +115,12 @@ describe("createCheckoutSessionSchema", () => {
     expect(parsed.documentType).toBe("CC");
     expect(parsed.documentNumber).toBe("1020304050");
 
-    const { documentType: _type, ...withoutType } = CHECKOUT;
-    expect(createCheckoutSessionSchema.safeParse(withoutType).success).toBe(false);
-    const { documentNumber: _number, ...withoutNumber } = CHECKOUT;
-    expect(createCheckoutSessionSchema.safeParse(withoutNumber).success).toBe(false);
+    expect(createCheckoutSessionSchema.safeParse(without(CHECKOUT, "documentType")).success).toBe(
+      false,
+    );
+    expect(
+      createCheckoutSessionSchema.safeParse(without(CHECKOUT, "documentNumber")).success,
+    ).toBe(false);
   });
 
   it("validates the number against its type and reports it on documentNumber", () => {
@@ -203,7 +209,6 @@ describe("the order carries the identity document", () => {
   });
 
   it("rejects an order without a document", () => {
-    const { documentType: _type, ...withoutType } = ORDER;
-    expect(orderSchema.safeParse(withoutType).success).toBe(false);
+    expect(orderSchema.safeParse(without(ORDER, "documentType")).success).toBe(false);
   });
 });

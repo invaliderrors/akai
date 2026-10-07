@@ -12,7 +12,6 @@ import { ShippingController } from "./shipping.controller";
 import { ShippingError } from "./shipping.errors";
 import { type ShippingOption } from "./shipping-rate.selector";
 import type { ShippingQuoteInput, ShippingService } from "./shipping.service";
-import { THROTTLE_KEY, THROTTLE_RULES } from "../throttler/throttle.decorator";
 
 const ACTOR: CartActor = { customerId: null, cartToken: "token" };
 

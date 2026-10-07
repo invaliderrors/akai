@@ -136,9 +136,9 @@ describe("Whop webhook signing", () => {
 describe("builders", () => {
   it("produces an order whose money components are internally consistent", () => {
     const order = buildOrder();
-    expect(order["subtotal"]).toBe(4131);
-    expect(order["taxTotal"]).toBe(868);
-    expect(order["grandTotal"]).toBe(4999);
+    expect(order["subtotal"]).toBe(7_478_992);
+    expect(order["taxTotal"]).toBe(1_421_008);
+    expect(order["grandTotal"]).toBe(8_900_000);
     // The invariant every order must satisfy.
     const subtotal = order["subtotal"] as number;
     const tax = order["taxTotal"] as number;
