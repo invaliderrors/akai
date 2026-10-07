@@ -3,7 +3,6 @@ import { emailTemplateKeySchema, type EmailTemplateKey, type Locale } from "@aka
 import { toMinor } from "@akai/money";
 import { escapeHtml, renderEmail, safeUrl } from "./email.renderer";
 import {
-  PER_PARCEL_TEMPLATE_KEYS,
   SUPPRESSION_EXEMPT_TEMPLATE_KEYS,
   parseTemplatePayload,
   type EmailPayloadFor,
@@ -84,25 +83,6 @@ const FIXTURES: { [K in EmailTemplateKey]: EmailPayloadFor<K> } = {
     shippedAt: "2026-07-21T09:00:00.000Z",
     orderUrl: "https://akai.shop/orders/AK-2026-000123",
     lines: LINES,
-  },
-  "ready-for-pickup": {
-    firstName: "Marta",
-    orderNumber: "AK-2026-000123",
-    carrier: "InPost",
-    trackingNumber: "IP123456789",
-    trackingUrl: "https://tracking.sendcloud.sc/forward?code=IP123456789",
-    orderUrl: "https://akai.shop/orders/AK-2026-000123",
-    servicePoint: { name: "PAPELERIA PILI", address: "Calle Delicias 12, 50002 Zaragoza" },
-    openingHours: [
-      {
-        day: "monday",
-        shifts: [
-          { start: "08:00", end: "14:00" },
-          { start: "17:00", end: "20:30" },
-        ],
-      },
-      { day: "sunday", shifts: [] },
-    ],
   },
   "delivery-confirmation": {
     firstName: "Marta",
@@ -366,66 +346,6 @@ describe("renderEmail — shipping without tracking", () => {
     const text = renderEmail("shipping-confirmation", "es", payload).text;
     expect(text).toContain("SE123456789ES");
     expect(text).toContain("https://seur.com/track/SE123456789ES");
-  });
-});
-
-describe("renderEmail — pickup point (Sendcloud)", () => {
-  it("names the pickup point in the shipping confirmation of a pickup order", () => {
-    const payload = parseTemplatePayload("shipping-confirmation", {
-      ...FIXTURES["shipping-confirmation"],
-      servicePoint: { name: "PAPELERIA PILI", address: "Calle Delicias 12, 50002 Zaragoza" },
-    });
-    for (const locale of LOCALES) {
-      const text = renderEmail("shipping-confirmation", locale, payload).text;
-      expect(text).toContain("PAPELERIA PILI");
-      expect(text).toContain("Calle Delicias 12, 50002 Zaragoza");
-    }
-  });
-
-  it("renders the ready-for-pickup mail with point, address and every shift, in both locales", () => {
-    const payload = parseTemplatePayload("ready-for-pickup", FIXTURES["ready-for-pickup"]);
-    const es = renderEmail("ready-for-pickup", "es", payload);
-    const en = renderEmail("ready-for-pickup", "en", payload);
-
-    expect(es.subject).toBe("Tu pedido AK-2026-000123 ya está en el punto de recogida");
-    expect(en.subject).toBe("Your order AK-2026-000123 is ready for pickup");
-    for (const rendered of [es, en]) {
-      expect(rendered.text).toContain("PAPELERIA PILI");
-      expect(rendered.text).toContain("Calle Delicias 12, 50002 Zaragoza");
-      expect(rendered.text).toContain("08:00–14:00, 17:00–20:30");
-      expect(rendered.text).toContain("https://tracking.sendcloud.sc/forward?code=IP123456789");
-    }
-    expect(es.text).toContain("Lunes");
-    expect(es.text).toContain("Cerrado");
-    expect(en.text).toContain("Monday");
-    expect(en.text).toContain("Closed");
-  });
-
-  it("still sends without a point snapshot, hours or tracking", () => {
-    const payload = parseTemplatePayload("ready-for-pickup", {
-      firstName: "Marta",
-      orderNumber: "AK-2026-000123",
-      carrier: "UPS",
-      orderUrl: "https://akai.shop/orders/AK-2026-000123",
-    });
-    for (const locale of LOCALES) {
-      const rendered = renderEmail("ready-for-pickup", locale, payload);
-      expect(rendered.text).not.toContain("undefined");
-      expect(rendered.text).toContain("https://akai.shop/orders/AK-2026-000123");
-    }
-  });
-
-  it("rejects a malformed shift time rather than mailing it", () => {
-    expect(() =>
-      parseTemplatePayload("ready-for-pickup", {
-        ...FIXTURES["ready-for-pickup"],
-        openingHours: [{ day: "monday", shifts: [{ start: "8am", end: "2pm" }] }],
-      }),
-    ).toThrow();
-  });
-
-  it("is per-parcel, so every send must carry the shipment id as its dedupe scope", () => {
-    expect(PER_PARCEL_TEMPLATE_KEYS.has("ready-for-pickup")).toBe(true);
   });
 });
 

@@ -30,7 +30,6 @@ const HANDLERS = [
   "createRate",
   "updateRate",
   "deleteRate",
-  "listSendcloudOptions",
 ] as const;
 
 function contextFor(handler: (typeof HANDLERS)[number], role: Role): ExecutionContext {

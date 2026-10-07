@@ -25,8 +25,6 @@ import { ContactModule } from "./modules/contact/contact.module";
 import { DiscountsModule } from "./modules/discounts/discounts.module";
 import { DisputesModule } from "./modules/disputes/disputes.module";
 import { EmailModule } from "./modules/email/email.module";
-import { FulfilmentModule } from "./modules/fulfilment/fulfilment.module";
-import { TrackingModule } from "./modules/fulfilment/tracking/tracking.module";
 import { GdprModule } from "./modules/gdpr/gdpr.module";
 import { IdempotencyModule } from "./modules/idempotency/idempotency.module";
 import { InventoryModule } from "./modules/inventory/inventory.module";
@@ -97,8 +95,8 @@ import { UsersModule } from "./modules/users/users.module";
     DiscountsModule,
     TaxModule,
     ShippingModule,
-    // Staff-editable zones and rates (Sendcloud spec §7a) — writes the rows
-    // ShippingModule reads live.
+    // Staff-editable zones and rates — writes the rows ShippingModule reads
+    // live.
     AdminShippingModule,
     CheckoutModule,
     OrdersModule,
@@ -106,9 +104,6 @@ import { UsersModule } from "./modules/users/users.module";
     InvoicesModule,
 
     // Post-purchase.
-    FulfilmentModule,
-    // Sendcloud tracking: the signed webhook, shipment-sync, the 2-h sweep.
-    TrackingModule,
     ReturnsModule,
     DisputesModule,
 

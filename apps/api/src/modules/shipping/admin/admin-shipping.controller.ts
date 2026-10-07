@@ -8,14 +8,12 @@ import {
   Param,
   Patch,
   Post,
-  Query,
 } from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import {
   createShippingRateSchema,
   createShippingZoneSchema,
   idSchema,
-  sendcloudOptionsQuerySchema,
   updateShippingRateSchema,
   updateShippingZoneSchema,
   type AdminShippingRate,
@@ -24,15 +22,12 @@ import {
   type AdminShippingZoneList,
   type CreateShippingRate,
   type CreateShippingZone,
-  type SendcloudOptionsQuery,
-  type SendcloudOptionsResponse,
   type UpdateShippingRate,
   type UpdateShippingZone,
 } from "@akai/contracts";
 
 import { ZodValidationPipe } from "../../../common/pipes/zod-validation.pipe";
 import { Roles } from "../../auth/guards/roles.guard";
-import { AdminSendcloudOptionsService } from "./admin-sendcloud-options.service";
 import { AdminShippingService } from "./admin-shipping.service";
 
 /**
@@ -53,10 +48,7 @@ import { AdminShippingService } from "./admin-shipping.service";
 @Controller("admin/shipping")
 @Roles("STAFF", "ADMIN")
 export class AdminShippingController {
-  constructor(
-    private readonly shipping: AdminShippingService,
-    private readonly sendcloudOptions: AdminSendcloudOptionsService,
-  ) {}
+  constructor(private readonly shipping: AdminShippingService) {}
 
   @Get("zones")
   @ApiOperation({ summary: "Every live shipping zone with its live rates" })
@@ -129,13 +121,5 @@ export class AdminShippingController {
     @Param("rateId", new ZodValidationPipe(idSchema)) rateId: string,
   ): Promise<void> {
     await this.shipping.deleteRate(zoneId, rateId);
-  }
-
-  @Get("sendcloud-options")
-  @ApiOperation({ summary: "Sendcloud shipping options from ES to a country (rate editor picker)" })
-  async listSendcloudOptions(
-    @Query(new ZodValidationPipe(sendcloudOptionsQuerySchema)) query: SendcloudOptionsQuery,
-  ): Promise<SendcloudOptionsResponse> {
-    return this.sendcloudOptions.list(query.country);
   }
 }

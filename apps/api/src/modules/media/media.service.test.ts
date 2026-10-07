@@ -95,7 +95,7 @@ describe("s3-presigner — SigV4 primitives", () => {
 
   it("signs GET instead of PUT when asked — the only other verb this module signs", () => {
     const request = canonicalRequest(
-      "/akai-private/labels/a/1.pdf",
+      "/akai-private/documents/a/1.pdf",
       "X-Amz-Algorithm=AWS4-HMAC-SHA256",
       "localhost:9002",
       "GET",
@@ -175,13 +175,13 @@ describe("presignGetUrl", () => {
   const PRIVATE_BASE = {
     ...PRESIGN_BASE,
     bucket: "akai-private",
-    objectKey: "labels/some-order-id/1.pdf",
+    objectKey: "documents/some-order-id/1.pdf",
   };
 
   it("carries the same signed parameters as a PUT, for the other verb this module signs", () => {
     const url = new URL(presignGetUrl(PRIVATE_BASE));
 
-    expect(url.pathname).toBe("/akai-private/labels/some-order-id/1.pdf");
+    expect(url.pathname).toBe("/akai-private/documents/some-order-id/1.pdf");
     expect(url.searchParams.get("X-Amz-Signature")).toMatch(/^[0-9a-f]{64}$/);
   });
 

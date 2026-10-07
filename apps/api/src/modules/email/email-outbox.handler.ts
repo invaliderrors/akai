@@ -367,7 +367,6 @@ export class EmailOutboxHandler implements OutboxHandler {
       case "reset-password":
       case "login-code":
       case "shipping-confirmation":
-      case "ready-for-pickup":
       case "contact-autoreply":
       case "contact-received":
       case "affiliate-application-autoreply":
@@ -381,8 +380,6 @@ export class EmailOutboxHandler implements OutboxHandler {
         // there is no way to tell WHICH one this mail is about. The producer
         // (OrdersService.createShipment) knows, builds the payload inside the
         // same transaction as the shipment, and scopes the claim by shipment id.
-        // `ready-for-pickup` is per-parcel for the same reason (its producer is
-        // the Sendcloud tracking sync, ShipmentSyncService).
         throw new Error(
           `Template "${reference.templateKey}" cannot be built from an order reference`,
         );

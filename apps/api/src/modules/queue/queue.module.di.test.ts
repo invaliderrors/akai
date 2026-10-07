@@ -15,10 +15,8 @@ import { QueueModule } from "./queue.module";
 import {
   CART_SWEEPER,
   RESERVATION_SWEEPER,
-  SHIPMENT_SYNC_SWEEPER,
   ScheduledJobsRunner,
 } from "./scheduled-jobs.runner";
-import { ShipmentSyncSweep } from "../fulfilment/tracking/shipment-sync.sweep";
 
 /**
  * DI GATE for the scheduler tier.
@@ -79,7 +77,6 @@ describe("QueueModule — dependency injection", () => {
     // what turns "the sweeps exist" into "the sweeps actually get called".
     expect(moduleRef.get(RESERVATION_SWEEPER)).toBeInstanceOf(ProductInventoryService);
     expect(moduleRef.get(CART_SWEEPER)).toBeInstanceOf(CartService);
-    expect(moduleRef.get(SHIPMENT_SYNC_SWEEPER)).toBeInstanceOf(ShipmentSyncSweep);
 
     await moduleRef.close();
   });

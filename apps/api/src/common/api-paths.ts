@@ -44,19 +44,3 @@ export const RESEND_WEBHOOK_ROUTE = "webhooks/resend";
  * delivery would fail closed with RAW_BODY_UNAVAILABLE.
  */
 export const RESEND_WEBHOOK_PATH = `/${API_GLOBAL_PREFIX}/${RESEND_WEBHOOK_ROUTE}`;
-
-/**
- * The webhook route Sendcloud posts "parcel status changed" to, below the
- * version prefix. Configured in the Sendcloud panel on the API integration as
- * `https://api.akai.shop/v1/webhooks/sendcloud` (spec
- * 2026-09-24-sendcloud-shipping §3.7).
- */
-export const SENDCLOUD_WEBHOOK_ROUTE = "webhooks/sendcloud";
-
-/**
- * The fully-prefixed Express path of the Sendcloud webhook. DERIVED, NEVER
- * RETYPED, for the same reason as the two above: Sendcloud signs the exact
- * bytes it sent, so the raw-body middleware must be mounted on the very path
- * the controller answers on, and `app.module.test.ts` asserts the two agree.
- */
-export const SENDCLOUD_WEBHOOK_PATH = `/${API_GLOBAL_PREFIX}/${SENDCLOUD_WEBHOOK_ROUTE}`;

@@ -20,7 +20,6 @@ const CODE_FOR_REASON: Readonly<Record<ShippingAdminFailureReason, ErrorCode>> =
   // The merged row is incoherent — the caller fixes the request.
   INVALID_BOUNDS: "VALIDATION_FAILED",
   INVALID_TRANSIT_DAYS: "VALIDATION_FAILED",
-  SERVICE_POINT_NEEDS_CARRIER: "VALIDATION_FAILED",
 };
 
 export class ShippingAdminError extends HttpException {
@@ -65,13 +64,6 @@ export class ShippingAdminError extends HttpException {
     return new ShippingAdminError(
       "INVALID_TRANSIT_DAYS",
       "transitDaysMin must not be greater than transitDaysMax.",
-    );
-  }
-
-  static servicePointNeedsCarrier(): ShippingAdminError {
-    return new ShippingAdminError(
-      "SERVICE_POINT_NEEDS_CARRIER",
-      "A SERVICE_POINT rate needs a carrierCode, or checkout cannot search its pickup points.",
     );
   }
 }

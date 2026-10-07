@@ -4,13 +4,11 @@ import { CartService } from "../cart/cart.service";
 import { CartModule } from "../cart/cart.module";
 import { CatalogModule } from "../catalog/catalog.module";
 import { ProductInventoryService } from "../catalog/product-inventory.service";
-import { ShipmentSyncSweep } from "../fulfilment/tracking/shipment-sync.sweep";
 import {
   CART_SWEEPER,
   DEFAULT_SCHEDULED_JOBS_INTERVALS,
   RESERVATION_SWEEPER,
   SCHEDULED_JOBS_INTERVALS,
-  SHIPMENT_SYNC_SWEEPER,
   ScheduledJobsRunner,
 } from "./scheduled-jobs.runner";
 
@@ -37,11 +35,6 @@ import {
   providers: [
     { provide: RESERVATION_SWEEPER, useExisting: ProductInventoryService },
     { provide: CART_SWEEPER, useExisting: CartService },
-    // Sendcloud tracking sweep. Provided HERE (it needs only Prisma) rather than
-    // by importing TrackingModule, so the scheduler does not pull the vendor
-    // client and the orders graph in behind a timer.
-    ShipmentSyncSweep,
-    { provide: SHIPMENT_SYNC_SWEEPER, useExisting: ShipmentSyncSweep },
     { provide: SCHEDULED_JOBS_INTERVALS, useValue: DEFAULT_SCHEDULED_JOBS_INTERVALS },
     ScheduledJobsRunner,
   ],

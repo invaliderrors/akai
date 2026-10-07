@@ -3,12 +3,10 @@ import { createLogger } from "@akai/observability";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
-  DEFAULT_SCHEDULED_JOBS_INTERVALS,
   ScheduledJobsRunner,
   type CartSweeper,
   type ReservationSweeper,
   type ScheduledJobsIntervals,
-  type ShipmentSyncSweeper,
 } from "./scheduled-jobs.runner";
 
 const logger = createLogger({ level: "silent", nodeEnv: "test", serviceName: "api" });
@@ -18,15 +16,10 @@ const logger = createLogger({ level: "silent", nodeEnv: "test", serviceName: "ap
 const INTERVALS: ScheduledJobsIntervals = {
   reservationExpiryMs: 1_000,
   cartExpiryMs: 3_000,
-  shipmentSyncMs: 7_000,
 };
 
-function makeRunner(
-  reservations: ReservationSweeper,
-  carts: CartSweeper,
-  shipments: ShipmentSyncSweeper = { enqueueStaleSyncs: () => Promise.resolve(0) },
-): ScheduledJobsRunner {
-  return new ScheduledJobsRunner(reservations, carts, shipments, INTERVALS, logger);
+function makeRunner(reservations: ReservationSweeper, carts: CartSweeper): ScheduledJobsRunner {
+  return new ScheduledJobsRunner(reservations, carts, INTERVALS, logger);
 }
 
 describe("ScheduledJobsRunner", () => {
@@ -60,27 +53,6 @@ describe("ScheduledJobsRunner", () => {
     expect(expireStaleCarts).toHaveBeenCalledTimes(1);
 
     await runner.onApplicationShutdown();
-  });
-
-  it("runs the Sendcloud shipment-sync sweep on its own cadence", async () => {
-    const enqueueStaleSyncs = vi.fn(() => Promise.resolve(3));
-    const runner = makeRunner(
-      { releaseExpired: () => Promise.resolve(0) },
-      { expireStaleCarts: () => Promise.resolve(0) },
-      { enqueueStaleSyncs },
-    );
-
-    runner.start();
-    await vi.advanceTimersByTimeAsync(6_999);
-    expect(enqueueStaleSyncs).not.toHaveBeenCalled();
-    await vi.advanceTimersByTimeAsync(1);
-    expect(enqueueStaleSyncs).toHaveBeenCalledTimes(1);
-
-    await runner.onApplicationShutdown();
-  });
-
-  it("defaults the shipment-sync sweep to every two hours", () => {
-    expect(DEFAULT_SCHEDULED_JOBS_INTERVALS.shipmentSyncMs).toBe(2 * 60 * 60 * 1000);
   });
 
   it("keeps sweeping after a run throws", async () => {

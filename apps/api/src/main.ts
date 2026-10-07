@@ -11,7 +11,6 @@ import { AppModule } from "./app.module";
 import {
   API_GLOBAL_PREFIX,
   RESEND_WEBHOOK_PATH,
-  SENDCLOUD_WEBHOOK_PATH,
   WHOP_WEBHOOK_PATH,
 } from "./common/api-paths";
 import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
@@ -85,10 +84,6 @@ async function bootstrap(): Promise<void> {
   // JSON.parse/stringify has different key order and whitespace and can never
   // verify.
   app.use(RESEND_WEBHOOK_PATH, createRawBodyMiddleware());
-  // Sendcloud signs the raw body (hex HMAC-SHA256, `Sendcloud-Signature`), so
-  // the tracking webhook needs the exact bytes too (spec 2026-09-24-sendcloud-
-  // shipping §3.7).
-  app.use(SENDCLOUD_WEBHOOK_PATH, createRawBodyMiddleware());
 
   // ---------------------------------------------------------------------------
   // 2. Validation.

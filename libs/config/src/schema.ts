@@ -37,29 +37,6 @@ const durationString = z
 const secret = (name: string) =>
   z.string().min(32, `${name} must be at least 32 characters of high-entropy random data`);
 
-/**
- * Sendcloud's v3 API. There is no sandbox host (spec §1 S5) — "test" is a mode
- * of the SAME account (`SENDCLOUD_MODE`), so the URL is a constant, not config.
- */
-export const SENDCLOUD_BASE_URL = "https://panel.sendcloud.sc/api/v3";
-
-/** `config.sendcloud` — the resolved, complete Sendcloud configuration. */
-export interface SendcloudConfig {
-  readonly publicKey: string;
-  readonly secretKey: string;
-  /** The panel's Webhook Signature Key, or the secret key when none is set. */
-  readonly webhookSecret: string;
-  readonly senderAddressId: number;
-  readonly mode: "test" | "live";
-  readonly baseUrl: string;
-}
-
-/** `""` / whitespace → `undefined`. A blank variable is ABSENT, never a credential. */
-function nonBlank(value: string | undefined): string | undefined {
-  const trimmed = value?.trim() ?? "";
-  return trimmed.length > 0 ? trimmed : undefined;
-}
-
 export const nodeEnvSchema = z.enum(["development", "test", "production"]);
 export type NodeEnv = z.infer<typeof nodeEnvSchema>;
 
@@ -340,17 +317,6 @@ export const serverEnvShape = z
     S3_BUCKET: z.string().min(1),
     S3_ACCESS_KEY_ID: z.string().min(1),
     S3_SECRET_ACCESS_KEY: z.string().min(1),
-    /**
-     * A SEPARATE, PRIVATE bucket for documents that must never be public —
-     * never `S3_BUCKET`. That bucket has an anonymous-download policy (product
-     * photos are meant to be public), so a private PDF placed there would be
-     * exactly as public as a product photo no matter how its object key was
-     * signed: MinIO's bucket-wide policy never checks for a signature once
-     * anonymous downloads are allowed at all. Today it holds the Sendcloud
-     * shipping labels (`labels/{orderId}/{parcelId}.pdf`), written server-side
-     * by the label service and read back through short-lived signed GETs.
-     */
-    S3_BUCKET_PRIVATE: z.string().min(1),
 
     // --- Translation -------------------------------------------------------
     /**
@@ -372,53 +338,6 @@ export const serverEnvShape = z
      * rotate a perfectly good key trying to fix a wrong hostname.
      */
     DEEPL_API_KEY: z.string().optional(),
-
-    // --- Fulfilment (Sendcloud) ---------------------------------------------
-    /**
-     * Sendcloud v3 API credentials (HTTP Basic, public key : secret key) and the
-     * sender address labels are bought from. Spec
-     * `docs/superpowers/specs/2026-09-24-sendcloud-shipping.md` §3.8.
-     *
-     * OPTIONAL AS A SET, the DeepL precedent: with none of the three set,
-     * `config.sendcloud` is `null` and the fulfilment module binds
-     * `NotConfiguredSendcloudClient`, so label actions answer a coded
-     * FULFILMENT_NOT_CONFIGURED, pickup-point search answers UNAVAILABLE and a
-     * SERVICE_POINT rate cannot be checked out — visibly absent, never a 500.
-     * PARTIALLY set is a boot failure (see the refinement below): a public key
-     * without its secret is a typo, not a choice.
-     *
-     * `.trim()` so a bare `SENDCLOUD_PUBLIC_KEY=` copied from a template reads
-     * as ABSENT rather than as a blank credential that 401s on every call.
-     */
-    SENDCLOUD_PUBLIC_KEY: z.string().trim().optional(),
-    SENDCLOUD_SECRET_KEY: z.string().trim().optional(),
-    /**
-     * The panel's Webhook Signature Key. OPTIONAL even when Sendcloud is
-     * configured: if the integration has no dedicated key, Sendcloud signs the
-     * "parcel status changed" webhook with the integration SECRET key (spec
-     * §11a), so `config.sendcloud.webhookSecret` falls back to it.
-     */
-    SENDCLOUD_WEBHOOK_SECRET: z.string().trim().optional(),
-    /**
-     * `from_address.sender_address_id` on every announced shipment — the id of
-     * the warehouse address in the Sendcloud panel (`GET /addresses/sender-addresses`).
-     * Blank reads as absent (preprocessed) so it joins the all-or-none rule
-     * rather than failing as "not a number".
-     */
-    SENDCLOUD_SENDER_ADDRESS_ID: z.preprocess(
-      (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
-      z.coerce.number().int().positive().optional(),
-    ),
-    /**
-     * `test` (the DEFAULT) swaps every label's shipping option for
-     * `sendcloud:letter` — an unstamped letter that costs (next to) nothing —
-     * so no development or staging machine ever buys a real carrier label.
-     * `live` buys the mapped carrier's label. Mirrors WHOP_ENVIRONMENT: the live
-     * deployment pins `SENDCLOUD_MODE=live` EXPLICITLY, and it is keyed on
-     * nothing else (the deployed API runs NODE_ENV=development on purpose, so a
-     * NODE_ENV-derived default would be wrong in exactly the place it matters).
-     */
-    SENDCLOUD_MODE: z.enum(["test", "live"]).default("test"),
 
     // --- Origins -----------------------------------------------------------
     CORS_ALLOWED_ORIGINS: csvList,
@@ -669,43 +588,6 @@ export const serverEnvSchema = serverEnvShape
       }
     }
 
-    // --- Sendcloud: all or none ------------------------------------------
-    // Named individually, like the Whop sandbox set: a boot failure should say
-    // which variable to go and fetch. The webhook secret is NOT part of the set
-    // (it falls back to the secret key), and neither is SENDCLOUD_MODE (it has
-    // a safe default).
-    const sendcloudSet = {
-      SENDCLOUD_PUBLIC_KEY: nonBlank(env.SENDCLOUD_PUBLIC_KEY),
-      SENDCLOUD_SECRET_KEY: nonBlank(env.SENDCLOUD_SECRET_KEY),
-      SENDCLOUD_SENDER_ADDRESS_ID: env.SENDCLOUD_SENDER_ADDRESS_ID,
-    };
-    const sendcloudPresent = Object.values(sendcloudSet).filter((value) => value !== undefined);
-    if (sendcloudPresent.length > 0 && sendcloudPresent.length < 3) {
-      for (const [name, value] of Object.entries(sendcloudSet)) {
-        if (value === undefined) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: [name],
-            message: `${name} is required once any of SENDCLOUD_PUBLIC_KEY, SENDCLOUD_SECRET_KEY and SENDCLOUD_SENDER_ADDRESS_ID is set — Sendcloud is configured all-or-none. Unset all three to run without fulfilment.`,
-          });
-        }
-      }
-    }
-    if (
-      sendcloudPresent.length === 0 &&
-      (nonBlank(env.SENDCLOUD_WEBHOOK_SECRET) !== undefined || env.SENDCLOUD_MODE === "live")
-    ) {
-      // A webhook secret or an explicit live pin with no credentials is a
-      // half-finished provisioning, not "Sendcloud off" — refuse it loudly
-      // rather than booting with fulfilment silently absent.
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["SENDCLOUD_PUBLIC_KEY"],
-        message:
-          "SENDCLOUD_WEBHOOK_SECRET or SENDCLOUD_MODE=live is set without SENDCLOUD_PUBLIC_KEY / SENDCLOUD_SECRET_KEY / SENDCLOUD_SENDER_ADDRESS_ID — set the credentials too, or remove both.",
-      });
-    }
-
     // --- Whop environment selection -------------------------------------
     const whopEnvironment = resolveWhopEnvironment(env.WHOP_ENVIRONMENT, env.NODE_ENV);
 
@@ -780,24 +662,7 @@ export const serverEnvSchema = serverEnvShape
             baseUrl: WHOP_BASE_URLS.live,
           };
 
-    // Sendcloud: resolved once, like Whop. `null` = not configured; the
-    // refinement above guarantees the set is complete whenever any part is.
-    const publicKey = nonBlank(env.SENDCLOUD_PUBLIC_KEY);
-    const secretKey = nonBlank(env.SENDCLOUD_SECRET_KEY);
-    const senderAddressId = env.SENDCLOUD_SENDER_ADDRESS_ID;
-    const sendcloud: SendcloudConfig | null =
-      publicKey !== undefined && secretKey !== undefined && senderAddressId !== undefined
-        ? {
-            publicKey,
-            secretKey,
-            webhookSecret: nonBlank(env.SENDCLOUD_WEBHOOK_SECRET) ?? secretKey,
-            senderAddressId,
-            mode: env.SENDCLOUD_MODE,
-            baseUrl: SENDCLOUD_BASE_URL,
-          }
-        : null;
-
-    return { ...env, whop, sendcloud };
+    return { ...env, whop };
   });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;

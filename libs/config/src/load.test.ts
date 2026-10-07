@@ -29,7 +29,6 @@ function validEnv(overrides: Record<string, string> = {}): NodeJS.ProcessEnv {
     S3_BUCKET: "akai-media",
     S3_ACCESS_KEY_ID: "key",
     S3_SECRET_ACCESS_KEY: "secret",
-    S3_BUCKET_PRIVATE: "akai-private",
     CORS_ALLOWED_ORIGINS: "http://localhost:3000,http://localhost:3001",
     STOREFRONT_URL: "http://localhost:3000",
     DASHBOARD_URL: "http://localhost:3001",
@@ -436,106 +435,6 @@ describe("cross-field rules", () => {
       }),
     );
     expect(config.NODE_ENV).toBe("production");
-  });
-});
-
-describe("sendcloud", () => {
-  const SENDCLOUD_ENV = {
-    SENDCLOUD_PUBLIC_KEY: "pub_key_1",
-    SENDCLOUD_SECRET_KEY: "secret_key_1",
-    SENDCLOUD_SENDER_ADDRESS_ID: "920582",
-  } as const;
-
-  it("is null when none of the keys is set — fulfilment is absent, not broken", () => {
-    const config = parseServerEnv(validEnv());
-    expect(config.sendcloud).toBeNull();
-    expect(config.SENDCLOUD_MODE).toBe("test");
-  });
-
-  it("treats bare/blank keys as absent", () => {
-    const config = parseServerEnv(
-      validEnv({
-        SENDCLOUD_PUBLIC_KEY: "",
-        SENDCLOUD_SECRET_KEY: "   ",
-        SENDCLOUD_SENDER_ADDRESS_ID: "",
-        SENDCLOUD_WEBHOOK_SECRET: "",
-      }),
-    );
-    expect(config.sendcloud).toBeNull();
-  });
-
-  it("resolves a complete set, defaulting to TEST mode and the v3 base URL", () => {
-    const config = parseServerEnv(validEnv(SENDCLOUD_ENV));
-    expect(config.sendcloud).toEqual({
-      publicKey: "pub_key_1",
-      secretKey: "secret_key_1",
-      // No dedicated signature key → Sendcloud signs with the secret key (spec §11a).
-      webhookSecret: "secret_key_1",
-      senderAddressId: 920582,
-      mode: "test",
-      baseUrl: "https://panel.sendcloud.sc/api/v3",
-    });
-  });
-
-  it("uses the dedicated webhook signature key when one is set", () => {
-    const config = parseServerEnv(
-      validEnv({ ...SENDCLOUD_ENV, SENDCLOUD_WEBHOOK_SECRET: "hook_key_1" }),
-    );
-    expect(config.sendcloud?.webhookSecret).toBe("hook_key_1");
-  });
-
-  it("is LIVE only when pinned explicitly", () => {
-    const config = parseServerEnv(validEnv({ ...SENDCLOUD_ENV, SENDCLOUD_MODE: "live" }));
-    expect(config.sendcloud?.mode).toBe("live");
-  });
-
-  it("refuses an unknown mode", () => {
-    expect(() =>
-      parseServerEnv(validEnv({ ...SENDCLOUD_ENV, SENDCLOUD_MODE: "production" })),
-    ).toThrow(/SENDCLOUD_MODE/);
-  });
-
-  it.each([
-    ["SENDCLOUD_PUBLIC_KEY"],
-    ["SENDCLOUD_SECRET_KEY"],
-    ["SENDCLOUD_SENDER_ADDRESS_ID"],
-  ] as const)("REFUSES to boot with %s missing from a partial set", (missing) => {
-    const env = validEnv(SENDCLOUD_ENV);
-    delete env[missing];
-    expect(() => parseServerEnv(env)).toThrow(new RegExp(`${missing}.*all-or-none`));
-  });
-
-  it("refuses a non-positive or non-integer sender address id", () => {
-    expect(() =>
-      parseServerEnv(validEnv({ ...SENDCLOUD_ENV, SENDCLOUD_SENDER_ADDRESS_ID: "0" })),
-    ).toThrow(/SENDCLOUD_SENDER_ADDRESS_ID/);
-    expect(() =>
-      parseServerEnv(validEnv({ ...SENDCLOUD_ENV, SENDCLOUD_SENDER_ADDRESS_ID: "12.5" })),
-    ).toThrow(/SENDCLOUD_SENDER_ADDRESS_ID/);
-  });
-
-  it("refuses a webhook secret or a live pin without credentials", () => {
-    expect(() => parseServerEnv(validEnv({ SENDCLOUD_WEBHOOK_SECRET: "hook" }))).toThrow(
-      /SENDCLOUD_PUBLIC_KEY/,
-    );
-    expect(() => parseServerEnv(validEnv({ SENDCLOUD_MODE: "live" }))).toThrow(
-      /SENDCLOUD_PUBLIC_KEY/,
-    );
-  });
-
-  it("logs the mode but never the keys", () => {
-    const redacted = redactedConfig(
-      parseServerEnv(validEnv({ ...SENDCLOUD_ENV, SENDCLOUD_WEBHOOK_SECRET: "hook_key_1" })),
-    );
-    expect(redacted["SENDCLOUD_MODE"]).toBe("test");
-    for (const key of [
-      "SENDCLOUD_PUBLIC_KEY",
-      "SENDCLOUD_SECRET_KEY",
-      "SENDCLOUD_WEBHOOK_SECRET",
-      "sendcloud",
-    ]) {
-      expect(redacted).not.toHaveProperty(key);
-    }
   });
 });
 

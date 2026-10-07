@@ -197,45 +197,6 @@ export const paymentFailedPayloadSchema = z
  * template is fulfilment's job, and a link that resolves to the wrong parcel is
  * worse than no link.
  */
-/**
- * A pickup point as a mail shows it — the snapshot taken at checkout (spec
- * §3.3), so it is the point the customer chose even if Sendcloud later renames
- * or retires it. Bounds match the `order.servicePoint*` columns.
- */
-const emailServicePointSchema = z
-  .object({
-    name: z.string().min(1).max(120),
-    address: z.string().min(1).max(255),
-  })
-  .strict();
-
-const WEEKDAY = z.enum([
-  "monday",
-  "tuesday",
-  "wednesday",
-  "thursday",
-  "friday",
-  "saturday",
-  "sunday",
-]);
-
-/** "HH:MM", exactly as Sendcloud sends a shift boundary. */
-const clockTimeSchema = z.string().regex(/^\d{2}:\d{2}$/, "Expected HH:MM");
-
-/**
- * One day of a pickup point's CURRENT week (Sendcloud returns the actual week,
- * not a template). `shifts: []` = closed that day. Several shifts per day are
- * real (08:00–14:00, 17:00–20:30 — spec §11a G2).
- */
-const openingDaySchema = z
-  .object({
-    day: WEEKDAY,
-    shifts: z
-      .array(z.object({ start: clockTimeSchema, end: clockTimeSchema }).strict())
-      .max(6),
-  })
-  .strict();
-
 export const shippingConfirmationPayloadSchema = z
   .object({
     firstName: firstNameSchema,
@@ -252,37 +213,6 @@ export const shippingConfirmationPayloadSchema = z
     orderUrl: urlSchema,
     /** The contents of THIS parcel, priced by the quantity actually shipped. */
     lines: z.array(emailOrderLineSchema).min(1).max(200),
-    /**
-     * The pickup point, for an order shipped to one (Sendcloud spec §8): the
-     * customer has to know where to go, not just that it moved. Absent for home
-     * delivery and for the manual path, which has no point to name.
-     */
-    servicePoint: emailServicePointSchema.optional(),
-  })
-  .strict();
-
-/**
- * "Your parcel is waiting for you" — Sendcloud reported AWAITING_CUSTOMER_PICKUP
- * (spec §8, decision D6). ONE PARCEL, deduped by shipment id exactly like
- * `shipping-confirmation`, because it is the moment the customer must act and a
- * second copy teaches them to ignore it.
- *
- * `servicePoint` is OPTIONAL: a home-delivery parcel the carrier could not hand
- * over is also left at a point, and then we have no snapshot to name — the
- * mail still goes, pointing at the carrier's tracking page instead. Opening
- * hours are best-effort (a live read at send time) and simply omitted when that
- * read fails; a mail without hours beats no mail.
- */
-export const readyForPickupPayloadSchema = z
-  .object({
-    firstName: firstNameSchema,
-    orderNumber: orderNumberSchema,
-    carrier: z.string().min(1).max(80),
-    trackingNumber: z.string().min(1).max(128).optional(),
-    trackingUrl: urlSchema.optional(),
-    orderUrl: urlSchema,
-    servicePoint: emailServicePointSchema.optional(),
-    openingHours: z.array(openingDaySchema).min(1).max(7).optional(),
   })
   .strict();
 
@@ -401,7 +331,6 @@ export const EMAIL_TEMPLATE_PAYLOADS = {
   "payment-receipt": paymentReceiptPayloadSchema,
   "payment-failed": paymentFailedPayloadSchema,
   "shipping-confirmation": shippingConfirmationPayloadSchema,
-  "ready-for-pickup": readyForPickupPayloadSchema,
   "delivery-confirmation": deliveryConfirmationPayloadSchema,
   "refund-confirmation": refundConfirmationPayloadSchema,
   "order-cancelled": orderCancelledPayloadSchema,
@@ -458,7 +387,7 @@ export const SUPPRESSION_EXEMPT_TEMPLATE_KEYS: ReadonlySet<EmailTemplateKey> =
  * silent swallow. It is enforced in EmailService.send.
  */
 export const PER_PARCEL_TEMPLATE_KEYS: ReadonlySet<EmailTemplateKey> =
-  new Set<EmailTemplateKey>(["shipping-confirmation", "ready-for-pickup"]);
+  new Set<EmailTemplateKey>(["shipping-confirmation"]);
 
 type PayloadParser<K extends EmailTemplateKey> = (input: unknown) => EmailPayloadFor<K>;
 
@@ -480,7 +409,6 @@ const PAYLOAD_PARSERS: { [K in EmailTemplateKey]: PayloadParser<K> } = {
   "payment-receipt": (input) => paymentReceiptPayloadSchema.parse(input),
   "payment-failed": (input) => paymentFailedPayloadSchema.parse(input),
   "shipping-confirmation": (input) => shippingConfirmationPayloadSchema.parse(input),
-  "ready-for-pickup": (input) => readyForPickupPayloadSchema.parse(input),
   "delivery-confirmation": (input) => deliveryConfirmationPayloadSchema.parse(input),
   "refund-confirmation": (input) => refundConfirmationPayloadSchema.parse(input),
   "order-cancelled": (input) => orderCancelledPayloadSchema.parse(input),

@@ -8,7 +8,6 @@ import {
   type AdminShippingZoneList,
   type CreateShippingRate,
   type CreateShippingZone,
-  type ShippingDeliveryType,
   type ShippingStrategy,
   type UpdateShippingRate,
   type UpdateShippingZone,
@@ -24,8 +23,7 @@ import {
 } from "./admin-shipping.mapper";
 
 /**
- * AdminShippingService — staff-editable shipping zones and rates (spec
- * `2026-09-24-sendcloud-shipping.md` §7a, client decision D8).
+ * AdminShippingService — staff-editable shipping zones and rates.
  *
  * Plain persistence against Prisma, like `DiscountAdminService`: the PRICING
  * rules live in `shipping-rate.selector.ts` and are untouched — this only
@@ -47,19 +45,19 @@ import {
  *     `PrismaShippingTaxResolver` throws on a served destination without one —
  *     deliberately, a 0% default is an invisible under-remittance — so a zone
  *     covering an untaxed country would make every quote there fail. DECISION:
- *     REFUSE (TAX_RATE_MISSING) rather than create the row. The seed's VAT
- *     figures (`ZONE_VAT_BPS`) are a per-country table, not a default, and
- *     there is no rate this editor could invent for a ninth country that is not
- *     a guess about someone's VAT return. Only countries being ADDED are
+ *     REFUSE (TAX_RATE_MISSING) rather than create the row. The seed's IVA
+ *     figure (`STANDARD_VAT_BPS`) is a per-country table, not a default, and
+ *     there is no rate this editor could invent for another country that is
+ *     not a guess about someone's tax return. Only countries being ADDED are
  *     checked, so renaming a zone never fails over a pre-existing gap.
  *  3. Countries come from `DESTINATION_COUNTRY_CODES` — the request schema.
- *  4. Rate coherence (bounds, transit days, SERVICE_POINT ⇒ carrier) — the
+ *  4. Rate coherence (bounds, transit days) — the
  *     request schemas check one body; `assertRateCoherent` re-checks the
  *     MERGED row, because a PATCH of `maxValue` alone can invert a stored
  *     `minValue`.
  *
- * DELETION IS SOFT. An order snapshots its shipping method (name, rate id,
- * option code, service point) at checkout, and `order.shippingRateId` is a
+ * DELETION IS SOFT. An order snapshots its shipping method (name, charge) at
+ * checkout, and `order.shippingRateId` is a
  * SET NULL foreign key besides — a soft-deleted rate keeps its row, so
  * existing orders keep resolving it; the quote simply stops offering it.
  */
@@ -79,8 +77,6 @@ interface MergedRate {
   readonly maxValue: number | null;
   readonly transitDaysMin: number | null;
   readonly transitDaysMax: number | null;
-  readonly deliveryType: ShippingDeliveryType;
-  readonly carrierCode: string | null;
 }
 
 /** The merged-row rules. Pure, exported for the unit suite. */
@@ -94,9 +90,6 @@ export function assertRateCoherent(rate: MergedRate): void {
     rate.transitDaysMin > rate.transitDaysMax
   ) {
     throw ShippingAdminError.invalidTransitDays();
-  }
-  if (rate.deliveryType === "SERVICE_POINT" && rate.carrierCode === null) {
-    throw ShippingAdminError.servicePointNeedsCarrier();
   }
 }
 
@@ -222,9 +215,6 @@ export class AdminShippingService {
         currency: input.currency,
         freeOverSubtotal: input.freeOverSubtotal,
         isActive: input.isActive,
-        deliveryType: input.deliveryType,
-        carrierCode: input.carrierCode,
-        sendcloudOptionCode: input.sendcloudOptionCode,
         transitDaysMin: input.transitDaysMin,
         transitDaysMax: input.transitDaysMax,
       },
@@ -247,8 +237,6 @@ export class AdminShippingService {
         input.transitDaysMin === undefined ? existing.transitDaysMin : input.transitDaysMin,
       transitDaysMax:
         input.transitDaysMax === undefined ? existing.transitDaysMax : input.transitDaysMax,
-      deliveryType: input.deliveryType ?? existing.deliveryType,
-      carrierCode: input.carrierCode === undefined ? existing.carrierCode : input.carrierCode,
     });
 
     const row = await this.prisma.shippingRate.update({
@@ -264,11 +252,6 @@ export class AdminShippingService {
           ? {}
           : { freeOverSubtotal: input.freeOverSubtotal }),
         ...(input.isActive === undefined ? {} : { isActive: input.isActive }),
-        ...(input.deliveryType === undefined ? {} : { deliveryType: input.deliveryType }),
-        ...(input.carrierCode === undefined ? {} : { carrierCode: input.carrierCode }),
-        ...(input.sendcloudOptionCode === undefined
-          ? {}
-          : { sendcloudOptionCode: input.sendcloudOptionCode }),
         ...(input.transitDaysMin === undefined ? {} : { transitDaysMin: input.transitDaysMin }),
         ...(input.transitDaysMax === undefined ? {} : { transitDaysMax: input.transitDaysMax }),
       },

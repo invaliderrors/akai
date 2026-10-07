@@ -39,19 +39,16 @@ function rateRow(overrides: Record<string, unknown> = {}): Record<string, unknow
   return {
     id: RATE_ID,
     zoneId: ZONE_ID,
-    name: { es: "Envío en punto de recogida INPOST", en: "InPost pickup point" },
+    name: { es: "Envío nacional", en: "National shipping" },
     strategy: "FLAT",
-    priceGross: 899,
-    currency: "EUR",
+    priceGross: 1_500_000,
+    currency: "COP",
     minValue: null,
     maxValue: null,
-    freeOverSubtotal: 25_000,
+    freeOverSubtotal: 30_000_000,
     isActive: true,
-    deliveryType: "SERVICE_POINT",
-    carrierCode: "inpost_es",
-    sendcloudOptionCode: "inpost_es:service_point,national_c2c",
-    transitDaysMin: 1,
-    transitDaysMax: 2,
+    transitDaysMin: 2,
+    transitDaysMax: 5,
     createdAt: T0,
     updatedAt: T0,
     deletedAt: null,
@@ -60,19 +57,16 @@ function rateRow(overrides: Record<string, unknown> = {}): Record<string, unknow
 }
 
 const newRate: CreateShippingRate = {
-  name: { es: "UPS Access Point" },
+  name: { es: "Envío express" },
   strategy: "FLAT",
   minValue: null,
   maxValue: null,
-  priceGross: toMinor(1_410),
-  currency: "EUR",
+  priceGross: toMinor(2_500_000),
+  currency: "COP",
   freeOverSubtotal: null,
   isActive: true,
-  deliveryType: "SERVICE_POINT",
-  carrierCode: "ups",
-  sendcloudOptionCode: "ups:standard/service_point",
-  transitDaysMin: 2,
-  transitDaysMax: 4,
+  transitDaysMin: 1,
+  transitDaysMax: 2,
 };
 
 interface Fakes {
@@ -242,7 +236,7 @@ describe("AdminShippingService — zones", () => {
       id: ZONE_ID,
       countryCodes: ["ES"],
       createdAt: T0.toISOString(),
-      rates: [{ id: RATE_ID, priceGross: 899, sendcloudOptionCode: "inpost_es:service_point,national_c2c" }],
+      rates: [{ id: RATE_ID, priceGross: 1_500_000, transitDaysMin: 2, transitDaysMax: 5 }],
     });
   });
 });
@@ -260,19 +254,10 @@ describe("AdminShippingService — rates", () => {
     await service.createRate(ZONE_ID, newRate);
 
     expect(f.rate.create.mock.calls[0]?.[0]).toMatchObject({
-      data: { zoneId: ZONE_ID, name: { es: "UPS Access Point" }, priceGross: 1_410 },
+      data: { zoneId: ZONE_ID, name: { es: "Envío express" }, priceGross: 2_500_000 },
     });
     const data = (f.rate.create.mock.calls[0]?.[0] as { data: { name: object } }).data;
     expect(data.name).not.toHaveProperty("en");
-  });
-
-  it("refuses a SERVICE_POINT rate without a carrier (checkout could not search points)", async () => {
-    const error = await refusal(
-      service.createRate(ZONE_ID, { ...newRate, carrierCode: null }),
-    );
-    expect(error.reason).toBe("SERVICE_POINT_NEEDS_CARRIER");
-    expect(error.getStatus()).toBe(400);
-    expect(f.rate.create).not.toHaveBeenCalled();
   });
 
   it("re-checks the MERGED row: a PATCH of maxValue alone cannot invert the stored min", async () => {
@@ -286,24 +271,8 @@ describe("AdminShippingService — rates", () => {
     expect(f.rate.update).not.toHaveBeenCalled();
   });
 
-  it("refuses switching a stored carrier-less rate to SERVICE_POINT", async () => {
-    f.rate.findFirst.mockResolvedValueOnce(
-      rateRow({ deliveryType: "HOME", carrierCode: null, sendcloudOptionCode: null }),
-    );
-
-    const error = await refusal(
-      service.updateRate(ZONE_ID, RATE_ID, { deliveryType: "SERVICE_POINT" }),
-    );
-    expect(error.reason).toBe("SERVICE_POINT_NEEDS_CARRIER");
-  });
-
-  it("refuses clearing the carrier of a stored SERVICE_POINT rate", async () => {
-    const error = await refusal(service.updateRate(ZONE_ID, RATE_ID, { carrierCode: null }));
-    expect(error.reason).toBe("SERVICE_POINT_NEEDS_CARRIER");
-  });
-
   it("refuses transit days that invert against the stored ones", async () => {
-    const error = await refusal(service.updateRate(ZONE_ID, RATE_ID, { transitDaysMin: 5 }));
+    const error = await refusal(service.updateRate(ZONE_ID, RATE_ID, { transitDaysMin: 6 }));
     expect(error.reason).toBe("INVALID_TRANSIT_DAYS");
   });
 
@@ -359,8 +328,6 @@ describe("assertRateCoherent", () => {
     maxValue: 1_000,
     transitDaysMin: 1,
     transitDaysMax: 2,
-    deliveryType: "HOME" as const,
-    carrierCode: null,
   };
 
   it("accepts an open-ended or well-ordered bracket", () => {

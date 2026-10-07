@@ -55,8 +55,6 @@ const FAKE_CONFIG = {
     webhookSecret: `ws_${"c".repeat(32)}`,
     baseUrl: "https://api.whop.com/api/v1",
   },
-  /** Sendcloud off: the tracking consumer wires against the NOT_CONFIGURED client. */
-  sendcloud: null,
 } as unknown as ServerEnv;
 
 const FAKE_LOGGER = {
@@ -115,10 +113,8 @@ describe("OutboxModule — dependency injection", () => {
     // could not be sold. Whop takes the amount on the checkout call, and the
     // `catalog.*` topics are no longer produced at all.
     expect(topics.has("storefront.revalidate")).toBe(true);
-    // Sendcloud tracking: produced by the webhook and the 2-hourly sweep.
-    expect(topics.has("shipment-sync")).toBe(true);
-    // Sendcloud labels: produced only by staff (bulk generate / retry).
-    expect(topics.has("order-fulfilment")).toBe(true);
+    // Nothing else: Sendcloud (`shipment-sync`, `order-fulfilment`) is gone.
+    expect([...topics].sort()).toEqual(["email", "storefront.revalidate"]);
 
     await moduleRef.close();
   });

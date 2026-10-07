@@ -3,7 +3,6 @@ import {
   toMinor,
   type AdminShippingRate,
   type AdminShippingZoneDetail,
-  type ShippingDeliveryType,
   type ShippingStrategy,
 } from "@akai/contracts";
 
@@ -27,9 +26,6 @@ export interface ShippingRateRecord {
   readonly maxValue: number | null;
   readonly freeOverSubtotal: number | null;
   readonly isActive: boolean;
-  readonly deliveryType: ShippingDeliveryType;
-  readonly carrierCode: string | null;
-  readonly sendcloudOptionCode: string | null;
   readonly transitDaysMin: number | null;
   readonly transitDaysMax: number | null;
   readonly createdAt: Date;
@@ -77,9 +73,6 @@ export function toAdminShippingRate(row: ShippingRateRecord): AdminShippingRate 
     currency: row.currency,
     freeOverSubtotal: row.freeOverSubtotal === null ? null : toMinor(row.freeOverSubtotal),
     isActive: row.isActive,
-    deliveryType: row.deliveryType,
-    carrierCode: row.carrierCode,
-    sendcloudOptionCode: row.sendcloudOptionCode,
     transitDaysMin: row.transitDaysMin,
     transitDaysMax: row.transitDaysMax,
     createdAt: row.createdAt.toISOString(),

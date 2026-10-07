@@ -44,15 +44,8 @@ export interface CartSweeper {
   expireStaleCarts(): Promise<number>;
 }
 
-/** The narrow slice of the Sendcloud tracking sweep this runner drives. */
-export interface ShipmentSyncSweeper {
-  /** Enqueue a `shipment-sync` for each stale live Sendcloud shipment. Returns the count. */
-  enqueueStaleSyncs(now?: Date): Promise<number>;
-}
-
 export const RESERVATION_SWEEPER = Symbol("RESERVATION_SWEEPER");
 export const CART_SWEEPER = Symbol("CART_SWEEPER");
-export const SHIPMENT_SYNC_SWEEPER = Symbol("SHIPMENT_SYNC_SWEEPER");
 
 /** Injection token + default for the sweep cadences. */
 export const SCHEDULED_JOBS_INTERVALS = Symbol("SCHEDULED_JOBS_INTERVALS");
@@ -62,17 +55,11 @@ export interface ScheduledJobsIntervals {
   readonly reservationExpiryMs: number;
   /** Cart reaping is housekeeping, not time-critical (expiry is enforced on read too). */
   readonly cartExpiryMs: number;
-  /**
-   * The Sendcloud tracking safety net (spec 2026-09-24-sendcloud-shipping §3.7):
-   * the webhook is the fast path; this only catches what it missed.
-   */
-  readonly shipmentSyncMs: number;
 }
 
 export const DEFAULT_SCHEDULED_JOBS_INTERVALS: ScheduledJobsIntervals = {
   reservationExpiryMs: 60_000,
   cartExpiryMs: 6 * 60 * 60 * 1000,
-  shipmentSyncMs: 2 * 60 * 60 * 1000,
 };
 
 /** One recurring job: its cadence and the unit of work it runs. */
@@ -98,7 +85,6 @@ export class ScheduledJobsRunner implements OnApplicationShutdown {
   constructor(
     @Inject(RESERVATION_SWEEPER) reservations: ReservationSweeper,
     @Inject(CART_SWEEPER) carts: CartSweeper,
-    @Inject(SHIPMENT_SYNC_SWEEPER) shipments: ShipmentSyncSweeper,
     @Inject(SCHEDULED_JOBS_INTERVALS) intervals: ScheduledJobsIntervals,
     @Inject(LOGGER) private readonly logger: Logger,
   ) {
@@ -112,11 +98,6 @@ export class ScheduledJobsRunner implements OnApplicationShutdown {
         name: "cart-expiry",
         intervalMs: intervals.cartExpiryMs,
         run: () => carts.expireStaleCarts(),
-      },
-      {
-        name: "shipment-sync-sweep",
-        intervalMs: intervals.shipmentSyncMs,
-        run: () => shipments.enqueueStaleSyncs(),
       },
     ];
 

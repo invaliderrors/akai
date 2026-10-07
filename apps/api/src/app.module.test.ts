@@ -5,10 +5,8 @@ import { resetServerConfigCache } from "@akai/config";
 import { AppModule } from "./app.module";
 import {
   RESEND_WEBHOOK_PATH,
-  SENDCLOUD_WEBHOOK_PATH,
   WHOP_WEBHOOK_PATH,
 } from "./common/api-paths";
-import { SendcloudWebhookController } from "./modules/fulfilment/tracking/sendcloud-webhook.controller";
 import { PAYMENTS_REPOSITORY } from "./modules/payments/repository/payments.repository";
 import { WHOP_GATEWAY } from "./modules/payments/whop/whop.gateway";
 import {
@@ -50,7 +48,6 @@ const TEST_ENV: NodeJS.ProcessEnv = {
   S3_BUCKET: "akai-media",
   S3_ACCESS_KEY_ID: "key",
   S3_SECRET_ACCESS_KEY: "secret",
-  S3_BUCKET_PRIVATE: "akai-private",
   CORS_ALLOWED_ORIGINS: "http://localhost:3000",
   STOREFRONT_URL: "http://localhost:3000",
   DASHBOARD_URL: "http://localhost:3001",
@@ -156,18 +153,5 @@ describe("payments wiring", () => {
     expect(WHOP_WEBHOOK_PATH).toBe(`/v1/${WHOP_WEBHOOK_ROUTE}`);
     expect(WHOP_WEBHOOK_PATH).toBe("/v1/webhooks/whop");
     expect(RESEND_WEBHOOK_PATH).toBe("/v1/webhooks/resend");
-  });
-
-  it("mounts the Sendcloud raw-body middleware on the path its controller answers on", async () => {
-    // Read off the controller's OWN route metadata rather than the constant it
-    // was written with, so a controller re-routed by hand fails here instead of
-    // 400-ing every signed delivery with RAW_BODY_UNAVAILABLE in production.
-    const route: unknown = Reflect.getMetadata("path", SendcloudWebhookController);
-    expect(SENDCLOUD_WEBHOOK_PATH).toBe(`/v1/${String(route)}`);
-    expect(SENDCLOUD_WEBHOOK_PATH).toBe("/v1/webhooks/sendcloud");
-
-    const moduleRef = await compile();
-    expect(moduleRef.get(SendcloudWebhookController)).toBeInstanceOf(SendcloudWebhookController);
-    await moduleRef.close();
   });
 });

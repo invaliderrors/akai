@@ -100,10 +100,6 @@ const LOGGABLE_KEYS = [
   // secret — the credentials it selects are redacted by omission like the rest.
   "WHOP_ENVIRONMENT",
   "WHOP_API_VERSION_DATE",
-  // Sendcloud: whether labels are real or `sendcloud:letter` stand-ins. The
-  // keys and the webhook secret are deliberately ABSENT (redacted); the sender
-  // address id is an identifier but has no operational value in a log line.
-  "SENDCLOUD_MODE",
   "S3_ENDPOINT",
   "S3_BUCKET",
   "CORS_ALLOWED_ORIGINS",

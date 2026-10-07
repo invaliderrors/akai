@@ -104,7 +104,7 @@ function formatDate(iso: string, locale: Locale): string {
   if (Number.isNaN(parsed.getTime())) {
     return iso;
   }
-  return new Intl.DateTimeFormat(locale === "es" ? "es-ES" : "en-IE", {
+  return new Intl.DateTimeFormat(locale === "es" ? "es-CO" : "en-US", {
     dateStyle: "long",
     timeZone: "UTC",
   }).format(parsed);
@@ -613,10 +613,6 @@ const renderShippingConfirmation: TemplateRenderer<"shipping-confirmation"> = (
         viewOrder: "Ver pedido",
         untracked:
           "Este envío no lleva seguimiento. Si no llega en los próximos días hábiles, responde a este correo y lo revisamos.",
-        pickupPoint: "Punto de recogida",
-        pickupAddress: "Dirección",
-        pickupNote:
-          "Te avisaremos por correo en cuanto el paquete esté listo para recoger en este punto.",
       },
       en: {
         subject: `Your order ${payload.orderNumber} is on its way`,
@@ -631,9 +627,6 @@ const renderShippingConfirmation: TemplateRenderer<"shipping-confirmation"> = (
         viewOrder: "View order",
         untracked:
           "This parcel ships without tracking. If it has not arrived within a few business days, reply to this email and we will look into it.",
-        pickupPoint: "Pickup point",
-        pickupAddress: "Address",
-        pickupNote: "We will email you as soon as the parcel is ready to collect at this point.",
       },
     },
     locale,
@@ -644,10 +637,6 @@ const renderShippingConfirmation: TemplateRenderer<"shipping-confirmation"> = (
   ];
   if (payload.trackingNumber !== undefined) {
     rows.push({ label: copy.tracking, value: payload.trackingNumber });
-  }
-  if (payload.servicePoint !== undefined) {
-    rows.push({ label: copy.pickupPoint, value: payload.servicePoint.name });
-    rows.push({ label: copy.pickupAddress, value: payload.servicePoint.address });
   }
 
   // There is ALWAYS a button: with a tracking URL it goes to the carrier, and
@@ -666,135 +655,9 @@ const renderShippingConfirmation: TemplateRenderer<"shipping-confirmation"> = (
     { kind: "lineItems", items: payload.lines },
     button,
   ];
-  if (payload.servicePoint !== undefined) {
-    blocks.push({ kind: "note", text: copy.pickupNote });
-  }
   if (!tracked) {
     blocks.push({ kind: "note", text: copy.untracked });
   }
-
-  return { subject: copy.subject, preheader: copy.preheader, blocks };
-};
-
-type OpeningDay = NonNullable<EmailPayloadFor<"ready-for-pickup">["openingHours"]>[number];
-
-const WEEKDAY_LABELS: Bilingual<Readonly<Record<OpeningDay["day"], string>>> = {
-  es: {
-    monday: "Lunes",
-    tuesday: "Martes",
-    wednesday: "Miércoles",
-    thursday: "Jueves",
-    friday: "Viernes",
-    saturday: "Sábado",
-    sunday: "Domingo",
-  },
-  en: {
-    monday: "Monday",
-    tuesday: "Tuesday",
-    wednesday: "Wednesday",
-    thursday: "Thursday",
-    friday: "Friday",
-    saturday: "Saturday",
-    sunday: "Sunday",
-  },
-};
-
-/** "08:00–14:00, 17:00–20:30", or the locale's "closed". */
-function shiftsLabel(day: OpeningDay, closed: string): string {
-  if (day.shifts.length === 0) {
-    return closed;
-  }
-  return day.shifts.map((shift) => `${shift.start}–${shift.end}`).join(", ");
-}
-
-const renderReadyForPickup: TemplateRenderer<"ready-for-pickup"> = (payload, locale) => {
-  const point = payload.servicePoint;
-  const copy = pick(
-    {
-      es: {
-        subject: `Tu pedido ${payload.orderNumber} ya está en el punto de recogida`,
-        preheader:
-          point === undefined
-            ? "Tu paquete te espera para que lo recojas."
-            : `Te espera en ${point.name}.`,
-        greeting: `Hola ${payload.firstName},`,
-        body:
-          point === undefined
-            ? `Tu paquete ha llegado y ${payload.carrier} lo tiene listo para recoger. En la página de seguimiento verás dónde.`
-            : "Tu paquete ha llegado al punto de recogida y ya puedes pasar a por él.",
-        bring:
-          "Lleva tu documento de identidad y el número de pedido o de seguimiento. Los puntos solo guardan los paquetes unos días; si no se recoge a tiempo, vuelve al remitente.",
-        pickupPoint: "Punto de recogida",
-        pickupAddress: "Dirección",
-        carrier: "Transportista",
-        tracking: "Nº de seguimiento",
-        hours: "Horario de esta semana",
-        closed: "Cerrado",
-        track: "Ver seguimiento",
-        viewOrder: "Ver pedido",
-      },
-      en: {
-        subject: `Your order ${payload.orderNumber} is ready for pickup`,
-        preheader:
-          point === undefined
-            ? "Your parcel is waiting for you to collect it."
-            : `It is waiting for you at ${point.name}.`,
-        greeting: `Hi ${payload.firstName},`,
-        body:
-          point === undefined
-            ? `Your parcel has arrived and ${payload.carrier} is holding it for collection. The tracking page shows where.`
-            : "Your parcel has arrived at the pickup point and is ready to collect.",
-        bring:
-          "Bring your ID and the order or tracking number. Pickup points only hold parcels for a few days; one not collected in time goes back to the sender.",
-        pickupPoint: "Pickup point",
-        pickupAddress: "Address",
-        carrier: "Carrier",
-        tracking: "Tracking number",
-        hours: "Opening hours this week",
-        closed: "Closed",
-        track: "View tracking",
-        viewOrder: "View order",
-      },
-    },
-    locale,
-  );
-
-  const rows: { label: string; value: string }[] = [];
-  if (point !== undefined) {
-    rows.push({ label: copy.pickupPoint, value: point.name });
-    rows.push({ label: copy.pickupAddress, value: point.address });
-  }
-  rows.push({ label: copy.carrier, value: payload.carrier });
-  if (payload.trackingNumber !== undefined) {
-    rows.push({ label: copy.tracking, value: payload.trackingNumber });
-  }
-
-  const blocks: Block[] = [
-    { kind: "heading", text: copy.subject },
-    { kind: "paragraph", text: copy.greeting },
-    { kind: "paragraph", text: copy.body },
-    { kind: "keyValue", rows },
-  ];
-
-  if (payload.openingHours !== undefined) {
-    const labels = WEEKDAY_LABELS[locale];
-    blocks.push({ kind: "paragraph", text: copy.hours });
-    blocks.push({
-      kind: "keyValue",
-      rows: payload.openingHours.map((day) => ({
-        label: labels[day.day],
-        value: shiftsLabel(day, copy.closed),
-      })),
-    });
-  }
-
-  blocks.push({ kind: "paragraph", text: copy.bring });
-  // Tracking first: without a snapshot it is the only place that says WHERE.
-  blocks.push(
-    payload.trackingUrl === undefined
-      ? { kind: "button", label: copy.viewOrder, url: payload.orderUrl }
-      : { kind: "button", label: copy.track, url: payload.trackingUrl },
-  );
 
   return { subject: copy.subject, preheader: copy.preheader, blocks };
 };
@@ -1195,7 +1058,6 @@ const RENDERERS: { [K in EmailTemplateKey]: TemplateRenderer<K> } = {
   "payment-receipt": renderPaymentReceipt,
   "payment-failed": renderPaymentFailed,
   "shipping-confirmation": renderShippingConfirmation,
-  "ready-for-pickup": renderReadyForPickup,
   "delivery-confirmation": renderDeliveryConfirmation,
   "refund-confirmation": renderRefundConfirmation,
   "order-cancelled": renderOrderCancelled,
