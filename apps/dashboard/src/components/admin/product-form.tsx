@@ -93,7 +93,8 @@ import { VariantImageField, type VariantImageSupport } from "./variant-image";
  * variant it is.
  *
  * There is NO sync column and no sync anything: the catalog mirror is deleted,
- * and under Whop an unmirrored variant is not a thing that exists.
+ * and Wompi is handed the order total, so an unmirrored variant is not a thing
+ * that exists.
  *
  * Client-side validation is a COURTESY, never a control. The API re-validates
  * everything with the same schema plus `.strict()`, and recomputes every price

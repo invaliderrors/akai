@@ -7,7 +7,13 @@ import { formatMoney } from "@akai/money";
 
 import { Button } from "@/components/ui/button";
 import { ConfirmActionError, TypeToConfirmDialog } from "@/components/ui/confirm";
-import { MoneyField, PopupButton, TextArea, type MoneyFieldValue } from "@/components/ui/field";
+import {
+  MoneyField,
+  PopupButton,
+  TextArea,
+  TextField,
+  type MoneyFieldValue,
+} from "@/components/ui/field";
 import { Icon } from "@/components/ui/icon";
 import { Money } from "@/components/ui/money";
 import {
@@ -49,8 +55,8 @@ export interface RefundFormProps {
  * The six members of `refundReasonSchema`, in the order an operator meets them.
  *
  * WITHDRAWAL_RIGHT IS SECOND, AND IT IS AN ADDITION TO THE ARTBOARD. It is the
- * EU 14-day right of withdrawal, which is the reason a European clothing
- * shop refunds most often, and the drawing omits it entirely.
+ * consumer's right to withdraw (in Colombia the "derecho de retracto", Ley 1480
+ * art. 47), a common reason a clothing shop refunds, and the drawing omits it.
  *
  * The drawn first option, "Cobro incorrecto del proveedor", HAS NO ENUM MEMBER
  * behind it. `createRefundSchema` is `.strict()` and types `reason` against
@@ -71,15 +77,20 @@ const REASONS: readonly RefundReason[] = [
 /** The API's own ceiling on `note`. Mirrored so the counter cannot disagree. */
 const NOTE_MAX = 1000;
 
+/** The API's ceiling on the Wompi refund reference. */
+const PROVIDER_REF_MAX = 128;
+
 /**
- * Record a refund intent against a settled payment.
+ * Record a refund the operator ALREADY made in the Wompi dashboard.
  *
  * THREE THINGS THIS FORM DOES NOT DO, each deliberate:
  *
- *  - It does not move money. The API records intent at status PENDING; the order
- *    reaches REFUNDED (or PARTIALLY_REFUNDED, via `statusAfterRefund`) only when
- *    the provider confirms by webhook. The copy says so, because an operator who
- *    believes the refund is done will tell the customer it is done.
+ *  - It does not move money. Wompi has no refund API for Web Checkout
+ *    payments, so the money goes back in the Wompi dashboard, by hand; this
+ *    records it (SUCCEEDED), moves the order to PARTIALLY_REFUNDED / REFUNDED
+ *    and emails the customer. The copy says so, because an operator who
+ *    believes this form refunds will tell the customer money is on its way when
+ *    nothing was sent.
  *  - It does not decide the amount. Leaving the field empty means "the full
  *    remaining balance", resolved SERVER-SIDE — the common case and the one most
  *    likely to be mistyped. Any amount entered is still bounded server-side by
@@ -112,6 +123,7 @@ export function RefundForm({
   const [amount, setAmount] = useState<MoneyFieldValue>({ raw: "", minor: null });
   const [reason, setReason] = useState<RefundReason>("REQUESTED_BY_CUSTOMER");
   const [note, setNote] = useState("");
+  const [providerRefundId, setProviderRefundId] = useState("");
   const [amountError, setAmountError] = useState<string | undefined>(undefined);
   const [confirming, setConfirming] = useState(false);
 
@@ -203,6 +215,7 @@ export function RefundForm({
     }
 
     const trimmedNote = note.trim();
+    const trimmedReference = providerRefundId.trim();
     const outcome = await onSubmit(
       {
         // The key is OMITTED entirely rather than set to `undefined`: the API's
@@ -214,6 +227,7 @@ export function RefundForm({
           : { amount: amount.minor }),
         reason,
         ...(trimmedNote.length === 0 ? {} : { note: trimmedNote }),
+        ...(trimmedReference.length === 0 ? {} : { providerRefundId: trimmedReference }),
         restockVariantIds: [],
       },
       idempotencyKey,
@@ -229,6 +243,7 @@ export function RefundForm({
 
     setAmount({ raw: "", minor: null });
     setNote("");
+    setProviderRefundId("");
     // Success: the next submission is a DIFFERENT refund, so it needs its own
     // key. Reusing this one would replay this response and move no money.
     setIdempotencyKey(mintKey());
@@ -283,6 +298,16 @@ export function RefundForm({
         value={reason}
         options={REASONS.map((value) => ({ value, label: reasonLabel(value) }))}
         onChange={setReason}
+      />
+
+      <TextField
+        label={t("refundProviderLabel")}
+        name="providerRefundId"
+        value={providerRefundId}
+        maxLength={PROVIDER_REF_MAX}
+        hint={t("refundProviderHint")}
+        mono
+        onChange={setProviderRefundId}
       />
 
       <TextArea

@@ -5,29 +5,13 @@ import type { CurrencyCode } from "@akai/contracts";
  *
  * `currencyCodeSchema` is an OPEN three-letter regex, not a closed enum, so the
  * contract would accept "XYZ" — but a discount scoped to a currency the payment
- * provider cannot charge in is a discount that silently never applies. This list
- * is the provider's own enum, read from `@whop/sdk` (`api/types/*.d.ts`, the
- * `Currency` const), uppercased: Whop speaks lowercase ISO-4217 and this system
- * speaks uppercase, and `whop.gateway.ts` owns that conversion.
+ * provider cannot charge in is a discount that silently never applies.
  *
- * COP is first because it is the store's base currency (`DEFAULT_CART_CURRENCY`),
- * not because of its code. The rest are alphabetical.
- *
- * Regenerate rather than hand-edit if the SDK is upgraded.
+ * ONE ENTRY: Wompi Colombia charges COP and nothing else, and Akai sells only in
+ * Colombia. A wider list (the previous provider charged in ~80 currencies) would
+ * offer the operator choices that can never match an order.
  */
-export const SUPPORTED_CURRENCIES: readonly CurrencyCode[] = [
-  "COP", "AED", "ALL", "AMD", "ARS", "AUD", "AWG", "BAM",
-  "BGN", "BHD", "BOB", "BRL", "BSD", "CAD", "CHF", "CLP",
-  "CNY", "CRC", "CZK", "DKK", "DOP", "DZD", "EGP", "ETB",
-  "EUR", "GBP", "GHS", "GMD", "GTQ", "GYD", "HKD", "HUF",
-  "IDR", "ILS", "INR", "JMD", "JOD", "JPY", "KES", "KHR",
-  "KRW", "KWD", "KZT", "LKR", "MAD", "MDL", "MGA", "MKD",
-  "MNT", "MOP", "MUR", "MXN", "MYR", "NAD", "NGN", "NOK",
-  "NZD", "OMR", "PEN", "PHP", "PKR", "PLN", "PYG", "QAR",
-  "RON", "RSD", "RUB", "RWF", "SAR", "SEK", "SGD", "THB",
-  "TND", "TRY", "TTD", "TWD", "TZS", "USD", "UYU", "UZS",
-  "VND", "XCD", "XOF", "ZAR",
-];
+export const SUPPORTED_CURRENCIES: readonly CurrencyCode[] = ["COP"];
 
 /**
  * The flag for a currency, or null where there honestly is not one.

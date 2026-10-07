@@ -417,11 +417,11 @@ describe("<DiscountForm />", () => {
 
     it("labels each currency with its code first, then its flag and name", () => {
       renderForm({});
-      // The code leads so the native select's type-ahead still answers "EUR" —
+      // The code leads so the native select's type-ahead still answers "COP" —
       // the muscle memory the old code input left behind. See lib/currency.
-      const euro = screen.getByRole("option", { name: /^EUR/ });
-      expect(euro.textContent).toContain("🇪🇺");
-      expect(euro.textContent?.toLowerCase()).toContain("euro");
+      const peso = screen.getByRole("option", { name: /^COP/ });
+      expect(peso.textContent).toContain("🇨🇴");
+      expect(peso.textContent?.toLowerCase()).toContain("peso");
     });
 
     it("submits the chosen currency", async () => {
@@ -430,11 +430,11 @@ describe("<DiscountForm />", () => {
       renderForm({ onSubmit });
 
       const control = screen.getByLabelText(esMessages.admin.discounts.form.currencyLabel);
-      await user.selectOptions(control, "GBP");
+      await user.selectOptions(control, "COP");
 
       expect(screen.getByLabelText<HTMLSelectElement>(
         esMessages.admin.discounts.form.currencyLabel,
-      ).value).toBe("GBP");
+      ).value).toBe("COP");
     });
   });
 

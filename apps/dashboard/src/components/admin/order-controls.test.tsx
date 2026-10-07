@@ -299,6 +299,42 @@ describe("<RefundForm />", () => {
     expect(onSubmit.mock.calls[0]?.[0]).not.toHaveProperty("amount");
   });
 
+  it("says it RECORDS a Wompi refund — it does not move money", () => {
+    renderForm({ onSubmit: vi.fn(async () => OK) });
+
+    expect(screen.getByText(/Registra el reembolso que hiciste en el panel de Wompi/)).toBeTruthy();
+  });
+
+  it("sends the Wompi reference when the operator gives one, trimmed", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn<(body: unknown, key: string) => Promise<OrderMutationOutcome>>(
+      async () => OK,
+    );
+
+    renderForm({ onSubmit, generateKey: () => "key-1" });
+    await user.type(
+      screen.getByLabelText("Referencia del reembolso en Wompi (opcional)"),
+      "  12345-REF  ",
+    );
+    await confirmRefund(user, "100.00");
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit.mock.calls[0]?.[0]).toMatchObject({ providerRefundId: "12345-REF" });
+  });
+
+  it("omits the Wompi reference when it is left blank", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn<(body: unknown, key: string) => Promise<OrderMutationOutcome>>(
+      async () => OK,
+    );
+
+    renderForm({ onSubmit, generateKey: () => "key-1" });
+    await confirmRefund(user, "100.00");
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit.mock.calls[0]?.[0]).not.toHaveProperty("providerRefundId");
+  });
+
   it("converts a partial refund amount to integer minor units", async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn<(body: unknown, key: string) => Promise<OrderMutationOutcome>>(

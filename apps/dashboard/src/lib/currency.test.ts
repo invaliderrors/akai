@@ -3,32 +3,19 @@ import { describe, expect, it } from "vitest";
 import { SUPPORTED_CURRENCIES, currencyFlag, currencyLabel } from "./currency";
 
 describe("SUPPORTED_CURRENCIES", () => {
-  it("leads with the store's base currency", () => {
-    // COP is DEFAULT_CART_CURRENCY. An operator scoping a discount reaches for
-    // it far more often than for the other 83, so it does not sit under C.
-    expect(SUPPORTED_CURRENCIES[0]).toBe("COP");
-  });
-
-  it("lists the rest alphabetically, with no duplicates", () => {
-    const rest = SUPPORTED_CURRENCIES.slice(1);
-    expect(rest).toEqual([...rest].sort());
-    expect(new Set(SUPPORTED_CURRENCIES).size).toBe(SUPPORTED_CURRENCIES.length);
+  it("is exactly what Wompi can charge: COP", () => {
+    // A discount scoped to a currency the provider cannot charge in would
+    // silently never apply, so the picker offers nothing else.
+    expect(SUPPORTED_CURRENCIES).toEqual(["COP"]);
   });
 
   it("holds only well-formed ISO-4217 codes", () => {
-    // The same shape `currencyCodeSchema` enforces at the boundary. A lowercase
-    // code here would be a half-done conversion from the provider's enum, which
-    // speaks lowercase.
+    // The same shape `currencyCodeSchema` enforces at the boundary.
     for (const code of SUPPORTED_CURRENCIES) {
       expect(code, `${code} is not an uppercase three-letter code`).toMatch(/^[A-Z]{3}$/);
     }
   });
 
-  it("covers the currencies this business actually charges in", () => {
-    for (const code of ["COP", "EUR", "USD"]) {
-      expect(SUPPORTED_CURRENCIES).toContain(code);
-    }
-  });
 });
 
 describe("currencyFlag", () => {

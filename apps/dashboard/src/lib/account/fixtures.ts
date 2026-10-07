@@ -202,7 +202,7 @@ export function buildPayment(overrides: Record<string, unknown> = {}): Payment {
   return paymentSchema.parse({
     id: UUID.payment,
     orderId: UUID.order,
-    provider: "WHOP",
+    provider: "WOMPI",
     status: "SUCCEEDED",
     amount: 12_098_000,
     currency: "COP",

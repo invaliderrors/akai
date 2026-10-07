@@ -542,7 +542,7 @@ export async function transitionOrder(
 }
 
 /**
- * Record a refund INTENT.
+ * Record a refund the operator already made in the Wompi dashboard.
  *
  * Carries an `Idempotency-Key` because this is a money-creating POST (spec §9):
  * a double-submitted refund form must replay the first response, not issue a

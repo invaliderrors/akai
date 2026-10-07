@@ -200,7 +200,8 @@ export const transitionOrderRequestSchema = z
 export type TransitionOrderRequest = z.infer<typeof transitionOrderRequestSchema>;
 
 /**
- * Mirrors the API's `createRefundRequestSchema`.
+ * Mirrors the API's `createRefundRequestSchema`: a refund the operator has
+ * ALREADY made in the Wompi dashboard, being recorded.
  *
  * `amount` omitted means "the full remaining refundable balance", resolved
  * SERVER-SIDE. That is both the common case and the one an operator is most
@@ -212,6 +213,8 @@ export const createRefundRequestSchema = z
     amount: z.number().int().min(1).optional(),
     reason: refundSchema.shape.reason,
     note: z.string().max(1000).optional(),
+    /** The refund's reference in the Wompi dashboard, when the operator has one. */
+    providerRefundId: z.string().trim().min(1).max(128).optional(),
     restockVariantIds: z.array(idSchema).default([]),
   })
   .strict();
