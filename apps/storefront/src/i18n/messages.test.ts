@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { identityDocumentTypeSchema } from "@akai/contracts";
+
 import { ApiError } from "@/lib/http";
 
 import { errorMessage, messages } from "./messages";
@@ -25,5 +27,17 @@ describe("errorMessage", () => {
 
   it("falls back to the generic message for anything else", () => {
     expect(errorMessage(errors, new Error("boom"))).toBe(errors.INTERNAL_ERROR);
+  });
+});
+
+describe("checkout copy for Colombia", () => {
+  it("names every identity document type the API accepts, in both locales", () => {
+    for (const locale of ["es", "en"] as const) {
+      const labels = messages(locale).checkout.documentTypes;
+      expect(Object.keys(labels).sort()).toEqual([...identityDocumentTypeSchema.options].sort());
+      for (const type of identityDocumentTypeSchema.options) {
+        expect(labels[type].trim()).not.toBe("");
+      }
+    }
   });
 });

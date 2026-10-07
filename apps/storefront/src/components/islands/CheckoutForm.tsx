@@ -1,6 +1,11 @@
 import {
-  DESTINATION_COUNTRY_CODES,
+  COLOMBIAN_DEPARTAMENTOS,
+  STORE_COUNTRY_CODE,
+  identityDocumentTypeSchema,
+  normaliseColombianMobile,
+  normaliseDocumentNumber,
   type Cart,
+  type IdentityDocumentType,
   type Locale,
   type ShippingOptionDto,
 } from "@akai/contracts";
@@ -20,32 +25,42 @@ interface Props {
   readonly errors: Messages["errors"];
 }
 
-const FIELDS = ["firstName", "lastName", "line1", "houseNumber", "line2", "city", "postalCode", "region", "phone"] as const;
-type Field = (typeof FIELDS)[number];
-const OPTIONAL: ReadonlySet<Field> = new Set(["line2", "region"]);
+const TEXT_FIELDS = ["firstName", "lastName", "line1", "line2", "city", "phone"] as const;
+type TextField = (typeof TEXT_FIELDS)[number];
+const OPTIONAL: ReadonlySet<TextField> = new Set(["line2"]);
+const WIDE: ReadonlySet<TextField> = new Set(["line1", "line2"]);
+
+const EMPTY_ADDRESS: Readonly<Record<TextField, string>> = {
+  firstName: "",
+  lastName: "",
+  line1: "",
+  line2: "",
+  city: "",
+  phone: "",
+};
 
 /**
- * Guest checkout: address → shipping quote → hosted payment redirect.
+ * Guest checkout: Colombian address + identity document → shipping quote →
+ * hosted payment redirect.
  *
- * Only HOME delivery options are offered: SERVICE_POINT rates need a pickup
- * point search the API does not expose yet, and checkout would reject them
- * without a `servicePointId`.
+ * Colombia is the only country served, so it is fixed rather than offered.
+ * The departamento comes from the contracts' closed list, the number goes in
+ * the street line ("Calle 10 # 43-21"), and the buyer's identity document
+ * (type + number) is required — the order snapshots it.
+ *
+ * Phone and document are checked here with the SAME normalisers the API uses,
+ * so the shopper is told what to fix before the round trip; the API stays the
+ * authority.
  */
 export default function CheckoutForm({ apiUrl, locale, cartHref, termsVersion, t, errors }: Props) {
   const client = useMemo(() => new CartClient(apiUrl, locale), [apiUrl, locale]);
-  const countries = useMemo(() => {
-    const names = new Intl.DisplayNames([locale], { type: "region" });
-    return DESTINATION_COUNTRY_CODES.map((code) => ({ code, name: names.of(code) ?? code })).sort((a, b) =>
-      a.name.localeCompare(b.name, locale),
-    );
-  }, [locale]);
 
   const [cart, setCart] = useState<Cart | null | undefined>(undefined);
   const [email, setEmail] = useState("");
-  const [countryCode, setCountryCode] = useState("ES");
-  const [address, setAddress] = useState<Record<Field, string>>(
-    Object.fromEntries(FIELDS.map((field) => [field, ""])) as Record<Field, string>,
-  );
+  const [address, setAddress] = useState<Record<TextField, string>>({ ...EMPTY_ADDRESS });
+  const [region, setRegion] = useState("");
+  const [documentType, setDocumentType] = useState<IdentityDocumentType>("CC");
+  const [documentNumber, setDocumentNumber] = useState("");
   const [options, setOptions] = useState<readonly ShippingOptionDto[] | null>(null);
   const [rateId, setRateId] = useState<string | null>(null);
   const [accepted, setAccepted] = useState(false);
@@ -61,18 +76,47 @@ export default function CheckoutForm({ apiUrl, locale, cartHref, termsVersion, t
   async function quote() {
     setError(null);
     try {
-      const response = await client.quote({ countryCode, postalCode: address.postalCode || null });
-      const home = response.options.filter((option) => option.deliveryType === "HOME");
-      setOptions(home);
-      setRateId(home[0]?.rateId ?? null);
+      const response = await client.quote({ countryCode: STORE_COUNTRY_CODE, postalCode: null });
+      setOptions(response.options);
+      setRateId(response.options[0]?.rateId ?? null);
     } catch (cause: unknown) {
       setError(errorMessage(errors, cause));
     }
   }
 
+  // The destination is fixed, so the methods can be priced as soon as the cart
+  // is known — no address field changes them.
+  useEffect(() => {
+    if (cart === null || cart === undefined || cart.items.length === 0) return;
+    let cancelled = false;
+    client.quote({ countryCode: STORE_COUNTRY_CODE, postalCode: null }).then(
+      (response) => {
+        if (cancelled) return;
+        setOptions(response.options);
+        setRateId(response.options[0]?.rateId ?? null);
+      },
+      (cause: unknown) => {
+        if (!cancelled) setError(errorMessage(errors, cause));
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [client, cart, errors]);
+
   async function submit(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
     if (cart === null || cart === undefined || rateId === null) return;
+
+    if (normaliseColombianMobile(address.phone) === null) {
+      setError(t.invalidPhone);
+      return;
+    }
+    if (normaliseDocumentNumber(documentType, documentNumber) === null) {
+      setError(t.invalidDocument);
+      return;
+    }
+
     setSubmitting(true);
     setError(null);
     try {
@@ -86,15 +130,16 @@ export default function CheckoutForm({ apiUrl, locale, cartHref, termsVersion, t
             lastName: address.lastName,
             company: null,
             line1: address.line1,
-            houseNumber: address.houseNumber,
             line2: nullable(address.line2),
             city: address.city,
-            region: nullable(address.region),
-            postalCode: address.postalCode,
-            countryCode,
+            region,
+            postalCode: null,
+            countryCode: STORE_COUNTRY_CODE,
             phone: address.phone,
           },
           shippingMethodId: rateId,
+          documentType,
+          documentNumber,
           locale,
           acceptedTermsVersion: termsVersion,
         },
@@ -129,45 +174,72 @@ export default function CheckoutForm({ apiUrl, locale, cartHref, termsVersion, t
               onChange={(event) => setEmail(event.target.value)}
             />
           </label>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block">
+              <span className="label">{t.documentType}</span>
+              <select
+                className="field"
+                value={documentType}
+                onChange={(event) => {
+                  const parsed = identityDocumentTypeSchema.safeParse(event.target.value);
+                  if (parsed.success) setDocumentType(parsed.data);
+                }}
+              >
+                {identityDocumentTypeSchema.options.map((type) => (
+                  <option key={type} value={type}>
+                    {t.documentTypes[type]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="label">{t.documentNumber}</span>
+              <input
+                className="field"
+                type="text"
+                required
+                maxLength={32}
+                value={documentNumber}
+                onChange={(event) => setDocumentNumber(event.target.value)}
+              />
+            </label>
+          </div>
         </section>
 
         <section className="space-y-4">
           <h2 className="font-display text-2xl uppercase">{t.shipping}</h2>
-          <label className="block">
-            <span className="label">{t.country}</span>
-            <select
-              className="field"
-              value={countryCode}
-              onChange={(event) => {
-                setCountryCode(event.target.value);
-                setOptions(null);
-                setRateId(null);
-              }}
-            >
-              {countries.map((country) => (
-                <option key={country.code} value={country.code}>
-                  {country.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          <p className="text-sm text-stone">{t.countryFixed}</p>
           <div className="grid gap-4 sm:grid-cols-2">
-            {FIELDS.map((field) => (
-              <label key={field} className={field === "line1" || field === "line2" ? "block sm:col-span-2" : "block"}>
+            {TEXT_FIELDS.map((field) => (
+              <label key={field} className={WIDE.has(field) ? "block sm:col-span-2" : "block"}>
                 <span className="label">{t[field]}</span>
                 <input
                   className="field"
                   required={!OPTIONAL.has(field)}
                   type={field === "phone" ? "tel" : "text"}
+                  inputMode={field === "phone" ? "numeric" : undefined}
+                  autoComplete={field === "phone" ? "tel-national" : undefined}
                   value={address[field]}
                   onChange={(event) => {
                     const value = event.target.value;
                     setAddress((previous) => ({ ...previous, [field]: value }));
-                    if (field === "postalCode") setOptions(null);
                   }}
                 />
               </label>
             ))}
+            <label className="block">
+              <span className="label">{t.region}</span>
+              <select className="field" required value={region} onChange={(event) => setRegion(event.target.value)}>
+                <option value="" disabled>
+                  {t.regionPlaceholder}
+                </option>
+                {COLOMBIAN_DEPARTAMENTOS.map((departamento) => (
+                  <option key={departamento.code} value={departamento.name}>
+                    {departamento.name}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
         </section>
 
