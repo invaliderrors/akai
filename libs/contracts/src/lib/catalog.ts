@@ -82,11 +82,6 @@ export const categoryListItemSchema = categorySchema
 
 export type CategoryListItem = z.infer<typeof categoryListItemSchema>;
 
-/** Public category list filters. There are none; the empty object rejects unknown keys. */
-export const categoryListQuerySchema = z.object({}).strict();
-
-export type CategoryListQuery = z.infer<typeof categoryListQuerySchema>;
-
 /**
  * Not paginated, deliberately.
  *

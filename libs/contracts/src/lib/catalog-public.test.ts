@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { toMinor } from "./money";
 
 import {
-  categoryListQuerySchema,
   categoryListResponseSchema,
   computeStackDiscountTiers,
   createProductSchema,
@@ -115,16 +114,6 @@ describe("productSortSchema", () => {
 
   it("defaults the list query to newest", () => {
     expect(productListQuerySchema.parse({}).sort).toBe("newest");
-  });
-});
-
-describe("categoryListQuerySchema", () => {
-  it("accepts no filters", () => {
-    expect(categoryListQuerySchema.parse({})).toEqual({});
-  });
-
-  it("is strict — no privileged filter can be smuggled in", () => {
-    expect(categoryListQuerySchema.safeParse({ includeDeleted: true }).success).toBe(false);
   });
 });
 
