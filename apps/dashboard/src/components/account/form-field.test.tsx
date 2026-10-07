@@ -149,18 +149,18 @@ describe("<SelectField />", () => {
   it("is a real select named by its label", () => {
     render(
       <SelectField
-        label="Idioma"
-        name="preferredLocale"
-        value="es"
+        label="Tipo de documento"
+        name="documentType"
+        value="CC"
         onChange={vi.fn()}
         options={[
-          { value: "es", label: "Español" },
-          { value: "en", label: "Inglés" },
+          { value: "CC", label: "Cédula de ciudadanía" },
+          { value: "CE", label: "Cédula de extranjería" },
         ]}
       />,
     );
 
-    expect(screen.getByLabelText("Idioma")).toHaveValue("es");
+    expect(screen.getByLabelText("Tipo de documento")).toHaveValue("CC");
   });
 
   it("hands back the option's literal type, not a bare string", async () => {
