@@ -61,7 +61,7 @@ import type { ApiResult } from "@/lib/api/errors";
  * role change is privilege escalation.
  */
 export const updateProfileRequestSchema = customerSchema
-  .pick({ firstName: true, lastName: true, phone: true, preferredLocale: true })
+  .pick({ firstName: true, lastName: true, phone: true })
   .partial()
   .strict();
 

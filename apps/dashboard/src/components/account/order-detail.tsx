@@ -1,9 +1,8 @@
 import type { ReactNode } from "react";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import type {
   AddressFields,
   CurrencyCode,
-  Locale,
   Order,
   OrderItem,
   OrderShipment,
@@ -17,7 +16,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { TotalsList } from "@/components/ui/totals-list";
 import type { OrderDetail } from "@/lib/account";
 
-import { asLocale, formatDate, formatDateTime } from "./format";
+import { formatDate, formatDateTime } from "./format";
 
 /**
  * A single order, in full.
@@ -32,8 +31,8 @@ import { asLocale, formatDate, formatDateTime } from "./format";
  *
  * NO `"use client"`, and nothing here needs one: no state, no effect, no
  * handler. `next-intl` ships a `react-server` condition, so `useTranslations`
- * and `useLocale` resolve to the RSC implementations when the page renders this
- * on the server and to the context hooks when a test wraps it in
+ * resolves to the RSC implementation when the page renders this
+ * on the server and to the context hook when a test wraps it in
  * `NextIntlClientProvider`.
  *
  * IT RENDERS NO `<h1>` AND NO BACK LINK. The page owns both through
@@ -208,7 +207,6 @@ interface DeliveryProgressProps {
  */
 function DeliveryProgress({ order, shipments }: DeliveryProgressProps) {
   const t = useTranslations("account.orderDetail");
-  const locale = asLocale(useLocale());
 
   if (order.status === "CANCELLED" || order.status === "FAILED") {
     return null;
@@ -256,7 +254,7 @@ function DeliveryProgress({ order, shipments }: DeliveryProgressProps) {
                   {step.at === null ? (
                     t("timelinePending")
                   ) : (
-                    <time dateTime={step.at}>{formatDateTime(step.at, locale)}</time>
+                    <time dateTime={step.at}>{formatDateTime(step.at)}</time>
                   )}
                 </span>
               </li>
@@ -274,7 +272,6 @@ function DeliveryProgress({ order, shipments }: DeliveryProgressProps) {
 
 function ShipmentsSection({ shipments }: { readonly shipments: readonly OrderShipment[] }) {
   const t = useTranslations("account.orderDetail");
-  const locale = asLocale(useLocale());
 
   if (shipments.length === 0) {
     return (
@@ -312,11 +309,11 @@ function ShipmentsSection({ shipments }: { readonly shipments: readonly OrderShi
                   )}
                   {shipment.deliveredAt !== null ? (
                     <time dateTime={shipment.deliveredAt}>
-                      {t("deliveredOn", { date: formatDate(shipment.deliveredAt, locale) })}
+                      {t("deliveredOn", { date: formatDate(shipment.deliveredAt) })}
                     </time>
                   ) : shipment.shippedAt !== null ? (
                     <time dateTime={shipment.shippedAt}>
-                      {t("shippedOn", { date: formatDate(shipment.shippedAt, locale) })}
+                      {t("shippedOn", { date: formatDate(shipment.shippedAt) })}
                     </time>
                   ) : null}
                 </span>
@@ -354,13 +351,12 @@ function ShipmentsSection({ shipments }: { readonly shipments: readonly OrderShi
 
 function OrderItemsSection({ order }: { readonly order: Order }) {
   const t = useTranslations("account.orderDetail");
-  const locale = asLocale(useLocale());
 
   return (
     <Group id="order-items-heading" title={t("itemsTitle")}>
       <GroupedList id="order-items" labelledBy="order-items-heading">
         {order.items.map((item) => (
-          <OrderItemRow key={item.id} item={item} currency={order.currency} locale={locale} />
+          <OrderItemRow key={item.id} item={item} currency={order.currency} />
         ))}
       </GroupedList>
     </Group>
@@ -370,11 +366,9 @@ function OrderItemsSection({ order }: { readonly order: Order }) {
 interface OrderItemRowProps {
   readonly item: OrderItem;
   readonly currency: CurrencyCode;
-  /** Narrowed by `asLocale` at the section above, never cast. */
-  readonly locale: Locale;
 }
 
-function OrderItemRow({ item, currency, locale }: OrderItemRowProps) {
+function OrderItemRow({ item, currency }: OrderItemRowProps) {
   const t = useTranslations("account.orderDetail");
 
   return (
@@ -393,13 +387,13 @@ function OrderItemRow({ item, currency, locale }: OrderItemRowProps) {
       meta={<span className="font-mono">{t("sku", { sku: item.sku })}</span>}
       trailing={
         <span className="grid justify-items-end gap-0.5">
-          <Money amount={item.lineTotalGross} currency={currency} locale={locale} emphasis />
+          <Money amount={item.lineTotalGross} currency={currency} emphasis />
           {/* Quantity and unit price under the line total: at ×1 they say the
               same thing twice, but at ×2 the line total alone leaves the
               customer to divide, and this is the screen they came to check. */}
           <span className="text-[13px] leading-[18px]">
             {t("quantity", { quantity: item.quantity })}{" · "}
-            <Money amount={item.unitPriceGross} currency={currency} locale={locale} />
+            <Money amount={item.unitPriceGross} currency={currency} />
           </span>
         </span>
       }
@@ -413,7 +407,6 @@ function OrderItemRow({ item, currency, locale }: OrderItemRowProps) {
 
 function OrderTotalsSection({ order }: { readonly order: Order }) {
   const t = useTranslations("account.orderDetail");
-  const locale = asLocale(useLocale());
 
   return (
     <Group id="order-totals-heading" title={t("totalsTitle")}>
@@ -426,7 +419,6 @@ function OrderTotalsSection({ order }: { readonly order: Order }) {
             free. */}
         <TotalsList
           currency={order.currency}
-          locale={locale}
           subtotal={{ label: t("subtotal"), amount: order.subtotal }}
           discount={{ label: t("discount"), amount: order.discountTotal }}
           shipping={{ label: t("shipping"), amount: order.shippingTotal }}
@@ -450,7 +442,6 @@ interface PaymentSectionProps {
 
 function PaymentSection({ order, payment }: PaymentSectionProps) {
   const t = useTranslations("account.orderDetail");
-  const locale = asLocale(useLocale());
 
   return (
     // `grid-rows-[auto_1fr]`: the two-up row stretches this section, and the
@@ -482,7 +473,7 @@ function PaymentSection({ order, payment }: PaymentSectionProps) {
             {payment.capturedAt === null ? null : (
               <p className="m-0 text-[13px] leading-[18px] text-[var(--label-secondary)]">
                 <time dateTime={payment.capturedAt}>
-                  {formatDateTime(payment.capturedAt, locale)}
+                  {formatDateTime(payment.capturedAt)}
                 </time>
               </p>
             )}

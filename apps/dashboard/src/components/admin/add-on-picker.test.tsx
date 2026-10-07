@@ -43,7 +43,6 @@ function renderPicker(
         candidates={candidates}
         selected={selected}
         onChange={onChange}
-        locale="es"
       />
     </NextIntlClientProvider>,
   );

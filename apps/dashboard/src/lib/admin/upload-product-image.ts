@@ -38,7 +38,7 @@ export interface UploadDeps {
     input: {
       objectKey: string;
       url: string;
-      alt: Record<string, string>;
+      alt: string;
       width: number;
       height: number;
       sortOrder: number;
@@ -81,7 +81,7 @@ export async function uploadProductImage(
   input: {
     productId: string;
     file: File;
-    alt: Record<string, string>;
+    alt: string;
     sortOrder: number;
     /** Set to attach the object to one variant rather than to the gallery. */
     variantId?: string;

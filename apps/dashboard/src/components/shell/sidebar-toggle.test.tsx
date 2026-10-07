@@ -18,7 +18,8 @@ import { SIDEBAR_COOKIE_NAME, isSidebarHidden } from "./sidebar-cookie";
 
 const refresh = vi.fn<() => void>();
 
-vi.mock("@/i18n/navigation", () => ({
+vi.mock("next/navigation", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/navigation")>()),
   useRouter: () => ({ refresh }),
 }));
 

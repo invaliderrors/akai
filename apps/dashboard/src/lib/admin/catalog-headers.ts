@@ -1,42 +1,37 @@
-import { localeSchema, type Locale } from "@akai/contracts";
-
 /**
  * Header the API sets when it stored something OTHER than what an operator
  * submitted — see `CONTENT_SANITIZED_HEADER`'s own doc comment in
  * `apps/api/src/modules/catalog/catalog.constants.ts` for the full reasoning
  * (why a header rather than the body, why not a 400).
  *
- * DUPLICATED, NOT IMPORTED — same reasoning as `CART_TOKEN_HEADER`
- * (`apps/storefront/src/lib/api/cart-token.ts`): a header NAME is a wire-format
- * detail shared across the Nx module boundary between `scope:server` and
- * `scope:web`, and the two apps may not import from each other or from a
- * shared `scope:server` module.
+ * DUPLICATED, NOT IMPORTED — same reasoning as `CART_TOKEN_HEADER`: a header
+ * NAME is a wire-format detail shared across the Nx module boundary between
+ * `scope:server` and `scope:web`, and the two apps may not import from each
+ * other or from a shared `scope:server` module.
  *
- * The value is a comma-separated list of `Locale` codes whose `description`
- * the sanitiser rewrote on this write.
+ * The value is a comma-separated list of the field names the sanitiser
+ * rewrote on this write — today only `description`.
  */
 export const CONTENT_SANITIZED_HEADER = "x-content-sanitized";
 
+/** The header's token for a rewritten product description. */
+const DESCRIPTION_TOKEN = "description";
+
 /**
- * Parses the header's value into the locales it actually names.
+ * Whether the API rewrote the product description on this write.
  *
- * Validated against `localeSchema` rather than split-and-trusted: this is
- * external input off the wire like any other, and an unrecognised token
- * (a future locale the API knows about and this dashboard build does not yet)
- * is dropped rather than surfacing as a raw string an operator cannot read.
- * Absent or empty means nothing was rewritten.
+ * Parsed token by token rather than compared whole: this is external input off
+ * the wire like any other, and an unrecognised token (a field a future API
+ * sanitises that this dashboard build does not yet know) is ignored rather than
+ * mistaken for the description. Absent or empty means nothing was rewritten.
  */
-export function parseSanitizedLocales(
+export function parseDescriptionSanitized(
   headers: Readonly<Record<string, string>> | undefined,
-): readonly Locale[] {
+): boolean {
   const raw = headers?.[CONTENT_SANITIZED_HEADER];
   if (raw === undefined || raw === "") {
-    return [];
+    return false;
   }
 
-  return raw
-    .split(",")
-    .map((token) => localeSchema.safeParse(token.trim()))
-    .filter((parsed) => parsed.success)
-    .map((parsed) => parsed.data);
+  return raw.split(",").some((token) => token.trim() === DESCRIPTION_TOKEN);
 }

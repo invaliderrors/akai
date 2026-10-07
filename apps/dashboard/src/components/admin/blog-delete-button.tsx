@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 import { ConfirmActionError, ConfirmAlert } from "@/components/ui/confirm";
-import { useRouter } from "@/i18n/navigation";
+import { useRouter } from "next/navigation";
 import { deleteBlogPostAction } from "@/lib/admin/actions";
 
 import { actionErrorKey } from "./affiliate-editor";

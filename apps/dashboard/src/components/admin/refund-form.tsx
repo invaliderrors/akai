@@ -2,7 +2,7 @@
 
 import { useId, useState } from "react";
 import { useTranslations } from "next-intl";
-import type { CurrencyCode, Locale, Minor, RefundReason } from "@akai/contracts";
+import type { CurrencyCode, Minor, RefundReason } from "@akai/contracts";
 import { formatMoney } from "@akai/money";
 
 import { Button } from "@/components/ui/button";
@@ -28,7 +28,6 @@ import { reasonKey } from "./order-status-control";
 
 export interface RefundFormProps {
   readonly currency: CurrencyCode;
-  readonly locale: Locale;
   /** `grandTotal − refundedTotal`, computed by the page. Display bound only. */
   readonly remainingRefundable: Minor;
   /** What has already gone back, for the panel's ledger. */
@@ -107,7 +106,6 @@ const PROVIDER_REF_MAX = 128;
  */
 export function RefundForm({
   currency,
-  locale,
   remainingRefundable,
   refundedTotal,
   onSubmit,
@@ -195,7 +193,7 @@ export function RefundForm({
     }
     if (parsed.value > remainingRefundable) {
       return t("refundTooLarge", {
-        amount: formatMoney(remainingRefundable, currency, locale),
+        amount: formatMoney(remainingRefundable, currency),
       });
     }
     return undefined;
@@ -271,7 +269,7 @@ export function RefundForm({
       <dl className="m-0 grid grid-cols-[1fr_auto] gap-x-3 gap-y-[2px] text-[12px]">
         <dt className="text-[var(--label-secondary)]">{t("refundAlready")}</dt>
         <dd className="m-0 text-right">
-          <Money amount={refundedTotal} currency={currency} locale={locale} />
+          <Money amount={refundedTotal} currency={currency} />
         </dd>
       </dl>
 
@@ -285,7 +283,7 @@ export function RefundForm({
           setAmountError(undefined);
         }}
         hint={t("refundAmountHint", {
-          max: formatMoney(remainingRefundable, currency, locale),
+          max: formatMoney(remainingRefundable, currency),
         })}
         errorMessages={moneyErrors}
         placeholder={formatMinorAsInput(remainingRefundable, currency)}
@@ -336,7 +334,7 @@ export function RefundForm({
           open={confirming}
           onClose={() => setConfirming(false)}
           title={t("refundConfirmTitle", {
-            amount: formatMoney(effective, currency, locale),
+            amount: formatMoney(effective, currency),
           })}
           consequence={t("refundConfirmBody")}
           icon="banknote"
@@ -351,7 +349,7 @@ export function RefundForm({
           ledger={[
             {
               label: t("refundAmountLabel", { currency }),
-              value: <Money amount={effective} currency={currency} locale={locale} emphasis />,
+              value: <Money amount={effective} currency={currency} emphasis />,
               emphasis: true,
             },
             { label: t("refundReasonLabel"), value: reasonLabel(reason) },

@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { Link } from "@/i18n/navigation";
+import Link from "next/link";
 
 import { SectionHeader } from "./card";
 import { Icon, type IconName } from "./icon";
@@ -52,7 +52,7 @@ type HeaderDensity = "comfortable" | "compact";
 // ---------------------------------------------------------------------------
 
 interface RowLink {
-  /** Locale-aware path. Renders the row as a `Link`, chevron and all. */
+  /** An app path. Renders the row as a `Link`, chevron and all. */
   readonly href: string;
   readonly onClick?: undefined;
 }

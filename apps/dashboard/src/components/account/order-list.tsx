@@ -1,14 +1,14 @@
 import type { ReactNode } from "react";
 import { useTranslations } from "next-intl";
 
-import type { Locale, OrderSummary } from "@akai/contracts";
+import type { OrderSummary } from "@akai/contracts";
 
 import { ContentRow, GroupedList } from "@/components/ui/grouped-list";
 import { Money } from "@/components/ui/money";
 import { EmptyState } from "@/components/ui/states";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { DataTable, type Column } from "@/components/ui/table";
-import { Link } from "@/i18n/navigation";
+import Link from "next/link";
 
 import { formatDate } from "./format";
 
@@ -54,12 +54,6 @@ export interface OrderListProps {
   /** One cursor page, already fetched by the page. Fetch high, render pure. */
   readonly orders: readonly OrderSummary[];
   /**
-   * Narrowed by the caller with `asLocale`, never cast: `<Money>` and
-   * `formatDate` both need the union, and a raw `useLocale()` string would
-   * silently format a Spanish-default store in en-US.
-   */
-  readonly locale: Locale;
-  /**
    * The pagination bar. A SLOT, not built here: the cursor stack is a property
    * of the URL, which belongs to the page, and keeping it out of this component
    * is what lets the list stay a pure function of its rows.
@@ -74,7 +68,7 @@ export interface OrderListProps {
   readonly emptyAction?: ReactNode;
 }
 
-export function OrderList({ orders, locale, footer, emptyAction }: OrderListProps) {
+export function OrderList({ orders, footer, emptyAction }: OrderListProps) {
   const t = useTranslations("account.orders");
 
   if (orders.length === 0) {
@@ -128,7 +122,7 @@ export function OrderList({ orders, locale, footer, emptyAction }: OrderListProp
     {
       key: "placedAt",
       header: t("colDate"),
-      cell: (order) => <time dateTime={order.placedAt}>{formatDate(order.placedAt, locale)}</time>,
+      cell: (order) => <time dateTime={order.placedAt}>{formatDate(order.placedAt)}</time>,
     },
     {
       key: "status",
@@ -148,7 +142,7 @@ export function OrderList({ orders, locale, footer, emptyAction }: OrderListProp
       header: t("colTotal"),
       kind: "numeric",
       cell: (order) => (
-        <Money amount={order.grandTotal} currency={order.currency} locale={locale} emphasis />
+        <Money amount={order.grandTotal} currency={order.currency} emphasis />
       ),
     },
   ];
@@ -192,7 +186,7 @@ export function OrderList({ orders, locale, footer, emptyAction }: OrderListProp
               key={order.id}
               href={`/orders/${order.orderNumber}`}
               title={<span className="font-mono">{order.orderNumber}</span>}
-              meta={`${formatDate(order.placedAt, locale)} · ${t("itemCount", {
+              meta={`${formatDate(order.placedAt)} · ${t("itemCount", {
                 count: order.itemCount,
               })}`}
               aside={<StatusBadge domain="order" value={order.status} density="compact" />}
@@ -200,7 +194,6 @@ export function OrderList({ orders, locale, footer, emptyAction }: OrderListProp
                 <Money
                   amount={order.grandTotal}
                   currency={order.currency}
-                  locale={locale}
                   emphasis
                 />
               }

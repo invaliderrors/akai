@@ -95,7 +95,7 @@
    ============================================================ */
 
 /* Density defaults on BARE :root, before the [data-density] blocks.
-   `app/[locale]/(auth)/` holds five page directories and NO layout, so auth
+   `app/(auth)/` holds five page directories and NO layout, so auth
    renders outside DashboardShell and can never receive a data-density
    attribute. Without these, every h-[var(--control-h)] on the auth screens, on
    not-found, on an error boundary and in every Vitest render resolves to

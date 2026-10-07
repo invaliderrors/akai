@@ -25,13 +25,12 @@ import esMessages from "../../../messages/es.json";
 /**
  * `usePathname` is the ONLY reason this component is a client component, so it
  * is the one thing the mock has to make controllable. `Link` is mocked down to
- * the anchor it renders — the href it is GIVEN is what is under test here, and
- * the locale prefix next-intl adds is covered by the e2e locale smoke.
+ * the anchor it renders — the href it is GIVEN is what is under test here.
  */
 const nav = vi.hoisted(() => ({ pathname: "/" }));
 
-vi.mock("@/i18n/navigation", () => ({
-  Link: ({
+vi.mock("next/link", () => ({
+  default: ({
     href,
     children,
     className,
@@ -46,6 +45,9 @@ vi.mock("@/i18n/navigation", () => ({
       {children}
     </a>
   ),
+}));
+vi.mock("next/navigation", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/navigation")>()),
   usePathname: () => nav.pathname,
 }));
 

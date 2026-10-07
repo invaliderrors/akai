@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { inventoryRowSchema, type InventoryRow } from "@akai/contracts";
 
 import { STATUS_TONE } from "@/lib/status";
-import { asLocale, resolveStockState, single } from "./inventory-display";
+import { resolveStockState, single } from "./inventory-display";
 
 /**
  * The badge an operator scans to decide what to act on.
@@ -100,18 +100,6 @@ describe("resolveStockState", () => {
     // would have put it level with an untracked row, which is a data problem
     // rather than a lost sale.
     expect(STATUS_TONE.stock.out).toBe("attention");
-  });
-});
-
-describe("asLocale", () => {
-  it("accepts the supported locales", () => {
-    expect(asLocale("es")).toBe("es");
-    expect(asLocale("en")).toBe("en");
-  });
-
-  it("falls back rather than passing an arbitrary segment to the API", () => {
-    expect(asLocale("fr")).toBe("es");
-    expect(asLocale("")).toBe("es");
   });
 });
 

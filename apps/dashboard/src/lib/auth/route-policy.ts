@@ -88,7 +88,7 @@ export type RouteDecision =
   | { readonly kind: "redirect"; readonly path: string; readonly reason: RedirectReason };
 
 export interface RoutePolicyInput {
-  /** Locale-stripped, e.g. `/admin/products` for `/en/admin/products`. */
+  /** Normalised (`normalisePathname`), e.g. `/admin/products`. */
   readonly pathname: string;
   /** Null when anonymous. `role` is the cached, advisory value. */
   readonly session: { readonly role: Role } | null;
@@ -142,27 +142,11 @@ export function decideAccess({ pathname, session }: RoutePolicyInput): RouteDeci
 }
 
 /**
- * Splits a locale prefix off a pathname.
- *
- * `localePrefix: "as-needed"` means the default locale carries NO prefix, so
- * `/orders` and `/en/orders` are the same route. Policy must see the same
- * string for both or the rules apply to only one of the two languages — a
- * bug that reliably escapes review because the default locale keeps working.
+ * Drops a trailing slash so `/orders/` and `/orders` reach the policy as the
+ * same string — the rules must not apply to only one spelling of a route.
  */
-export function stripLocale(
-  pathname: string,
-  locales: readonly string[],
-): { readonly locale: string | null; readonly pathname: string } {
-  const segments = pathname.split("/");
-  const first = segments[1];
-
-  if (first !== undefined && locales.includes(first)) {
-    const remainder = `/${segments.slice(2).join("/")}`;
-    return { locale: first, pathname: remainder === "/" ? "/" : remainder.replace(/\/$/, "") };
-  }
-
-  const normalised = pathname === "/" ? "/" : pathname.replace(/\/$/, "");
-  return { locale: null, pathname: normalised };
+export function normalisePathname(pathname: string): string {
+  return pathname === "/" ? "/" : pathname.replace(/\/$/, "");
 }
 
 /**
@@ -175,39 +159,24 @@ export function stripLocale(
  *  - must start with a single `/` (rejects absolute URLs)
  *  - `//host` and `/\host` are rejected: browsers treat both as protocol-relative
  *  - anything else falls back to the dashboard home
- *
- * The locale prefix is stripped because the caller passes the result to
- * next-intl's router, which adds its own — leaving it would produce `/en/en/orders`.
  */
-export function sanitiseNextPath(
-  raw: string | null,
-  locales: readonly string[],
-): string {
+export function sanitiseNextPath(raw: string | null): string {
   if (raw === null || !raw.startsWith("/") || raw.startsWith("//") || raw.startsWith("/\\")) {
     return DASHBOARD_HOME_PATH;
   }
 
-  // The query string is preserved but kept out of locale stripping, which
-  // reasons about path segments only. `/en/orders?cursor=abc` must survive as
-  // `/orders?cursor=abc`, not lose the cursor and silently reset to page one.
+  // The query string is preserved but kept out of path normalisation, which
+  // reasons about path segments only. `/orders?cursor=abc` must survive with
+  // its cursor, not silently reset to page one.
   const queryStart = raw.indexOf("?");
   const pathPart = queryStart === -1 ? raw : raw.slice(0, queryStart);
   const query = queryStart === -1 ? "" : raw.slice(queryStart);
 
-  const { pathname } = stripLocale(pathPart, locales);
+  const pathname = normalisePathname(pathPart);
 
   // A redirect back to an anonymous-only page after signing in would bounce
   // straight back out again via `decideAccess`. Home is the useful destination.
   return classifyPath(pathname) === "anonymous-only"
     ? DASHBOARD_HOME_PATH
     : `${pathname}${query}`;
-}
-
-/** Re-applies a locale prefix, honouring `as-needed` for the default locale. */
-export function localisedPath(
-  path: string,
-  locale: string,
-  defaultLocale: string,
-): string {
-  return locale === defaultLocale ? path : `/${locale}${path === "/" ? "" : path}`;
 }

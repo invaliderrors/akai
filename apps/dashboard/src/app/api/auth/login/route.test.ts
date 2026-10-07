@@ -54,7 +54,6 @@ const CUSTOMER = {
   lastName: "Ruiz",
   phone: null,
   role: "CUSTOMER",
-  preferredLocale: "es",
   twoFactorEnabled: false,
   anonymisedAt: null,
   createdAt: "2026-07-01T10:00:00.000Z",

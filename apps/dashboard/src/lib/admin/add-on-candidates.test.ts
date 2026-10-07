@@ -13,10 +13,7 @@ function row(
   id: string,
   slug: string,
   listed: boolean,
-  translations: readonly { locale: string; name: string }[] = [
-    { locale: "es", name: `${slug} es` },
-    { locale: "en", name: `${slug} en` },
-  ],
+  name = `${slug} es`,
   extra: Record<string, unknown> = {},
 ) {
   // SHAPED LIKE THE REAL ROW, including `status` and `variants`. The earlier
@@ -29,7 +26,7 @@ function row(
     slug,
     listed,
     status: "ACTIVE",
-    translations,
+    name,
     variants: [{ isActive: true, price: { gross: 4999, currency: "EUR" } }],
     ...extra,
   };
@@ -46,7 +43,7 @@ describe("loadAddOnCandidates", () => {
       items: [row("a", "agua", false), row("b", "camiseta", true)],
     });
 
-    const result = await loadAddOnCandidates(http, "es");
+    const result = await loadAddOnCandidates(http);
 
     expect(result.map((candidate) => candidate.slug)).toEqual(["agua"]);
   });
@@ -58,32 +55,15 @@ describe("loadAddOnCandidates", () => {
       items: [row("a", "agua", false), row("self", "camiseta", false)],
     });
 
-    const result = await loadAddOnCandidates(http, "es", "self");
+    const result = await loadAddOnCandidates(http, "self");
 
     expect(result.map((candidate) => candidate.id)).toEqual(["a"]);
   });
 
-  it("names each candidate in the operator's locale", async () => {
-    listProducts.mockResolvedValue({ items: [row("a", "agua", false)] });
+  it("names each candidate with the product's own name", async () => {
+    listProducts.mockResolvedValue({ items: [row("a", "agua", false, "Agua")] });
 
-    expect((await loadAddOnCandidates(http, "en"))[0]?.name).toBe("agua en");
-    expect((await loadAddOnCandidates(http, "es"))[0]?.name).toBe("agua es");
-  });
-
-  it("falls back to another translation, then to the slug", async () => {
-    listProducts.mockResolvedValue({
-      items: [
-        row("a", "agua", false, [{ locale: "es", name: "Agua" }]),
-        row("b", "pegatinas", false, []),
-      ],
-    });
-
-    const result = await loadAddOnCandidates(http, "en");
-
-    // No English translation — the Spanish one still names it better than an id.
-    expect(result[0]?.name).toBe("Agua");
-    // No translation at all — the slug is always present and always unique.
-    expect(result[1]?.name).toBe("pegatinas");
+    expect((await loadAddOnCandidates(http))[0]?.name).toBe("Agua");
   });
 
   it("returns nothing rather than throwing when the catalogue read fails", async () => {
@@ -91,7 +71,7 @@ describe("loadAddOnCandidates", () => {
     // picker is not worth giving it one.
     listProducts.mockRejectedValue(new Error("API request failed (503)"));
 
-    await expect(loadAddOnCandidates(http, "es")).resolves.toEqual([]);
+    await expect(loadAddOnCandidates(http)).resolves.toEqual([]);
   });
 });
 
@@ -104,7 +84,7 @@ describe("loadAddOnCandidates — status and price", () => {
       items: [row("a", "agua", false, undefined, { status: "DRAFT" })],
     });
 
-    const result = await loadAddOnCandidates(http, "es");
+    const result = await loadAddOnCandidates(http);
 
     expect(result).toHaveLength(1);
     expect(result[0]?.status).toBe("DRAFT");
@@ -122,7 +102,7 @@ describe("loadAddOnCandidates — status and price", () => {
       ],
     });
 
-    const result = await loadAddOnCandidates(http, "es");
+    const result = await loadAddOnCandidates(http);
 
     expect(result[0]?.priceGross).toBe(2550);
     expect(result[0]?.currency).toBe("EUR");
@@ -133,7 +113,7 @@ describe("loadAddOnCandidates — status and price", () => {
       items: [row("a", "agua", false, undefined, { variants: [] })],
     });
 
-    const result = await loadAddOnCandidates(http, "es");
+    const result = await loadAddOnCandidates(http);
 
     expect(result[0]?.priceGross).toBeNull();
   });

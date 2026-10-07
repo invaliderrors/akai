@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { z } from "zod";
-import { useRouter } from "@/i18n/navigation";
+import { useRouter } from "next/navigation";
 import { postJson } from "@/lib/bff/client";
 
 const responseSchema = z.object({ status: z.literal("signed-out") });

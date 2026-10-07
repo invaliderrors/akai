@@ -1,4 +1,4 @@
-import { Link } from "@/i18n/navigation";
+import Link from "next/link";
 
 import { Button, buttonClassName } from "./button";
 import { Icon } from "./icon";
@@ -15,10 +15,8 @@ import type { SearchParamValue } from "./segmented-control";
  * submission, removing one filter is a link.
  *
  * THE FORM HAS NO `action`, DELIBERATELY. Omitted, a GET form submits to the
- * current URL — which under next-intl includes the `/es` or `/en` segment.
- * Writing `action={pathname}` would look tidier and would silently drop the
- * locale prefix on every Apply. `pathname` is used ONLY to build hrefs, and
- * those go through `Link`, which puts the prefix back.
+ * current URL, which is exactly the list being filtered. `pathname` is used
+ * ONLY to build the remove-one-filter hrefs, which go through `Link`.
  *
  * A GET SUBMIT REPLACES THE WHOLE QUERY STRING with the form's own fields, so
  * anything already in the URL that is not a field here is carried across as a
@@ -75,7 +73,7 @@ export function single(value: SearchParamValue): string | undefined {
 }
 
 export interface BuildFilterHrefOptions {
-  /** Route the list lives on, e.g. `/admin/orders`. `Link` adds the locale. */
+  /** Route the list lives on, e.g. `/admin/orders`. */
   readonly pathname: string;
   /** Everything already in the URL. Unrelated params are carried across. */
   readonly searchParams?: Readonly<Record<string, SearchParamValue>>;

@@ -80,16 +80,17 @@ interface LinkMockProps {
   readonly "aria-label"?: string;
 }
 
-vi.mock("@/i18n/navigation", () => ({
-  Link: ({ href, children, ...rest }: LinkMockProps) => (
+vi.mock("next/link", () => ({
+  default: ({ href, children, ...rest }: LinkMockProps) => (
     <a href={href} {...rest}>
       {children}
     </a>
   ),
+}));
+vi.mock("next/navigation", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/navigation")>()),
   usePathname: () => "/",
   useRouter: () => ({ replace: vi.fn(), refresh: vi.fn() }),
-  getPathname: ({ href, locale }: { href: string; locale: string }) =>
-    locale === "es" ? href : `/${locale}${href}`,
 }));
 
 vi.mock("@/lib/bff/client", () => ({

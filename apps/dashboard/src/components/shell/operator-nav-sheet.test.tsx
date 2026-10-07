@@ -36,8 +36,8 @@ interface LinkMockProps {
   readonly "aria-current"?: "page";
 }
 
-vi.mock("@/i18n/navigation", () => ({
-  Link: ({ href, children, onClick, ...rest }: LinkMockProps) => (
+vi.mock("next/link", () => ({
+  default: ({ href, children, onClick, ...rest }: LinkMockProps) => (
     <a
       href={href}
       {...rest}
@@ -52,6 +52,9 @@ vi.mock("@/i18n/navigation", () => ({
       {children}
     </a>
   ),
+}));
+vi.mock("next/navigation", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/navigation")>()),
   usePathname: () => nav.pathname,
   // Never called here — `accountInitials` is imported from `account-menu`,
   // which pulls the sign-out button in with it. Present so the mocked module

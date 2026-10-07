@@ -2,7 +2,7 @@
 
 import { useId, useState } from "react";
 import { useTranslations } from "next-intl";
-import type { CurrencyCode, Locale, Minor } from "@akai/contracts";
+import type { CurrencyCode, Minor } from "@akai/contracts";
 import { formatMoney, multiply } from "@akai/money";
 
 import { Button } from "@/components/ui/button";
@@ -105,7 +105,6 @@ export interface PreviewAddOnVariant {
 export interface ProductPreviewDialogProps {
   readonly open: boolean;
   readonly onClose: () => void;
-  readonly locale: Locale;
   readonly currency: CurrencyCode;
   readonly name: string;
   readonly shortDescription: string;
@@ -118,7 +117,6 @@ export interface ProductPreviewDialogProps {
 export function ProductPreviewDialog({
   open,
   onClose,
-  locale,
   currency,
   name,
   shortDescription,
@@ -207,14 +205,14 @@ export function ProductPreviewDialog({
 
             {selected?.priceGross != null && (
               <p className="mt-3 font-mono text-3xl text-ink">
-                {formatMoney(selected.priceGross, currency, locale)}
+                {formatMoney(selected.priceGross, currency)}
               </p>
             )}
             {selected?.compareAtGross != null &&
               selected.priceGross != null &&
               selected.compareAtGross > selected.priceGross && (
                 <p className="mt-1 font-mono text-sm text-muted2 line-through">
-                  {formatMoney(selected.compareAtGross, currency, locale)}
+                  {formatMoney(selected.compareAtGross, currency)}
                 </p>
               )}
 
@@ -281,10 +279,10 @@ export function ProductPreviewDialog({
                             )}
                           </th>
                           <td className="py-2 pe-3 text-end font-mono tabular-nums">
-                            {formatMoney(row.total, currency, locale)}
+                            {formatMoney(row.total, currency)}
                           </td>
                           <td className="py-2 pe-3 text-end font-mono tabular-nums">
-                            {formatMoney(row.unit, currency, locale)}
+                            {formatMoney(row.unit, currency)}
                           </td>
                           <td className="py-2 text-end font-mono tabular-nums">
                             {row.savingPercent > 0 ? `−${row.savingPercent} %` : "—"}
@@ -351,7 +349,6 @@ export function ProductPreviewDialog({
                                       : formatMoney(
                                           variant.priceGross as Minor,
                                           variant.currency as CurrencyCode,
-                                          locale,
                                         )}
                                   </span>
                                 </label>
@@ -389,7 +386,7 @@ export function ProductPreviewDialog({
                               >
                                 {price === 0
                                   ? t("preview.addOnsFree")
-                                  : formatMoney(price as Minor, currency as CurrencyCode, locale)}
+                                  : formatMoney(price as Minor, currency as CurrencyCode)}
                               </span>
                             )}
                           </span>

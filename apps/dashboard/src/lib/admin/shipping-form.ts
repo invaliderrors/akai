@@ -5,7 +5,6 @@ import {
   toMinor,
   type AdminShippingRate,
   type AdminShippingZoneDetail,
-  type Locale,
   type ShippingAdminFailureReason,
   type ShippingStrategy,
   SHIPPING_RATE_CURRENCY,
@@ -47,8 +46,7 @@ export type RateFormError =
   | "TRANSIT_ORDER";
 
 export type RateField =
-  | "nameEs"
-  | "nameEn"
+  | "name"
   | "minValue"
   | "maxValue"
   | "priceGross"
@@ -60,8 +58,7 @@ export type RateFieldErrors = Partial<Readonly<Record<RateField, RateFormError>>
 
 /** Everything an input holds is a string. Converted on submit. */
 export interface RateFormValues {
-  readonly nameEs: string;
-  readonly nameEn: string;
+  readonly name: string;
   readonly strategy: ShippingStrategy;
   /** WEIGHT: whole grams. PRICE: whole pesos ("300000" / "300.000"). Ignored for FLAT. */
   readonly minValue: string;
@@ -84,8 +81,7 @@ const TRANSIT_MAX_DAYS = 60;
 
 export function emptyRateValues(): RateFormValues {
   return {
-    nameEs: "",
-    nameEn: "",
+    name: "",
     strategy: "FLAT",
     minValue: "",
     maxValue: "",
@@ -105,8 +101,7 @@ function boundAsInput(value: number | null, strategy: ShippingStrategy): string 
 
 export function rateToValues(rate: AdminShippingRate): RateFormValues {
   return {
-    nameEs: rate.name.es ?? "",
-    nameEn: rate.name.en ?? "",
+    name: rate.name,
     strategy: rate.strategy,
     minValue: boundAsInput(rate.minValue, rate.strategy),
     maxValue: boundAsInput(rate.maxValue, rate.strategy),
@@ -152,11 +147,9 @@ function bound(raw: string, strategy: ShippingStrategy): Parsed<number | null> {
 export function buildRatePayload(values: RateFormValues): RateBuildResult {
   const errors: Partial<Record<RateField, RateFormError>> = {};
 
-  const nameEs = values.nameEs.trim();
-  const nameEn = values.nameEn.trim();
-  if (nameEs === "") errors.nameEs = "REQUIRED";
-  else if (nameEs.length > NAME_MAX) errors.nameEs = "TOO_LONG";
-  if (nameEn.length > NAME_MAX) errors.nameEn = "TOO_LONG";
+  const name = values.name.trim();
+  if (name === "") errors.name = "REQUIRED";
+  else if (name.length > NAME_MAX) errors.name = "TOO_LONG";
 
   const price = parseMajorUnitInput(values.priceGross, SHIPPING_CURRENCY);
   if (!price.ok) errors.priceGross = price.error;
@@ -206,7 +199,7 @@ export function buildRatePayload(values: RateFormValues): RateBuildResult {
   return {
     ok: true,
     value: {
-      name: nameEn === "" ? { es: nameEs } : { es: nameEs, en: nameEn },
+      name,
       strategy: values.strategy,
       minValue: min.value,
       maxValue: max.value,
@@ -303,9 +296,9 @@ export function buildZonePayload(
 // Display
 // ---------------------------------------------------------------------------
 
-/** A rate's name in the operator's locale, falling back to Spanish (the store default). */
-export function rateDisplayName(rate: Pick<AdminShippingRate, "name">, locale: Locale): string {
-  return (locale === "en" ? rate.name.en : undefined) ?? rate.name.es ?? rate.name.en ?? "";
+/** A rate's display name, trimmed — "" for a row with no usable name. */
+export function rateDisplayName(rate: Pick<AdminShippingRate, "name">): string {
+  return rate.name.trim();
 }
 
 /** An ACTIVE rate whose free-shipping threshold is not what the storefront advertises. */

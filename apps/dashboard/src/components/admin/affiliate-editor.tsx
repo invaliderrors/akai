@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 
-import { useRouter } from "@/i18n/navigation";
+import { useRouter } from "next/navigation";
 import {
   createAffiliateAction,
   deleteAffiliateAction,

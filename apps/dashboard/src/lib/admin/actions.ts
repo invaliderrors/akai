@@ -5,7 +5,6 @@ import {
   blogCoverUploadUrlRequestSchema,
   createBlogPostSchema,
   offerEverywhereSchema,
-  translateRequestSchema,
   updateBlogPostSchema,
   updateProductSchema,
   type BlogCoverUploadUrlRequest,
@@ -14,7 +13,6 @@ import {
   type CreateProduct,
   type UpdateBlogPost,
   type ErrorCode,
-  type Locale,
   type OfferEverywhereResult,
   type OrderStatus,
   type UpdateSiteSettings,
@@ -33,18 +31,6 @@ import { createAdminHttp } from "./http-adapter";
 import { AdminApiError, type AdminHttp, type AdminHttpRequest } from "./http";
 import * as api from "./api";
 import * as shippingApi from "./shipping-api";
-import {
-  mergeBlogTranslations,
-  toBlogTranslationTexts,
-  translateBlogCopyInputSchema,
-  type BlogCopy,
-} from "./blog-copy";
-import {
-  mergeTranslations,
-  toTranslationTexts,
-  translateCopyInputSchema,
-  type ProductCopy,
-} from "./translate-copy";
 import {
   addVariantRequestSchema,
   adjustInventoryRequestSchema,
@@ -237,8 +223,8 @@ async function run<T>(operation: () => Promise<T>): Promise<ActionResult<T>> {
 export interface CreatedProduct {
   readonly id: string;
   readonly variants: readonly { readonly id: string; readonly sku: string }[];
-  /** Locales whose description the API's sanitiser rewrote. Empty when nothing changed. */
-  readonly sanitizedLocales: readonly Locale[];
+  /** Whether the API's sanitiser rewrote the description. */
+  readonly descriptionSanitized: boolean;
 }
 
 export async function createProductAction(
@@ -246,12 +232,12 @@ export async function createProductAction(
 ): Promise<ActionResult<CreatedProduct>> {
   const result = await run(async () => {
     const http = await adminHttp();
-    const { product, sanitizedLocales } = await api.createProduct(http, input);
+    const { product, descriptionSanitized } = await api.createProduct(http, input);
     revalidatePath("/admin/products");
     return {
       id: product.id,
       variants: product.variants.map((variant) => ({ id: variant.id, sku: variant.sku })),
-      sanitizedLocales,
+      descriptionSanitized,
     };
   });
 
@@ -261,7 +247,7 @@ export async function createProductAction(
 export async function updateProductAction(
   id: string,
   input: CreateProduct,
-): Promise<ActionResult<{ id: string; sanitizedLocales: readonly Locale[] }>> {
+): Promise<ActionResult<{ id: string; descriptionSanitized: boolean }>> {
   return run(async () => {
     const http = await adminHttp();
 
@@ -282,7 +268,7 @@ export async function updateProductAction(
     const updatable: Record<string, unknown> = { ...input };
     delete updatable["variants"];
 
-    const { product, sanitizedLocales } = await api.updateProduct(
+    const { product, descriptionSanitized } = await api.updateProduct(
       http,
       id,
       updateProductSchema.parse(updatable),
@@ -290,7 +276,7 @@ export async function updateProductAction(
 
     revalidatePath("/admin/products");
     revalidatePath(`/admin/products/${id}`);
-    return { id: product.id, sanitizedLocales };
+    return { id: product.id, descriptionSanitized };
   });
 }
 
@@ -436,82 +422,6 @@ export async function setVariantInventoryPolicyAction(
     await api.setInventoryPolicy(http, variantId, body);
     revalidatePath("/admin/products");
     return null;
-  });
-}
-
-// ---------------------------------------------------------------------------
-// Translation
-// ---------------------------------------------------------------------------
-
-/**
- * Machine-translate one product's copy into the locale the form is showing.
- *
- * A SERVER ACTION RATHER THAN A BROWSER FETCH, for two reasons that do not
- * overlap. The admin bearer is held server-side and stays there, as it does for
- * every other action in this file. And the endpoint behind it spends money at a
- * metered vendor per character: reachable from the browser it would be one
- * runaway effect away from an invoice, whereas here the vendor is only ever
- * addressed by a caller the API has already authenticated as an operator, with
- * the contract's ceilings applied before anything is sent.
- *
- * IT PREFILLS; IT NEVER SAVES. Nothing in this function writes a product row.
- * The operator reads what came back, edits it, and saves deliberately — a
- * machine translation of customer-facing copy going live unreviewed is a
- * compliance problem, not a convenience, and the form marks the filled fields
- * as unreviewed until a human touches them.
- */
-export async function translateProductCopyAction(
-  input: unknown,
-): Promise<ActionResult<ProductCopy>> {
-  const parsed = translateCopyInputSchema.safeParse(input);
-  if (!parsed.success) {
-    // No `reason`: the caller sent a shape this action does not accept, which
-    // is a client bug rather than one of the closed states an operator can be
-    // told something useful about.
-    return {
-      ok: false,
-      code: "VALIDATION_FAILED",
-      reason: null,
-      message: "The translation request was rejected before it was sent.",
-    };
-  }
-
-  const texts = toTranslationTexts(parsed.data.copy);
-  if (texts.length === 0) {
-    // ANSWERED WITHOUT A REQUEST. An all-blank source can only translate to
-    // nothing, and the vendor bills for being asked. The form disables the
-    // button in this state too; this is the half of the guard that survives a
-    // caller who is not the form.
-    return {
-      ok: false,
-      code: "VALIDATION_FAILED",
-      reason: "EMPTY_SOURCE",
-      message: "There is nothing to translate.",
-    };
-  }
-
-  const body = translateRequestSchema.safeParse({
-    source: parsed.data.from,
-    target: parsed.data.to,
-    texts,
-  });
-  if (!body.success) {
-    // The contract's own ceilings — per text, per batch — reached before the
-    // request rather than in the 400 that would come back from it.
-    return {
-      ok: false,
-      code: "VALIDATION_FAILED",
-      reason: null,
-      message: "The copy is outside the bounds the translation endpoint accepts.",
-    };
-  }
-
-  return run(async () => {
-    const http = await adminHttp();
-    const response = await api.translateCopy(http, body.data);
-    // Blank fields were dropped on the way out; they come back blank rather
-    // than carrying the source language's text into the other locale's box.
-    return mergeTranslations(response.translations);
   });
 }
 
@@ -953,54 +863,6 @@ export async function createBlogCoverUploadUrlAction(
     const body = blogCoverUploadUrlRequestSchema.parse(input);
     const http = await adminHttp();
     return api.createBlogCoverUploadUrl(http, id, body);
-  });
-}
-
-/**
- * Machine-translate a post's copy into the other locale — the blog twin of
- * `translateProductCopyAction`, with the same guarantees: it PREFILLS and never
- * saves, blank fields are never sent, and the contract's ceilings are applied
- * before the metered vendor is addressed.
- */
-export async function translateBlogCopyAction(input: unknown): Promise<ActionResult<BlogCopy>> {
-  const parsed = translateBlogCopyInputSchema.safeParse(input);
-  if (!parsed.success) {
-    return {
-      ok: false,
-      code: "VALIDATION_FAILED",
-      reason: null,
-      message: "The translation request was rejected before it was sent.",
-    };
-  }
-
-  const texts = toBlogTranslationTexts(parsed.data.copy);
-  if (texts.length === 0) {
-    return {
-      ok: false,
-      code: "VALIDATION_FAILED",
-      reason: "EMPTY_SOURCE",
-      message: "There is nothing to translate.",
-    };
-  }
-
-  const body = translateRequestSchema.safeParse({
-    source: parsed.data.from,
-    target: parsed.data.to,
-    texts,
-  });
-  if (!body.success) {
-    return {
-      ok: false,
-      code: "VALIDATION_FAILED",
-      reason: null,
-      message: "The copy is outside the bounds the translation endpoint accepts.",
-    };
-  }
-
-  return run(async () => {
-    const http = await adminHttp();
-    const response = await api.translateCopy(http, body.data);
-    return mergeBlogTranslations(response.translations);
   });
 }
 

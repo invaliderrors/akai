@@ -106,20 +106,20 @@ describe("formatValue", () => {
   it("renders PERCENTAGE from BASIS POINTS, not as a raw integer", () => {
     // 1000 basis points is 10%. Rendering "1000%" or "€10.00" here is the
     // hundred-fold misread this function exists to prevent.
-    const formatted = formatValue(discount({ type: "PERCENTAGE", value: 1000 }), "en");
+    const formatted = formatValue(discount({ type: "PERCENTAGE", value: 1000 }));
     expect(formatted).toContain("10");
     expect(formatted).toContain("%");
     expect(formatted).not.toContain("1000");
   });
 
   it("keeps sub-percent precision", () => {
-    expect(formatValue(discount({ type: "PERCENTAGE", value: 1050 }), "en")).toContain("10.5");
+    // es-CO writes the decimal with a comma.
+    expect(formatValue(discount({ type: "PERCENTAGE", value: 1050 }))).toContain("10,5");
   });
 
   it("renders FIXED_AMOUNT as money from MINOR units", () => {
     const formatted = formatValue(
       discount({ type: "FIXED_AMOUNT", value: 1000, currency: "EUR" }),
-      "en",
     );
     // 1000 minor units is €10.00 — the SAME integer that means 10% above.
     expect(formatted).toContain("10");
@@ -127,14 +127,13 @@ describe("formatValue", () => {
   });
 
   it("renders FREE_SHIPPING as a dash, because its value is unused", () => {
-    expect(formatValue(discount({ type: "FREE_SHIPPING", value: 0 }), "en")).toBe("—");
+    expect(formatValue(discount({ type: "FREE_SHIPPING", value: 0 }))).toBe("—");
   });
 
   it("degrades an out-of-range FIXED_AMOUNT to its raw integer instead of throwing", () => {
     // isMinor narrows rather than asserting: one bad row must not 500 the list.
     const formatted = formatValue(
       discount({ type: "FIXED_AMOUNT", value: Number.MAX_SAFE_INTEGER }),
-      "en",
     );
     expect(formatted).toBe(String(Number.MAX_SAFE_INTEGER));
   });

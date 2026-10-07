@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { describe, expect, it, vi } from "vitest";
 
-import { Link } from "@/i18n/navigation";
+import Link from "next/link";
 import { Button, IconButton, buttonClassName, type ButtonVariant } from "./button";
 
 const VARIANTS: readonly ButtonVariant[] = [
@@ -189,7 +189,7 @@ describe("<IconButton />", () => {
 });
 
 describe("buttonClassName()", () => {
-  it("styles a locale-aware Link as a button while it stays a link", () => {
+  it("styles a Link as a button while it stays a link", () => {
     render(
       <NextIntlClientProvider locale="es" messages={{}}>
         <Link

@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 import type { BlogPostStatus } from "@akai/contracts";
 
 import { Switch } from "@/components/ui/toggle";
-import { useRouter } from "@/i18n/navigation";
+import { useRouter } from "next/navigation";
 import { setBlogPostPublishedAction } from "@/lib/admin/actions";
 
 /**

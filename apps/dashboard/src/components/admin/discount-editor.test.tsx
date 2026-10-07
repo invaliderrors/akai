@@ -35,14 +35,17 @@ vi.mock("@/lib/admin/actions", () => ({
   deleteDiscountAction: (id: string) => deleteDiscountAction(id),
 }));
 
-vi.mock("@/i18n/navigation", () => ({
-  useRouter: () => ({ push, refresh }),
+vi.mock("next/link", () => ({
   // The form's Cancel is a real link. Mocked to a bare anchor because the
-  // locale-aware one needs a router context this suite deliberately has not
+  // real one needs a router context this suite deliberately has not
   // built — the assertion here is about the href the editor chose.
-  Link: ({ href, children }: { href: string; children: ReactNode }) => (
+  default: ({ href, children }: { href: string; children: ReactNode }) => (
     <a href={href}>{children}</a>
   ),
+}));
+vi.mock("next/navigation", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/navigation")>()),
+  useRouter: () => ({ push, refresh }),
 }));
 
 const { DiscountEditor, actionErrorKey } = await import("./discount-editor");
@@ -172,7 +175,7 @@ describe("<DiscountEditor />", () => {
     await fillAndSubmitNewCode();
 
     // A created code has a new id, so the edit page is a different URL — and the
-    // push goes through @/i18n/navigation so the locale prefix survives.
+    // push targets it.
     expect(push).toHaveBeenCalledWith(`/admin/discounts/${DISCOUNT_ID}`);
   });
 

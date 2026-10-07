@@ -2,8 +2,7 @@ import { z } from "zod";
 import {
   customerSchema,
   type Customer,
-  type Locale,
-} from "@akai/contracts";
+  } from "@akai/contracts";
 import { apiRequest, type ApiRequestOptions } from "./http";
 import type { ApiResult } from "./errors";
 import {
@@ -57,7 +56,6 @@ export interface RegisterInput {
   readonly password: string;
   readonly firstName: string;
   readonly lastName: string;
-  readonly preferredLocale: Locale;
   readonly turnstileToken: string;
   readonly marketingConsent: boolean;
 }

@@ -1,4 +1,4 @@
-import { localeSchema, type InventoryRow, type Locale } from "@akai/contracts";
+import type { InventoryRow } from "@akai/contracts";
 
 /**
  * Pure display logic for the stock list.
@@ -41,12 +41,6 @@ export function resolveStockState(row: InventoryRow): StockState {
     return "low";
   }
   return "ok";
-}
-
-/** Narrows a route param to the locale union, falling back to the default. */
-export function asLocale(raw: string): Locale {
-  const parsed = localeSchema.safeParse(raw);
-  return parsed.success ? parsed.data : "es";
 }
 
 /**

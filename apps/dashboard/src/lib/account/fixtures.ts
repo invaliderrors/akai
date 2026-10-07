@@ -60,7 +60,6 @@ export function buildCustomer(overrides: Record<string, unknown> = {}): Customer
     lastName: "Ruiz",
     phone: null,
     role: "CUSTOMER",
-    preferredLocale: "es",
     twoFactorEnabled: false,
     anonymisedAt: null,
     createdAt: "2026-01-04T10:00:00.000Z",
@@ -111,7 +110,6 @@ export function buildOrder(overrides: Record<string, unknown> = {}): Order {
     customerId: UUID.customer,
     email: "elena@example.com",
     status: "SHIPPED",
-    locale: "es",
     currency: "COP",
     items: [
       {

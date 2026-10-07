@@ -38,25 +38,25 @@ import type { ActionResult } from "@/lib/admin/actions";
 export interface CategoryRow {
   readonly id: string;
   readonly slug: string;
-  readonly name: { readonly es?: string; readonly en?: string };
+  readonly name: string;
   readonly productCount: number;
 }
 
 interface CreatedCategory {
   readonly id: string;
   readonly slug: string;
-  readonly name: { readonly es?: string; readonly en?: string };
+  readonly name: string;
 }
 
 interface CategoryManagerProps {
   readonly initial: readonly CategoryRow[];
   readonly onCreate: (input: {
     slug: string;
-    name: { es: string; en: string };
+    name: string;
   }) => Promise<ActionResult<CreatedCategory>>;
   readonly onRename: (
     id: string,
-    input: { name: { es: string; en: string } },
+    input: { name: string },
   ) => Promise<ActionResult<CreatedCategory>>;
   readonly onReorder: (
     categoryIds: readonly string[],
@@ -75,14 +75,12 @@ export function CategoryManager({
   const [rows, setRows] = useState<readonly CategoryRow[]>(initial);
 
   const [slug, setSlug] = useState("");
-  const [nameEs, setNameEs] = useState("");
-  const [nameEn, setNameEn] = useState("");
+  const [name, setName] = useState("");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | undefined>(undefined);
 
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [draftEs, setDraftEs] = useState("");
-  const [draftEn, setDraftEn] = useState("");
+  const [draft, setDraft] = useState("");
   const [renaming, setRenaming] = useState(false);
   const [renameError, setRenameError] = useState<string | undefined>(undefined);
 
@@ -97,7 +95,7 @@ export function CategoryManager({
     try {
       const result = await onCreate({
         slug: slug.trim(),
-        name: { es: nameEs.trim(), en: nameEn.trim() },
+        name: name.trim(),
       });
       if (!result.ok) {
         setCreateError(result.code === "CONFLICT" ? t("duplicateSlug") : t("createFailed"));
@@ -108,8 +106,7 @@ export function CategoryManager({
         { id: result.data.id, slug: result.data.slug, name: result.data.name, productCount: 0 },
       ]);
       setSlug("");
-      setNameEs("");
-      setNameEn("");
+      setName("");
     } finally {
       setCreating(false);
     }
@@ -117,8 +114,7 @@ export function CategoryManager({
 
   function startEditing(row: CategoryRow): void {
     setEditingId(row.id);
-    setDraftEs(row.name.es ?? "");
-    setDraftEn(row.name.en ?? "");
+    setDraft(row.name);
     setRenameError(undefined);
   }
 
@@ -126,7 +122,7 @@ export function CategoryManager({
     setRenameError(undefined);
     setRenaming(true);
     try {
-      const result = await onRename(id, { name: { es: draftEs.trim(), en: draftEn.trim() } });
+      const result = await onRename(id, { name: draft.trim() });
       if (!result.ok) {
         setRenameError(t("renameFailed"));
         return;
@@ -172,7 +168,7 @@ export function CategoryManager({
   }
 
   function categoryName(row: CategoryRow): string {
-    return row.name.es ?? row.name.en ?? row.slug;
+    return row.name.trim() === "" ? row.slug : row.name;
   }
 
   return (
@@ -182,7 +178,7 @@ export function CategoryManager({
         className="grid gap-3 rounded-[var(--r-card)] bg-[var(--bg-grouped-secondary)] p-[var(--card-p)]"
       >
         <h2 className="m-0 text-[13px] font-semibold text-[var(--label)]">{t("createTitle")}</h2>
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           <TextField
             label={t("slugLabel")}
             name="slug"
@@ -194,20 +190,11 @@ export function CategoryManager({
             disabled={creating}
           />
           <TextField
-            label={t("nameEsLabel")}
-            name="nameEs"
-            id="category-name-es"
-            value={nameEs}
-            onChange={setNameEs}
-            required
-            disabled={creating}
-          />
-          <TextField
-            label={t("nameEnLabel")}
-            name="nameEn"
-            id="category-name-en"
-            value={nameEn}
-            onChange={setNameEn}
+            label={t("nameLabel")}
+            name="name"
+            id="category-name"
+            value={name}
+            onChange={setName}
             required
             disabled={creating}
           />
@@ -238,21 +225,13 @@ export function CategoryManager({
                   </span>
 
                   {editingId === row.id ? (
-                    <div className="grid flex-1 gap-2 sm:grid-cols-2">
+                    <div className="grid flex-1 gap-2">
                       <TextField
-                        label={t("nameEsLabel")}
-                        name={`rename-es-${row.id}`}
-                        id={`rename-es-${row.id}`}
-                        value={draftEs}
-                        onChange={setDraftEs}
-                        disabled={renaming}
-                      />
-                      <TextField
-                        label={t("nameEnLabel")}
-                        name={`rename-en-${row.id}`}
-                        id={`rename-en-${row.id}`}
-                        value={draftEn}
-                        onChange={setDraftEn}
+                        label={t("nameLabel")}
+                        name={`rename-${row.id}`}
+                        id={`rename-${row.id}`}
+                        value={draft}
+                        onChange={setDraft}
                         disabled={renaming}
                       />
                     </div>
@@ -260,11 +239,6 @@ export function CategoryManager({
                     <div className="min-w-0 flex-1">
                       <p className="m-0 truncate text-[13px] font-medium text-[var(--label)]">
                         {categoryName(row)}
-                        {row.name.en !== undefined && row.name.es !== undefined ? (
-                          <span className="ml-1.5 font-normal text-[var(--label-secondary)]">
-                            · {row.name.en}
-                          </span>
-                        ) : null}
                       </p>
                       <p className="m-0 truncate text-[11px] text-[var(--label-secondary)]">
                         <span className="font-mono">{row.slug}</span>

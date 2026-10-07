@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 import { buttonClassName } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import { ErrorState, type StateDensity } from "@/components/ui/states";
-import { Link } from "@/i18n/navigation";
+import Link from "next/link";
 import { AdminApiError } from "@/lib/admin/http";
 
 /**

@@ -42,11 +42,10 @@ export interface PackComponentCandidateVariant {
 
 export async function loadPackComponentCandidates(
   http: AdminHttp,
-  locale: "es" | "en",
   excludePackProductId?: string,
 ): Promise<readonly PackComponentCandidateRow[]> {
   try {
-    const page = await listProducts(http, { limit: 100, sort: "name", locale });
+    const page = await listProducts(http, { limit: 100, sort: "name" });
 
     return page.items
       .filter((product) => product.kind !== "PACK")
@@ -61,20 +60,12 @@ export async function loadPackComponentCandidates(
           currency: sellable?.price.currency ?? null,
           variants: product.variants.map((variant) => ({
             id: variant.id,
-            label:
-              variant.name?.[locale] ??
-              variant.name?.es ??
-              variant.name?.en ??
-              variant.sku,
+            label: variant.name ?? variant.sku,
             priceGross: variant.price.gross,
             currency: variant.price.currency,
             isActive: variant.isActive,
           })),
-          name:
-            product.translations.find((translation) => translation.locale === locale)
-              ?.name ??
-            product.translations[0]?.name ??
-            product.slug,
+          name: product.name,
         };
       });
   } catch {

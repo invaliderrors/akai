@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useMemo, useState, type FormEvent, type ReactNode } from "react";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import type { z } from "zod";
 import type { CurrencyCode, DiscountType } from "@akai/contracts";
 import { minorUnitExponent } from "@akai/money";
@@ -17,7 +17,7 @@ import {
 import { Notice } from "@/components/ui/notice";
 import { Checkbox } from "@/components/ui/toggle";
 import { SUPPORTED_CURRENCIES, currencyLabel } from "@/lib/currency";
-import { Link } from "@/i18n/navigation";
+import Link from "next/link";
 import {
   formatMinorAsInput,
   formatPercentageAsInput,
@@ -150,7 +150,7 @@ export interface DiscountFormProps {
    */
   readonly dangerAction?: ReactNode;
   /**
-   * Where Cancel goes. A route only — `Link` adds the locale prefix.
+   * Where Cancel goes. An app route.
    *
    * A LINK and not a button: cancelling this form is a navigation (back to the
    * list, or closing the inline panel), so it belongs in the middle-click,
@@ -229,7 +229,6 @@ export function DiscountForm({
   affiliates,
 }: DiscountFormProps) {
   const t = useTranslations("admin.discounts");
-  const locale = useLocale();
   const formId = useId();
   const mode = discount === undefined ? "create" : "edit";
 
@@ -265,15 +264,15 @@ export function DiscountForm({
    * own enum — see `lib/currency` for why the code leads the label and the flag
    * does not.
    *
-   * Memoised on the locale because `Intl.DisplayNames` is built 84 times to
-   * make this list, and the form re-renders on every keystroke in it.
+   * Memoised because `Intl.DisplayNames` is built once per option to make this
+   * list, and the form re-renders on every keystroke in it.
    */
   const currencyOptions: readonly PopupButtonOption<string>[] = useMemo(
     () => [
       { value: "", label: t("form.currencyAny") },
-      ...SUPPORTED_CURRENCIES.map((code) => ({ value: code, label: currencyLabel(code, locale) })),
+      ...SUPPORTED_CURRENCIES.map((code) => ({ value: code, label: currencyLabel(code) })),
     ],
-    [locale, t],
+    [t],
   );
 
   const typeOptions: readonly PopupButtonOption<DiscountType>[] = DISCOUNT_TYPES.map(

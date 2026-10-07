@@ -12,7 +12,6 @@ import { TotalsList, type TotalsListProps } from "./totals-list";
  */
 const BASE: TotalsListProps = {
   currency: "COP",
-  locale: "es",
   subtotal: { label: "Subtotal", amount: toMinor(7_980_000) },
   shipping: { label: "Envío", amount: toMinor(1_500_000) },
   taxIncluded: { label: "IVA incluido", amount: toMinor(1_514_622) },
@@ -163,12 +162,11 @@ describe("<TotalsList />", () => {
     expect(screen.getByText("Total").className).toContain("text-[13px]");
   });
 
-  it("renders the figures in the same locale it is given", () => {
+  it("renders the figures in es-CO, whole pesos with dot grouping", () => {
     renderTotals({
-      locale: "en",
       subtotal: { label: "Subtotal", amount: toMinor(482_149_000) },
     });
 
-    expect(text(valueFor(screen.getByText("Subtotal")))).toBe("$4,821,490");
+    expect(text(valueFor(screen.getByText("Subtotal")))).toBe("$ 4.821.490");
   });
 });

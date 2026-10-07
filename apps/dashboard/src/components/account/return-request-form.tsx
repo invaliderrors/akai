@@ -1,18 +1,18 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 
 import type { CurrencyCode, Minor } from "@akai/contracts";
 
-import type { RequestReturnResult } from "@/app/[locale]/(customer)/returns/actions";
+import type { RequestReturnResult } from "@/app/(customer)/returns/actions";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { PopupButton, TextArea } from "@/components/ui/field";
 import { Notice } from "@/components/ui/notice";
 import { EmptyState } from "@/components/ui/states";
 
-import { asLocale, formatAmount, formatDate } from "./format";
+import { formatAmount, formatDate } from "./format";
 
 /**
  * "Request a return".
@@ -100,7 +100,6 @@ export interface ReturnRequestFormProps {
 
 export function ReturnRequestForm({ orders, onSubmit }: ReturnRequestFormProps) {
   const t = useTranslations("account.returns");
-  const locale = asLocale(useLocale());
 
   // `orders[0]` is `EligibleOrder | undefined` under `noUncheckedIndexedAccess`.
   // Pre-selecting the first is what a pop-up button does — it always carries a
@@ -214,8 +213,8 @@ export function ReturnRequestForm({ orders, onSubmit }: ReturnRequestFormProps) 
             // rendered by `ui/money`.
             label: t("orderOption", {
               orderNumber: order.orderNumber,
-              date: formatDate(order.placedAt, locale),
-              total: formatAmount(order.grandTotal, order.currency, locale),
+              date: formatDate(order.placedAt),
+              total: formatAmount(order.grandTotal, order.currency),
             }),
           }))}
         />

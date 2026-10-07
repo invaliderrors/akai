@@ -11,15 +11,12 @@ import { MessageCatalogError, loadMessages, messageCatalogSchema } from "./messa
 
 /**
  * Same contract as the storefront's `src/i18n/messages.test.ts`, against this
- * app's own catalogs. The dashboard is where an account holder reads their
+ * app's own (Spanish-only) catalogue. The dashboard is where an account holder reads their
  * order history and an admin reads the store's numbers; a message key silently
  * resolving to `undefined` there is a blank field next to money.
  *
- * THREE GATES, AND THEY CATCH THREE DIFFERENT FAILURES.
+ * TWO GATES, AND THEY CATCH TWO DIFFERENT FAILURES.
  *
- *   parity      a key in one catalog and not the other. The `satisfies` in
- *               `messages.ts` already fails the build on this; the test keeps
- *               it true for anything the compiler widens.
  *   enum        a status vocabulary that grew a member with no label. The tone
  *               side is asserted in `lib/status/index.test.ts`; the LABEL side
  *               is here, because a badge with a tone and no translation renders
@@ -60,20 +57,13 @@ function resolvePath(catalog: unknown, path: string): unknown {
 }
 
 describe("loadMessages", () => {
-  it("returns a catalog for every routed locale", () => {
-    expect(Object.keys(loadMessages("es")).length).toBeGreaterThan(0);
-    expect(Object.keys(loadMessages("en")).length).toBeGreaterThan(0);
+  it("returns the Spanish catalogue", () => {
+    expect(leafPaths(loadMessages()).length).toBeGreaterThan(0);
+    expect(resolvePath(loadMessages(), "status.order.PAID")).toEqual(expect.any(String));
   });
 
   it("returns the SAME object on repeated calls, not a rebuilt copy", () => {
-    expect(loadMessages("es")).toBe(loadMessages("es"));
-  });
-
-  it("keeps the two locales at key parity", () => {
-    const spanish = leafPaths(loadMessages("es")).sort();
-    const english = leafPaths(loadMessages("en")).sort();
-
-    expect(english).toEqual(spanish);
+    expect(loadMessages()).toBe(loadMessages());
   });
 });
 
@@ -97,28 +87,27 @@ describe("messageCatalogSchema", () => {
 });
 
 describe("MessageCatalogError", () => {
-  it("names the locale and the deepest failing path", () => {
+  it("names the deepest failing path", () => {
     const parsed = messageCatalogSchema.safeParse({ orders: { total: 42 } });
     expect(parsed.success).toBe(false);
     if (parsed.success) return;
 
-    const error = new MessageCatalogError("en", parsed.error.issues);
+    const error = new MessageCatalogError(parsed.error.issues);
 
     expect(error).toBeInstanceOf(Error);
-    expect(error.locale).toBe("en");
     expect(error.message).toContain("orders.total");
   });
 });
 
 /**
- * GATE (a) — every badged value has a label in BOTH catalogs.
+ * GATE (a) — every badged value has a label.
  *
  * Driven off `STATUS_TONE` rather than a hand-written list, so the rule really
  * is "add a status, add one row": a new member of a contract enum is already a
  * compile error in `StatusVocabulary`, and the moment it is given a tone this
- * test demands the two sentences that go with it.
+ * test demands the sentence that goes with it.
  */
-describe("the status vocabulary is fully translated", () => {
+describe("the status vocabulary is fully labelled", () => {
   const domains = Object.entries<Readonly<Record<string, BadgeTone>>>(STATUS_TONE);
 
   it("covers every domain lib/status knows about", () => {
@@ -135,13 +124,11 @@ describe("the status vocabulary is fully translated", () => {
   });
 
   for (const [domain, members] of domains) {
-    it(`labels every ${domain} member in es and en`, () => {
+    it(`labels every ${domain} member`, () => {
       const missing = Object.keys(members).flatMap((member) => {
         const path = `status.${domain}.${member}`;
-        return (["es", "en"] as const).flatMap((locale) => {
-          const leaf = resolvePath(loadMessages(locale), path);
-          return typeof leaf === "string" && leaf.trim() !== "" ? [] : [`${locale}: ${path}`];
-        });
+        const leaf = resolvePath(loadMessages(), path);
+        return typeof leaf === "string" && leaf.trim() !== "" ? [] : [path];
       });
 
       expect(missing).toEqual([]);
@@ -171,7 +158,7 @@ describe("no source file reads a retired message key", () => {
 
   /**
    * `const t = useTranslations("admin.orders")`, in every shape the app uses:
-   * the hook, the awaited server helper, the `{ locale, namespace }` object
+   * the hook, the awaited server helper, the `{ namespace }` object
    * form, and the no-argument form that reads from the catalog root.
    */
   const DECLARATION =
@@ -239,8 +226,8 @@ describe("no source file reads a retired message key", () => {
     expect(total).toBeGreaterThan(500);
   });
 
-  it("resolves every literal key against the Spanish catalog", () => {
-    const catalog = loadMessages("es");
+  it("resolves every literal key against the catalogue", () => {
+    const catalog = loadMessages();
 
     const unresolved = sourceFiles(SRC_ROOT).flatMap((file) =>
       keyReads(file)
@@ -248,7 +235,6 @@ describe("no source file reads a retired message key", () => {
         .map((path) => `${relative(SRC_ROOT, file)}: ${path}`),
     );
 
-    // Parity is asserted above, so Spanish standing in for both is safe.
     expect([...new Set(unresolved)]).toEqual([]);
   });
 });
@@ -263,12 +249,11 @@ describe("the superseded duplicates stay retired", () => {
   it.each(["account.orderStatus", "account.paymentStatus", "account.shipmentStatus"])(
     "has no %s namespace",
     (path) => {
-      expect(resolvePath(loadMessages("es"), path)).toBeUndefined();
-      expect(resolvePath(loadMessages("en"), path)).toBeUndefined();
+      expect(resolvePath(loadMessages(), path)).toBeUndefined();
     },
   );
 
   it("keeps the status namespace that replaced them", () => {
-    expect(resolvePath(loadMessages("es"), "status.order.PAID")).toEqual(expect.any(String));
+    expect(resolvePath(loadMessages(), "status.order.PAID")).toEqual(expect.any(String));
   });
 });

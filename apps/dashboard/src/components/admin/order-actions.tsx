@@ -1,8 +1,8 @@
 "use client";
 
-import type { CurrencyCode, Locale, Minor, OrderStatus } from "@akai/contracts";
+import type { CurrencyCode, Minor, OrderStatus } from "@akai/contracts";
 
-import { useRouter } from "@/i18n/navigation";
+import { useRouter } from "next/navigation";
 import type { ActionErrorCode } from "@/lib/admin/actions";
 import { requestRefundAction, transitionOrderAction } from "@/lib/admin/actions";
 import { canRefund } from "@/lib/admin/order-status";
@@ -49,7 +49,6 @@ export interface OrderActionsProps {
   readonly orderNumber: string;
   readonly status: OrderStatus;
   readonly currency: CurrencyCode;
-  readonly locale: Locale;
   /** `grandTotal − refundedTotal`, computed by the page with @akai/money. */
   readonly remainingRefundable: Minor;
   /** Already refunded, for the refund panel's ledger. */
@@ -65,17 +64,11 @@ export interface OrderActionsProps {
  * would let the screen disagree with the state machine the moment the API
  * applied a rule the client does not model — and the state machine deliberately
  * has rules the client does not model.
- *
- * The router comes from `@/i18n/navigation`, not `next/navigation` — the
- * repo-wide `no-restricted-imports` rule grants that module the only exemption,
- * because a bare `next/navigation` router produces hrefs that drop the locale
- * prefix and silently kick English users back to Spanish on the next click.
  */
 export function OrderActions({
   orderNumber,
   status,
   currency,
-  locale,
   remainingRefundable,
   refundedTotal,
 }: OrderActionsProps) {
@@ -125,7 +118,6 @@ export function OrderActions({
         <div id={ORDER_REFUND_PANEL_ID}>
           <RefundForm
             currency={currency}
-            locale={locale}
             remainingRefundable={remainingRefundable}
             refundedTotal={refundedTotal}
             onSubmit={handleRefund}

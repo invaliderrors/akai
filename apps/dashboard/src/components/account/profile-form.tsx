@@ -28,12 +28,7 @@ import { FormActions, SubmitButton, indexFieldErrors } from "./form-field";
  * came here to CHECK is the one thing this screen must not withhold; the
  * footnote says how to change it.
  *
- * THERE IS NO LANGUAGE ROW, and its absence is a decision. The account menu in
- * the shell is the single language affordance in the product; a second switcher
- * that has to stay in step with it is a defect generator, and the plan records
- * the drawn row as dropped. `preferredLocale` is therefore not sent either —
- * the update schema is `.partial()`, and echoing back a value this form no
- * longer owns would silently revert a change made in the menu a moment ago.
+ * THERE IS NO LANGUAGE ROW: the shop is Spanish only.
  *
  * NEITHER IS THERE A MARKETING-CONSENT SWITCH. The artboard draws one and the
  * copy for it is authored, but `customerSchema` — what `GET /me` returns — has

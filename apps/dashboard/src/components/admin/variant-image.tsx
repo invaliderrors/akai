@@ -23,7 +23,7 @@ import { useMediaLabels } from "./product-media";
  * WHY IT IS A CELL PLUS A DIALOG, and not the uploader inline. The variant
  * table's whole point is that one variant costs about 150px: the column header
  * carries the label and the cell carries the control. An uploader inline —
- * a thumbnail grid, a dropzone and two alt-text fields — is roughly 260px of
+ * a thumbnail grid, a dropzone and an alt-text field — is roughly 260px of
  * height PER ROW, which would undo the density pass that built the table. So
  * the cell holds a 24px affordance and the editing happens in a modal.
  *
@@ -37,7 +37,7 @@ import { useMediaLabels } from "./product-media";
  * This repo has just finished merging two product-image pickers into one; the
  * only things a variant image needs that the merge did not already provide are
  * the cell affordance, the `variantId` on the attach, and the cap of one image.
- * Everything else — the presign → PUT → attach ordering, per-locale alt text,
+ * Everything else — the presign → PUT → attach ordering, the alt text,
  * the undo on removal, the progress phases — comes from the component that
  * already owns it and is already tested.
  *
@@ -232,26 +232,12 @@ export function VariantImageField(props: VariantImageFieldProps) {
   );
 }
 
-/**
- * A contract `MediaAsset` as the uploader's own item shape.
- *
- * Built key by key rather than spread: `MediaAsset["alt"]` is
- * `Partial<Record<Locale, string>>`, whose values are `string | undefined`, and
- * `ProductMediaItem["alt"]` is a total `Record<string, string>`. Copying the
- * present entries is what makes that narrowing real instead of asserted.
- */
+/** A contract `MediaAsset` as the uploader's own item shape. */
 function toMediaItem(asset: MediaAsset): ProductMediaItem {
-  const alt: Record<string, string> = {};
-  for (const [locale, text] of Object.entries(asset.alt)) {
-    if (text !== undefined) {
-      alt[locale] = text;
-    }
-  }
-
   return {
     id: asset.id,
     url: asset.url,
-    alt,
+    alt: asset.alt,
     width: asset.width,
     height: asset.height,
     sortOrder: asset.sortOrder,

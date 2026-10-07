@@ -31,7 +31,8 @@ vi.mock("@/lib/bff/client", () => ({
   postJson: (path: string, body: unknown) => postJson(path, body),
 }));
 
-vi.mock("@/i18n/navigation", () => ({
+vi.mock("next/navigation", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/navigation")>()),
   useRouter: () => ({ replace, refresh }),
 }));
 

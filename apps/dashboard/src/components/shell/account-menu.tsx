@@ -1,10 +1,10 @@
 "use client";
 
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 
 import { Popover } from "@/components/ui/overlay";
-import { Link, usePathname } from "@/i18n/navigation";
+import Link from "next/link";
 
 import { SignOutButton } from "./sign-out-button";
 
@@ -140,18 +140,6 @@ export interface AccountMenuProps {
 
 export function AccountMenu({ email, name, storeHref }: AccountMenuProps) {
   const t = useTranslations("common");
-  const pathname = usePathname();
-
-  /**
-   * The literals are produced, not narrowed. `useLocale()` is typed `string`
-   * because next-intl cannot know our routing config, and a conditional that
-   * YIELDS `"es" | "en"` gives `Link` the exact union it wants without a cast
-   * and without a second copy of the narrowing helper.
-   */
-  const isEnglish = useLocale() === "en";
-  const otherLocale = isEnglish ? "es" : "en";
-  const currentLanguage = t(isEnglish ? "localeName.en" : "localeName.es");
-  const otherLanguage = t(isEnglish ? "localeName.es" : "localeName.en");
 
   const initials = accountInitials(email, name);
 
@@ -207,35 +195,9 @@ export function AccountMenu({ email, name, storeHref }: AccountMenuProps) {
             {t("profile")}
           </Link>
 
-          {/*
-            A TOGGLE, NOT A SUBMENU — there are exactly two locales, and a
-            disclosure that opens a two-item list is a step nobody needs. The
-            trailing value is therefore the CURRENT language (what a settings row
-            shows) while the row's action is "switch to the other one", and the
-            accessible name says both: the visible text is contained in it, so
-            voice control still matches what a person can read (WCAG 2.5.3), and
-            nobody activates a row expecting it to do what it merely reports.
-
-            The query string is deliberately not carried across: `usePathname()`
-            returns the route, and re-applying an operator's filters under a new
-            locale is a decision the filter bar owns, not this row.
-          */}
-          <Link
-            role="menuitem"
-            href={pathname}
-            locale={otherLocale}
-            onClick={close}
-            aria-label={`${t("language")}: ${currentLanguage}. ${t("switchLanguage")}: ${otherLanguage}`}
-            className={MENU_ITEM_CLASS}
-          >
-            {t("language")}
-            <span className="ms-auto opacity-70">{currentLanguage}</span>
-          </Link>
-
           {storeHref === undefined || storeHref === "" ? null : (
-            // A plain anchor, not the locale-aware `Link`: this leaves the
-            // dashboard for another origin, where our `/es` and `/en` prefixes
-            // mean nothing and prepending one would 404.
+            // A plain anchor, not `Link`: this leaves the dashboard for another
+            // origin, which client-side routing cannot reach.
             <a role="menuitem" href={storeHref} onClick={close} className={MENU_ITEM_CLASS}>
               {t("backToStore")}
             </a>

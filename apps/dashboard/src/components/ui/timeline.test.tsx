@@ -7,7 +7,6 @@ import { describe, expect, it, vi } from "vitest";
 import { Icon, type IconName } from "./icon";
 import { Timeline, type TimelineEntry } from "./timeline";
 import esMessages from "../../../messages/es.json";
-import enMessages from "../../../messages/en.json";
 
 /**
  * The visibility words come from the closed `internalNote` vocabulary in
@@ -15,9 +14,9 @@ import enMessages from "../../../messages/en.json";
  * passing after a translator flattened "Solo operadores" into something an
  * operator cannot act on.
  */
-function renderTimeline(ui: ReactNode, locale: "es" | "en" = "es") {
+function renderTimeline(ui: ReactNode) {
   return render(
-    <NextIntlClientProvider locale={locale} messages={locale === "es" ? esMessages : enMessages}>
+    <NextIntlClientProvider locale="es" messages={esMessages}>
       {ui}
     </NextIntlClientProvider>,
   );
@@ -113,14 +112,13 @@ describe("<Timeline />", () => {
     expect(screen.getAllByText("Visible para el cliente")).toHaveLength(2);
   });
 
-  it("translates the visibility words, and only those", () => {
+  it("labels the visibility from the catalogue and renders the API's text verbatim", () => {
     // The API's `type` and `message` are open `z.string()` with no enum behind
-    // them, so they are rendered verbatim in both locales. The two visibility
-    // labels are ours, and they move.
-    renderTimeline(<Timeline entries={[NOTE, SHIPPED]} />, "en");
+    // them, so they are rendered verbatim. The two visibility labels are ours.
+    renderTimeline(<Timeline entries={[NOTE, SHIPPED]} />);
 
-    expect(screen.getByText("Operators only")).toBeInTheDocument();
-    expect(screen.getByText("Visible to customer")).toBeInTheDocument();
+    expect(screen.getByText("Solo operadores")).toBeInTheDocument();
+    expect(screen.getByText("Visible para el cliente")).toBeInTheDocument();
     expect(screen.getByText(/Cliente llamó/)).toBeInTheDocument();
     expect(screen.getByText("Enviado con SEUR")).toBeInTheDocument();
   });

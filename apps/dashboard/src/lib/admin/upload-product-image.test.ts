@@ -38,7 +38,7 @@ function deps(attach = vi.fn().mockResolvedValue({ ok: true, data: { id: "p1" } 
 }
 
 const file = (bytes = 512) => new File([new Uint8Array(bytes)], "a.png", { type: "image/png" });
-const input = { productId: "p1", file: file(), alt: { es: "Bote" }, sortOrder: 0 };
+const input = { productId: "p1", file: file(), alt: "Bote", sortOrder: 0 };
 
 describe("uploadProductImage", () => {
   beforeEach(() => {

@@ -1,24 +1,19 @@
 import { z } from "zod";
-import en from "../../messages/en.json";
 import es from "../../messages/es.json";
-import { routing } from "./routing";
 
 /**
- * The dashboard's message catalogs, loaded STATICALLY and checked twice.
+ * The dashboard's message catalogue — Spanish, the shop's only language —
+ * loaded STATICALLY and checked twice.
  *
- * Same defect, same fix as `apps/storefront/src/i18n/messages.ts` — read that
- * file for the full reasoning. In short: `request.ts` used to end with
+ * Same defect, same fix as `apps/storefront/src/i18n/messages.ts`. In short:
+ * `request.ts` used to end with
  * `` (await import(`../../messages/${locale}.json`)).default ``, a specifier
- * TypeScript cannot resolve, so the entire user-facing string catalog entered
+ * TypeScript cannot resolve, so the entire user-facing string catalogue entered
  * the app as `any` and was handed to next-intl unvalidated.
  *
- * The two catalogs are duplicated between the apps rather than shared because
- * they are different vocabularies (a shop and an account area), and `@/*` is
- * app-local by design. The MECHANISM is duplicated with them.
+ * next-intl stays as the catalogue's reader (`t()`, ICU plurals and
+ * interpolation); there is no locale routing.
  */
-
-/** A locale this app routes, taken from the routing config so the two agree. */
-type DashboardLocale = (typeof routing.locales)[number];
 
 /** One node of a message tree: a string, a list of nodes, or a nested namespace. */
 export type MessageNode = string | readonly MessageNode[] | { readonly [key: string]: MessageNode };
@@ -32,27 +27,20 @@ const messageNodeSchema: z.ZodType<MessageNode, z.ZodTypeDef, unknown> = z.lazy(
   z.union([z.string(), z.array(messageNodeSchema), z.record(messageNodeSchema)]),
 );
 
-/** A whole catalog: a namespace map whose leaves are message nodes. */
+/** A whole catalogue: a namespace map whose leaves are message nodes. */
 export const messageCatalogSchema = z.record(messageNodeSchema);
 
-/** Spanish is the default locale, so its catalog is the reference shape. */
+/** The catalogue's static shape. */
 export type MessageCatalog = typeof es;
 
 /**
- * Every catalog, keyed by locale. The `satisfies` is the COMPILE-TIME half of
- * the check: a key present in one catalog and missing from the other, or a
- * locale with no catalog at all, is a build error.
- *
- * IT IS ONLY HALF, AND THE OTHER HALF IS IN THE TEST BESIDE THIS FILE. What
- * the compiler cannot see is the READ side: `t()` keys are plain strings (there
+ * The compiler cannot see the READ side: `t()` keys are plain strings (there
  * is no `IntlMessages` augmentation in this app), so a namespace retired from
- * both catalogs while a page still reads it is neither a type error nor a
- * failing render — next-intl prints the key path, and an operator gets
- * `admin.metrics.title` next to a euro figure. `messages.test.ts` scans the
- * source for namespace and key literals and resolves each against `es`, which
- * is what makes a retirement commit safe to write.
+ * the catalogue while a page still reads it is neither a type error nor a
+ * failing render — next-intl prints the key path. `messages.test.ts` scans the
+ * source for namespace and key literals and resolves each against this
+ * catalogue, which is what makes a retirement commit safe to write.
  */
-const catalogs = { es, en } satisfies Record<DashboardLocale, MessageCatalog>;
 
 /**
  * Expand union failures down to the leaf that actually failed — a `z.union`
@@ -67,11 +55,9 @@ function flattenIssues(issues: readonly z.ZodIssue[]): z.ZodIssue[] {
   );
 }
 
-/** Thrown when a catalog in the bundle is not a message tree. */
+/** Thrown when the catalogue in the bundle is not a message tree. */
 export class MessageCatalogError extends Error {
-  readonly locale: DashboardLocale;
-
-  constructor(locale: DashboardLocale, issues: readonly z.ZodIssue[]) {
+  constructor(issues: readonly z.ZodIssue[]) {
     const seen = new Set<string>();
     const detail = flattenIssues(issues)
       .sort((a, b) => b.path.length - a.path.length)
@@ -80,25 +66,23 @@ export class MessageCatalogError extends Error {
       .slice(0, 5)
       .join(", ");
 
-    super(`Message catalog for locale "${locale}" is malformed at: ${detail}`);
+    super(`Message catalog is malformed at: ${detail}`);
     this.name = "MessageCatalogError";
-    this.locale = locale;
   }
 }
 
 /**
- * The validated catalog for one locale.
+ * The validated catalogue.
  *
  * The parse is a GATE, not a transform: on success the statically-typed import
  * is handed on, because `messageCatalogSchema`'s output is the widened
  * `Record<string, MessageNode>` and returning that would discard the precise
  * key type callers get from `MessageCatalog`.
  */
-export function loadMessages(locale: DashboardLocale): MessageCatalog {
-  const catalog = catalogs[locale];
-  const parsed = messageCatalogSchema.safeParse(catalog);
+export function loadMessages(): MessageCatalog {
+  const parsed = messageCatalogSchema.safeParse(es);
   if (!parsed.success) {
-    throw new MessageCatalogError(locale, parsed.error.issues);
+    throw new MessageCatalogError(parsed.error.issues);
   }
-  return catalog;
+  return es;
 }

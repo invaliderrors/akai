@@ -13,12 +13,11 @@ import {
 } from "./pagination";
 
 /**
- * The locale-aware Link needs a routing context a unit test never has, so it is
- * mocked down to the anchor it renders. The href it is GIVEN is what matters
- * here; the locale prefix next-intl adds is covered by the e2e locale smoke.
+ * `Link` is mocked down to the anchor it renders. The href it is GIVEN is what
+ * matters here.
  */
-vi.mock("@/i18n/navigation", () => ({
-  Link: ({
+vi.mock("next/link", () => ({
+  default: ({
     href,
     children,
     className,

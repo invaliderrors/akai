@@ -5,12 +5,9 @@ import {
   SIGN_IN_PATH,
   classifyPath,
   decideAccess,
-  localisedPath,
+  normalisePathname,
   sanitiseNextPath,
-  stripLocale,
 } from "./route-policy";
-
-const LOCALES = ["es", "en"] as const;
 
 function session(role: Role) {
   return { role };
@@ -145,44 +142,29 @@ describe("decideAccess", () => {
   });
 });
 
-describe("stripLocale", () => {
+describe("normalisePathname", () => {
   it.each([
-    ["/en/orders", "en", "/orders"],
-    ["/es/orders", "es", "/orders"],
-    ["/orders", null, "/orders"],
-    ["/", null, "/"],
-    ["/en", "en", "/"],
-    ["/orders/", null, "/orders"],
-  ] as const)("strips %s", (input, locale, pathname) => {
-    expect(stripLocale(input, LOCALES)).toEqual({ locale, pathname });
+    ["/orders", "/orders"],
+    ["/orders/", "/orders"],
+    ["/", "/"],
+  ] as const)("normalises %s", (input, pathname) => {
+    expect(normalisePathname(input)).toBe(pathname);
   });
 
-  it("does not mistake a path segment for a locale", () => {
-    expect(stripLocale("/entries", LOCALES)).toEqual({ locale: null, pathname: "/entries" });
-  });
-});
-
-describe("localisedPath", () => {
-  it("omits the prefix for the default locale", () => {
-    expect(localisedPath("/sign-in", "es", "es")).toBe("/sign-in");
-    expect(localisedPath("/", "es", "es")).toBe("/");
-  });
-
-  it("adds the prefix for a non-default locale", () => {
-    expect(localisedPath("/sign-in", "en", "es")).toBe("/en/sign-in");
-    expect(localisedPath("/", "en", "es")).toBe("/en");
+  it("leaves a former locale prefix alone — /en is just an unknown path now", () => {
+    expect(normalisePathname("/en/orders")).toBe("/en/orders");
   });
 });
 
 describe("sanitiseNextPath", () => {
-  it("keeps a safe relative path and strips its locale", () => {
-    expect(sanitiseNextPath("/en/orders", LOCALES)).toBe("/orders");
-    expect(sanitiseNextPath("/orders", LOCALES)).toBe("/orders");
+  it("keeps a safe relative path", () => {
+    expect(sanitiseNextPath("/orders")).toBe("/orders");
+    expect(sanitiseNextPath("/orders/")).toBe("/orders");
   });
 
   it("preserves the query string", () => {
     // Dropping it would silently reset a paginated list to page one.
-    expect(sanitiseNextPath("/en/orders?cursor=abc", LOCALES)).toBe("/orders?cursor=abc");
+    expect(sanitiseNextPath("/orders?cursor=abc")).toBe("/orders?cursor=abc");
   });
 
   it.each([
@@ -195,12 +177,12 @@ describe("sanitiseNextPath", () => {
     // Open-redirect defence: `next` arrives from a URL anyone can craft and
     // mail to a user, who then signs in successfully and lands on the
     // attacker's page still trusting it.
-    expect(sanitiseNextPath(raw, LOCALES)).toBe(DASHBOARD_HOME_PATH);
+    expect(sanitiseNextPath(raw)).toBe(DASHBOARD_HOME_PATH);
   });
 
   it("refuses to bounce back to an anonymous-only page", () => {
     // Otherwise sign-in would redirect to sign-in, which redirects to home —
     // a visible flicker at best and a loop at worst.
-    expect(sanitiseNextPath("/sign-in", LOCALES)).toBe(DASHBOARD_HOME_PATH);
+    expect(sanitiseNextPath("/sign-in")).toBe(DASHBOARD_HOME_PATH);
   });
 });

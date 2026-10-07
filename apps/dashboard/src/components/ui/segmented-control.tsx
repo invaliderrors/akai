@@ -1,4 +1,4 @@
-import { Link } from "@/i18n/navigation";
+import Link from "next/link";
 
 /**
  * The macOS segmented control — as LINKS, not as a widget.
@@ -80,7 +80,7 @@ export interface SegmentedControlProps {
   readonly segments: readonly Segment[];
   /** The param's current value, straight off `searchParams`. */
   readonly value: string | undefined;
-  /** The route this control sits on, e.g. `/orders`. `Link` adds the locale. */
+  /** The route this control sits on, e.g. `/orders`. */
   readonly pathname: string;
   readonly param: string;
   readonly searchParams?: Readonly<Record<string, SearchParamValue>>;

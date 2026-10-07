@@ -10,7 +10,9 @@ import esMessages from "../../../messages/es.json";
 import { OrderShipments, type OrderShipmentHandlers } from "./order-shipments";
 
 const refresh = vi.fn();
-vi.mock("@/i18n/navigation", () => ({ useRouter: () => ({ refresh }) }));
+vi.mock("next/navigation", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/navigation")>()), useRouter: () => ({ refresh }),
+}));
 vi.mock("@/lib/admin/actions", () => ({
   createShipmentAction: vi.fn(),
   markShipmentDeliveredAction: vi.fn(),
@@ -54,7 +56,6 @@ function renderCard(props: {
       <ToastProvider closeLabel="Cerrar">
         <OrderShipments
           orderNumber={ORDER_NUMBER}
-          locale="es"
           shipments={props.shipments}
           toShip={props.toShip ?? []}
           handlers={props.handlers}

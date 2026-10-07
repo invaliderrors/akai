@@ -7,7 +7,7 @@ import type { z } from "zod";
 import { Button, buttonClassName } from "@/components/ui/button";
 import { TextField } from "@/components/ui/field";
 import { Notice } from "@/components/ui/notice";
-import { Link } from "@/i18n/navigation";
+import Link from "next/link";
 import {
   createAffiliateRequestSchema,
   updateAffiliateRequestSchema,
@@ -67,7 +67,7 @@ export interface AffiliateFormProps {
   readonly formError?: string | undefined;
   /** The destructive control, at the footer's left edge. See `discount-form.tsx`'s identical slot for why it is a slot and not a prop pair. */
   readonly dangerAction?: ReactNode;
-  /** Where Cancel goes. A route only — `Link` adds the locale prefix. */
+  /** Where Cancel goes. An app route. */
   readonly cancelHref?: string;
 }
 

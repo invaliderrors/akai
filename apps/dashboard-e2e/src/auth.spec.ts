@@ -3,12 +3,9 @@ import { expect, test } from "@playwright/test";
 /**
  * The auth shell's end-to-end contract.
  *
- * These assertions cover what unit tests structurally cannot: that
- * `src/i18n/request.ts`'s TEMPLATE-LITERAL message import actually resolves.
- * That line is invisible to both tsc and eslint, so typecheck and lint stay
- * green while every page 500s — the exact failure mode spec §16 R1 calls out.
- * A test that loads a real page in both locales is the only thing that catches
- * it.
+ * These assertions cover what unit tests structurally cannot: that a real page
+ * renders through next-intl's request config with the Spanish catalogue, and
+ * that middleware's redirects and cookies behave in a real browser.
  *
  * REQUIRES `apps/dashboard/.env.local` (copy `.env.local.example`). Without
  * SESSION_SECRET the app fails fast on the first request by design, and these
@@ -26,25 +23,18 @@ test.describe("route protection", () => {
     await expect(page).toHaveURL(/\/sign-in\?next=%2Forders$/);
   });
 
-  test("keeps an English visitor in English when redirecting", async ({ page }) => {
-    // A redirect that drops the locale prefix silently returns EN users to the
-    // Spanish default for the rest of the visit.
+  test("sends a former English URL to the Spanish page", async ({ page }) => {
+    // The dashboard is Spanish only; old `/en/...` links 301 to the bare path.
     await page.goto("/en/admin/products");
-    await expect(page).toHaveURL(/\/en\/sign-in/);
+    await expect(page).toHaveURL(/\/sign-in\?next=%2Fadmin%2Fproducts$/);
   });
 });
 
-test.describe("bilingual auth shell", () => {
-  test("renders Spanish copy at the default locale", async ({ page }) => {
+test.describe("auth shell", () => {
+  test("renders Spanish copy", async ({ page }) => {
     await page.goto("/sign-in");
     await expect(page.getByRole("heading", { name: "Entra en tu cuenta" })).toBeVisible();
-    await expect(page.locator("html")).toHaveAttribute("lang", "es");
-  });
-
-  test("renders English copy under /en", async ({ page }) => {
-    await page.goto("/en/sign-in");
-    await expect(page.getByRole("heading", { name: "Sign in to your account" })).toBeVisible();
-    await expect(page.locator("html")).toHaveAttribute("lang", "en");
+    await expect(page.locator("html")).toHaveAttribute("lang", "es-CO");
   });
 
   test("reaches sign-up and forgot-password from sign-in", async ({ page }) => {

@@ -1,6 +1,4 @@
-import createIntlMiddleware from "next-intl/middleware";
 import { NextResponse, type NextRequest } from "next/server";
-import { routing } from "./i18n/routing";
 import { serverEnv } from "./lib/env";
 import { refresh as refreshTokens } from "./lib/api/auth";
 import { createCsrfToken } from "@akai/session";
@@ -19,10 +17,11 @@ import {
   isSessionExpired,
   type SessionPayload,
 } from "@akai/session";
-import { decideAccess, localisedPath, stripLocale } from "./lib/auth/route-policy";
+import { decideAccess, normalisePathname } from "./lib/auth/route-policy";
 
 /**
- * Locale routing + session refresh + route protection, in that dependency order.
+ * Session refresh + CSRF issuing + route protection, in that dependency order.
+ * The dashboard is Spanish only: there is no locale routing.
  *
  * Middleware is the only place in a Next app that can BOTH read a request's
  * cookies and write cookies on the response before rendering starts. That makes
@@ -32,7 +31,12 @@ import { decideAccess, localisedPath, stripLocale } from "./lib/auth/route-polic
  * user silently signed out.
  */
 
-const intlMiddleware = createIntlMiddleware(routing);
+/**
+ * The dashboard used to serve English under `/en` (and accept a literal `/es`).
+ * Those URLs survive in old emails and bookmarks, so they 301 to the bare path
+ * rather than 404 — or worse, bounce through sign-in to a page that 404s.
+ */
+const FORMER_LOCALE_PREFIX = /^\/(?:en|es)(?=\/|$)/;
 
 /** Cookie mutations to apply to whichever response we end up returning. */
 interface CookieWrite {
@@ -42,9 +46,15 @@ interface CookieWrite {
 }
 
 export default async function middleware(request: NextRequest): Promise<NextResponse> {
+  const formerLocale = FORMER_LOCALE_PREFIX.exec(request.nextUrl.pathname);
+  if (formerLocale !== null) {
+    const target = request.nextUrl.clone();
+    target.pathname = request.nextUrl.pathname.slice(formerLocale[0].length) || "/";
+    return NextResponse.redirect(target, 301);
+  }
+
   const env = serverEnv();
-  const { locale, pathname } = stripLocale(request.nextUrl.pathname, routing.locales);
-  const activeLocale = locale ?? routing.defaultLocale;
+  const pathname = normalisePathname(request.nextUrl.pathname);
 
   const cookieWrites: CookieWrite[] = [];
 
@@ -109,7 +119,7 @@ export default async function middleware(request: NextRequest): Promise<NextResp
 
   if (decision.kind === "redirect") {
     const target = request.nextUrl.clone();
-    target.pathname = localisedPath(decision.path, activeLocale, routing.defaultLocale);
+    target.pathname = decision.path;
     target.search = "";
 
     if (decision.reason === "unauthenticated") {
@@ -122,10 +132,7 @@ export default async function middleware(request: NextRequest): Promise<NextResp
     return applyCookies(NextResponse.redirect(target), cookieWrites);
   }
 
-  // -------------------------------------------------------------------------
-  // 4. Hand off to next-intl for locale negotiation and rewriting.
-  // -------------------------------------------------------------------------
-  return applyCookies(intlMiddleware(request), cookieWrites);
+  return applyCookies(NextResponse.next(), cookieWrites);
 }
 
 /** A year. The CSRF token is not a credential; rotating it on every write suffices. */
@@ -204,8 +211,7 @@ function applyCookies(response: NextResponse, writes: readonly CookieWrite[]): N
 
 export const config = {
   /**
-   * Excludes `/api` so the BFF route handlers are never locale-rewritten (an
-   * `/en/api/auth/login` rewrite would 404) and never redirected — a route
+   * Excludes `/api` so the BFF route handlers are never redirected — a route
    * handler answering a redirect instead of JSON breaks the sign-in form in a
    * way that looks like a server error.
    *

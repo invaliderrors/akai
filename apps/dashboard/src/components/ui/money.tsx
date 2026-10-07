@@ -1,4 +1,4 @@
-import type { CurrencyCode, Locale, Minor } from "@akai/contracts";
+import type { CurrencyCode, Minor } from "@akai/contracts";
 import { formatAggregateMinor, formatMoney } from "@akai/money";
 
 /**
@@ -38,7 +38,7 @@ const BASE_CLASS = "tabular-nums whitespace-nowrap text-[var(--label)]";
  * U+2212 MINUS SIGN, not U+002D HYPHEN-MINUS.
  *
  * ICU emits the ASCII hyphen for a negative currency figure ("-$ 29.900" in
- * es-CO, "-$29,900" in en-US). In a right-aligned stack of tabular figures that
+ * es-CO). In a right-aligned stack of tabular figures that
  * hyphen is the one glyph in the string with no tabular width, so the negative
  * row's digits sit a fraction off its neighbours'; U+2212 is drawn to the digit
  * width precisely so a signed column lines up. It is also the character a
@@ -51,9 +51,8 @@ const BASE_CLASS = "tabular-nums whitespace-nowrap text-[var(--label)]";
 const MINUS_SIGN = "−";
 
 /**
- * Safe as a blanket replacement because the platform's `Locale` union is
- * exactly `es` | `en`: neither es-CO nor en-US puts a hyphen anywhere else in a
- * currency figure — the group and decimal separators are "." "," and the symbol
+ * Safe as a blanket replacement because every figure is formatted in es-CO,
+ * which puts no hyphen anywhere else in a currency figure — the group and decimal separators are "." "," and the symbol
  * is "$". A locale with a hyphen in its number pattern would need
  * `formatToParts` and a `minusSign` part instead.
  */
@@ -90,22 +89,13 @@ export interface MoneyProps {
    */
   readonly amount: Minor;
   readonly currency: CurrencyCode;
-  /**
-   * Narrowed by comparison at the call site (`asLocale` in
-   * `components/account/format.ts`), never cast. Typed as the union rather than
-   * `string` so a raw `useLocale()` result is a compile error here instead of a
-   * silent en-US rendering of a Spanish-default store.
-   */
-  readonly locale: Locale;
   /** Weight only — 600 for a grand total or a headline figure. Never a size. */
   readonly emphasis?: boolean;
   readonly className?: string;
 }
 
-export function Money({ amount, currency, locale, emphasis = false, className }: MoneyProps) {
-  return (
-    <Figure figure={formatMoney(amount, currency, locale)} emphasis={emphasis} className={className} />
-  );
+export function Money({ amount, currency, emphasis = false, className }: MoneyProps) {
+  return <Figure figure={formatMoney(amount, currency)} emphasis={emphasis} className={className} />;
 }
 
 export interface AggregateMoneyProps {
@@ -123,7 +113,6 @@ export interface AggregateMoneyProps {
    */
   readonly amountMinor: number;
   readonly currency: CurrencyCode;
-  readonly locale: Locale;
   readonly emphasis?: boolean;
   readonly className?: string;
 }
@@ -137,18 +126,17 @@ export interface AggregateMoneyProps {
  * is the cap this path steps around.
  *
  * It shares one Intl call with `formatMoney`, so an aggregate and a line total
- * render as the same euro figure in both locales rather than two near-spellings.
+ * render as the same peso figure rather than two near-spellings.
  */
 export function AggregateMoney({
   amountMinor,
   currency,
-  locale,
   emphasis = false,
   className,
 }: AggregateMoneyProps) {
   return (
     <Figure
-      figure={formatAggregateMinor(amountMinor, currency, locale)}
+      figure={formatAggregateMinor(amountMinor, currency)}
       emphasis={emphasis}
       className={className}
     />

@@ -51,7 +51,7 @@ import { CONTENT_SANITIZED_HEADER } from "./catalog-headers";
 function buildProductBody() {
   return createProductSchema.parse({
     slug: "hoodie-kumo",
-    translations: [{ locale: "es", name: "Hoodie Kumo", shortDescription: "Sudadera", description: "" }],
+    name: "Hoodie Kumo", shortDescription: "Sudadera", description: "",
     variants: [{ sku: "AK-HOOD-M", priceGross: 4999, currency: "EUR" }],
   });
 }
@@ -89,7 +89,7 @@ function buildVariant() {
     id: "11111111-1111-4111-8111-111111111111",
     productId: "22222222-2222-4222-8222-222222222222",
     sku: "AK-HOOD-M",
-    name: { es: "M", en: "M" },
+    name: "M",
     options: { size: "10mg" },
     price: {
       currency: "EUR",
@@ -120,9 +120,7 @@ function buildProduct() {
     slug: "hoodie-kumo",
     status: "ACTIVE",
     taxClass: "STANDARD",
-    translations: [
-      { locale: "es", name: "Hoodie Kumo", shortDescription: "Sudadera", description: "..." },
-    ],
+    name: "Hoodie Kumo", shortDescription: "Sudadera", description: "...",
     variants: [buildVariant()],
     media: [],
     categories: [],
@@ -165,6 +163,16 @@ describe("listProducts", () => {
 
     expect(calls[0]?.query).toMatchObject({ status: "DRAFT", search: "hoodie" });
     expect(calls[0]?.query?.cursor).toBeUndefined();
+  });
+
+  it("never sends a locale — the API's query schema is strict and the shop is Spanish only", async () => {
+    const { http, calls } = fakeHttp(
+      ok({ items: [], nextCursor: null, hasMore: false }),
+    );
+
+    await listProducts(http, { sort: "name", limit: 100 });
+
+    expect(calls[0]?.query).not.toHaveProperty("locale");
   });
 
   it("throws a typed error carrying the API's code, not just a status", async () => {
@@ -249,31 +257,35 @@ describe("listProducts", () => {
  * rewrote a pasted description, and nothing above `apiRequest` ever read it.
  */
 describe("createProduct", () => {
-  it("reports no sanitized locale when the header is absent", async () => {
+  it("reports no sanitised description when the header is absent", async () => {
     const { http } = fakeHttp(ok(buildProduct()));
 
     const result = await createProduct(http, buildProductBody());
 
-    expect(result.sanitizedLocales).toEqual([]);
+    expect(result.descriptionSanitized).toBe(false);
     expect(result.product.id).toBe(buildProduct().id);
   });
 
-  it("surfaces every locale the API's sanitiser rewrote", async () => {
-    const { http } = fakeHttp(ok(buildProduct(), { [CONTENT_SANITIZED_HEADER]: "es,en" }));
+  it("surfaces a description the API's sanitiser rewrote", async () => {
+    const { http } = fakeHttp(
+      ok(buildProduct(), { [CONTENT_SANITIZED_HEADER]: "description" }),
+    );
 
     const result = await createProduct(http, buildProductBody());
 
-    expect(result.sanitizedLocales).toEqual(["es", "en"]);
+    expect(result.descriptionSanitized).toBe(true);
   });
 });
 
 describe("updateProduct", () => {
-  it("surfaces the sanitized locale on an update too", async () => {
-    const { http } = fakeHttp(ok(buildProduct(), { [CONTENT_SANITIZED_HEADER]: "es" }));
+  it("surfaces a rewritten description on an update too", async () => {
+    const { http } = fakeHttp(
+      ok(buildProduct(), { [CONTENT_SANITIZED_HEADER]: "description" }),
+    );
 
     const result = await updateProduct(http, buildProduct().id, buildProductBody());
 
-    expect(result.sanitizedLocales).toEqual(["es"]);
+    expect(result.descriptionSanitized).toBe(true);
   });
 });
 
@@ -360,7 +372,7 @@ describe("listCategories", () => {
           {
             id: "11111111-1111-4111-8111-111111111111",
             slug: "recuperacion",
-            name: { es: "Recuperación", en: "Recovery" },
+            name: "Recuperación",
             sortOrder: 0,
             productCount: 4,
           },
@@ -378,26 +390,26 @@ describe("listCategories", () => {
 });
 
 describe("createCategory", () => {
-  it("POSTs the slug and both locale names, and parses back the category", async () => {
+  it("POSTs the slug and the name, and parses back the category", async () => {
     const { http, calls } = fakeHttp(
       ok({
         id: "11111111-1111-4111-8111-111111111111",
         slug: "sudaderas",
-        name: { es: "Sudaderas", en: "Hoodies" },
+        name: "Sudaderas",
         sortOrder: 4,
       }),
     );
 
     const result = await createCategory(http, {
       slug: "sudaderas",
-      name: { es: "Sudaderas", en: "Hoodies" },
+      name: "Sudaderas",
     });
 
     expect(calls[0]?.method).toBe("POST");
     expect(calls[0]?.path).toBe("/admin/categories");
     expect(calls[0]?.body).toEqual({
       slug: "sudaderas",
-      name: { es: "Sudaderas", en: "Hoodies" },
+      name: "Sudaderas",
     });
     expect(result.sortOrder).toBe(4);
   });
@@ -409,19 +421,19 @@ describe("updateCategory", () => {
       ok({
         id: "11111111-1111-4111-8111-111111111111",
         slug: "recuperacion",
-        name: { es: "Recuperación total", en: "Full recovery" },
+        name: "Recuperación total",
         sortOrder: 0,
       }),
     );
 
     const result = await updateCategory(http, "11111111-1111-4111-8111-111111111111", {
-      name: { es: "Recuperación total", en: "Full recovery" },
+      name: "Recuperación total",
     });
 
     expect(calls[0]?.method).toBe("PATCH");
     expect(calls[0]?.path).toBe("/admin/categories/11111111-1111-4111-8111-111111111111");
-    expect(calls[0]?.body).toEqual({ name: { es: "Recuperación total", en: "Full recovery" } });
-    expect(result.name).toEqual({ es: "Recuperación total", en: "Full recovery" });
+    expect(calls[0]?.body).toEqual({ name: "Recuperación total" });
+    expect(result.name).toBe("Recuperación total");
   });
 });
 
@@ -649,7 +661,6 @@ describe("getOrder", () => {
         customerId: null,
         email: "buyer@example.com",
         status: "PAID",
-        locale: "es",
         currency: "COP",
         items: [
           {

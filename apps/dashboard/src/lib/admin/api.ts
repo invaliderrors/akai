@@ -18,14 +18,11 @@ import {
   type InventoryFilter,
   type JobState,
   type JobsSummary,
-  type Locale,
   type OfferEverywhere,
   type OfferEverywhereResult,
   type ProductKind,
   type Role,
   type SiteSettings,
-  type TranslateRequest,
-  type TranslateResponse,
   type UpdateProduct,
   type UpdateSiteSettings,
   adminCustomerSchema,
@@ -46,9 +43,8 @@ import {
   productVariantSchema,
   refundSchema,
   siteSettingsSchema,
-  translateResponseSchema,
 } from "@akai/contracts";
-import { parseSanitizedLocales } from "./catalog-headers";
+import { parseDescriptionSanitized } from "./catalog-headers";
 import { parseOrThrow, type AdminHttp } from "./http";
 import {
   adminAffiliateLinkSchema,
@@ -100,7 +96,6 @@ export interface AdminProductListParams {
   readonly category?: string;
   readonly sort?: "newest" | "price_asc" | "price_desc" | "name" | "manual";
   readonly includeDeleted?: boolean;
-  readonly locale?: "es" | "en";
   readonly cursor?: string;
   readonly limit?: number;
   /** `PACK` powers the dedicated `/admin/products/packs` list. */
@@ -168,7 +163,7 @@ export async function listCategories(http: AdminHttp): Promise<CategoryListRespo
 
 export interface CreateCategoryInput {
   readonly slug: string;
-  readonly name: { readonly es: string; readonly en: string };
+  readonly name: string;
 }
 
 export async function createCategory(
@@ -184,7 +179,7 @@ export async function createCategory(
 }
 
 export interface UpdateCategoryInput {
-  readonly name: { readonly es: string; readonly en: string };
+  readonly name: string;
 }
 
 /** Rename only — slug and manual order each have their own route. */
@@ -270,7 +265,6 @@ export async function listProducts(
       category: params.category,
       sort: params.sort,
       includeDeleted: params.includeDeleted,
-      locale: params.locale,
       cursor: params.cursor,
       limit: params.limit,
       kind: params.kind,
@@ -291,14 +285,12 @@ export async function getProduct(
 /**
  * What a product write hands back, beyond the resource itself.
  *
- * `sanitizedLocales` names every locale whose `description` the API's
- * sanitiser rewrote on this write — see `CONTENT_SANITIZED_HEADER`. Empty,
- * never absent, when nothing was rewritten, so a caller never has to branch
- * on presence versus length.
+ * `descriptionSanitized` says whether the API's sanitiser rewrote the
+ * `description` on this write — see `CONTENT_SANITIZED_HEADER`.
  */
 export interface ProductWrite {
   readonly product: z.infer<typeof productSchema>;
-  readonly sanitizedLocales: readonly Locale[];
+  readonly descriptionSanitized: boolean;
 }
 
 export async function createProduct(
@@ -312,33 +304,8 @@ export async function createProduct(
   });
   return {
     product: parseOrThrow(productSchema, response),
-    sanitizedLocales: parseSanitizedLocales(response.headers),
+    descriptionSanitized: parseDescriptionSanitized(response.headers),
   };
-}
-
-/**
- * Machine-translate one product's copy from one locale into the other.
- *
- * A READ of a third-party service, not a write of ours: nothing is created and
- * nothing is stored, which is why the API answers 200 rather than 201 and why
- * there is no `revalidatePath` on the action that calls this. The operator sees
- * the result in the form and saves it, or does not.
- *
- * The body is built by the CALLER from `translateRequestSchema`, so every
- * ceiling that stands between this dashboard and a metered vendor account —
- * texts per batch, characters per text, characters per request — is enforced
- * before the request is made, not discovered in the 400 that comes back.
- */
-export async function translateCopy(
-  http: AdminHttp,
-  body: TranslateRequest,
-): Promise<TranslateResponse> {
-  const response = await http.request({
-    method: "POST",
-    path: "/admin/translations",
-    body,
-  });
-  return parseOrThrow(translateResponseSchema, response);
 }
 
 export async function updateProduct(
@@ -353,7 +320,7 @@ export async function updateProduct(
   });
   return {
     product: parseOrThrow(productSchema, response),
-    sanitizedLocales: parseSanitizedLocales(response.headers),
+    descriptionSanitized: parseDescriptionSanitized(response.headers),
   };
 }
 
@@ -967,7 +934,6 @@ export interface AdminInventoryListParams {
   readonly limit?: number;
   readonly filter?: InventoryFilter;
   readonly search?: string;
-  readonly locale?: Locale;
 }
 
 /**
@@ -992,7 +958,6 @@ export async function listInventory(
       ...(params.cursor === undefined ? {} : { cursor: params.cursor }),
       ...(params.search === undefined ? {} : { search: params.search }),
       ...(params.filter === undefined ? {} : { filter: params.filter }),
-      ...(params.locale === undefined ? {} : { locale: params.locale }),
       limit: params.limit,
     },
   });
@@ -1120,8 +1085,8 @@ export async function createMediaUploadUrl(
 export interface AddProductMediaInput {
   readonly objectKey: string;
   readonly url: string;
-  /** Per-locale alt text; it is user-facing copy like any other. */
-  readonly alt: Record<string, string>;
+  /** Alt text; it is user-facing copy like any other. */
+  readonly alt: string;
   readonly width: number;
   readonly height: number;
   readonly sortOrder: number;

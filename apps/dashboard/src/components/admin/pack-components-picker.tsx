@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
-import type { CurrencyCode, Locale } from "@akai/contracts";
+import type { CurrencyCode } from "@akai/contracts";
 import { formatMoney, toMinor } from "@akai/money";
 
 import { PopupButton, TextField } from "@/components/ui/field";
@@ -63,8 +63,6 @@ export interface PackComponentsPickerProps {
   readonly candidates: readonly PackComponentCandidate[];
   readonly selected: readonly PackComponentSelection[];
   readonly onChange: (next: readonly PackComponentSelection[]) => void;
-  /** The locale being edited, so prices read the way the operator expects. */
-  readonly locale: Locale;
   /**
    * The pack's OWN flat price, as currently typed — parsed but not yet
    * necessarily valid, so this is `null` while the field is empty or
@@ -82,7 +80,6 @@ export function PackComponentsPicker({
   candidates,
   selected,
   onChange,
-  locale,
   packPriceGross,
   currency,
 }: PackComponentsPickerProps) {
@@ -174,7 +171,7 @@ export function PackComponentsPicker({
     const price =
       variant.priceGross === 0
         ? t("defaultVariantFree")
-        : formatMoney(toMinor(variant.priceGross), variant.currency as CurrencyCode, locale);
+        : formatMoney(toMinor(variant.priceGross), variant.currency as CurrencyCode);
     return `${variant.label} · ${price}`;
   }
 
@@ -263,8 +260,8 @@ export function PackComponentsPicker({
       {componentsTotal !== null && packPriceGross !== null && selected.length > 0 && (
         <p className="text-[11px] text-[var(--label-secondary)]">
           {t("packComponentsTotalHint", {
-            componentsTotal: formatMoney(toMinor(componentsTotal), currency, locale),
-            packPrice: formatMoney(toMinor(packPriceGross), currency, locale),
+            componentsTotal: formatMoney(toMinor(componentsTotal), currency),
+            packPrice: formatMoney(toMinor(packPriceGross), currency),
           })}
         </p>
       )}

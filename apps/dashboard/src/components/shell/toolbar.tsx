@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 
 import { Icon } from "@/components/ui/icon";
 import { publicEnv } from "@/lib/env";
-import { Link, getPathname } from "@/i18n/navigation";
+import Link from "next/link";
 
 import { AccountMenu } from "./account-menu";
 import { SidebarToggle } from "./sidebar-toggle";
@@ -94,16 +94,11 @@ export function Toolbar({ area, email, name, sidebarHidden, navControl, title }:
   const t = useTranslations("common");
 
   /**
-   * The GET form needs a REAL path, and `action` is plain HTML that knows
-   * nothing about next-intl — so the locale prefix has to be baked in or every
-   * English operator's search would land them in Spanish. (`ui/filter-bar.tsx`
-   * has the opposite problem and solves it by omitting `action` entirely, which
-   * only works because it submits to the page it is already on.) The
-   * conditional produces the `"es" | "en"` literal union rather than narrowing
-   * a widened `string`, so no cast is involved.
+   * The GET form needs a REAL path: `action` is plain HTML, and it submits to
+   * the orders list rather than the page it is on. (`ui/filter-bar.tsx`
+   * omits `action` entirely because it submits to the page it is already on.)
    */
-  const locale = useLocale() === "en" ? "en" : "es";
-  const ordersPath = getPathname({ href: "/admin/orders", locale });
+  const ordersPath = "/admin/orders";
 
   return (
     <header

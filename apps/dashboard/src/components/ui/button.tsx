@@ -24,9 +24,8 @@ import { Icon, type IconName } from "./icon";
  * WHY THERE IS NO `as` / `href` PROP. A link that looks like a button must
  * still be a link — right-click, middle-click, "open in new tab" and the
  * screen reader's link rotor all hang off the element, not the paint. But this
- * app's links must come from `@/i18n/navigation` or they drop the locale
- * prefix, and a polymorphic Button would have to import that Link and re-export
- * its whole prop surface. So the styling is exported as a plain function
+ * app's links are `next/link`'s `Link`, and a polymorphic Button would have to
+ * import that Link and re-export its whole prop surface. So the styling is exported as a plain function
  * instead: `<Link className={buttonClassName({ variant: "prominent" })}>`.
  * `role="link"` survives, and nothing here has to know about routing.
  *
@@ -247,7 +246,7 @@ export interface ButtonClassNameOptions {
 /**
  * The button paint as a plain class string.
  *
- * Exists so a `<Link>` from `@/i18n/navigation` can look like a button while
+ * Exists so a `<Link>` from `next/link` can look like a button while
  * staying a link — `reset-password-form` and `verify-email-panel` are exactly
  * that shape, and today they reach for the legacy `.btn .btn--primary` classes.
  * Also the seam any future host element uses; `Button` itself is a thin caller.

@@ -11,7 +11,7 @@ import { Button, IconButton } from "@/components/ui/button";
 import { PopupButton, TextField } from "@/components/ui/field";
 import { Notice } from "@/components/ui/notice";
 import { Dialog } from "@/components/ui/overlay";
-import { useRouter } from "@/i18n/navigation";
+import { useRouter } from "next/navigation";
 import { adjustInventoryAction } from "@/lib/admin/actions";
 
 /**

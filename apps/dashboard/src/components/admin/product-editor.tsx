@@ -10,7 +10,7 @@ import {
   type Product,
 } from "@akai/contracts";
 
-import { useRouter } from "@/i18n/navigation";
+import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
@@ -28,28 +28,20 @@ import {
   removeProductMediaAction,
   setVariantInventoryPolicyAction,
   unpublishProductAction,
-  translateProductCopyAction,
   updateProductAction,
   updateVariantAction,
   type ActionErrorCode,
   type ActionResult,
 } from "@/lib/admin/actions";
-import {
-  translateCopyReasonOf,
-  type TranslateCopyReason,
-} from "@/lib/admin/translate-copy";
 import { uploadProductImage } from "@/lib/admin/upload-product-image";
 
 import { ConfirmActionError } from "./type-to-confirm-button";
 import { DeleteProductButton } from "./delete-product-button";
 import {
   ProductForm,
-  TranslateCopyError,
   type ClassifiedVariantChanges,
   type OfferEverywhereIntent,
-  type ProductCopyDraft,
   type StagedVariantImage,
-  type TranslateCopyRequest,
 } from "./product-form";
 import { StagedProductMedia } from "./product-media";
 
@@ -142,31 +134,6 @@ const ACTION_ERROR_KEYS: Readonly<Record<ActionErrorCode, string>> = {
   UNPARSEABLE_RESPONSE: "generic",
 };
 
-/**
- * Every translation failure, mapped onto its own sentence.
- *
- * TOTAL over `TranslateCopyReason`, and that is the point: a reason added to
- * the contract fails to compile here until somebody decides what the operator
- * is told. They need genuinely different sentences — "nobody configured a key"
- * is a permanent state of this deployment, "too many at once" is over in five
- * seconds, "the quota is spent" is neither — and all three arrive as the same
- * coarse CONFLICT, which is exactly why the envelope carries a reason.
- *
- * EXPORTED for its test. The alternative is asserting nine sentences through
- * nine renders of the largest form in the app.
- */
-export const TRANSLATE_REASON_KEYS: Readonly<Record<TranslateCopyReason, string>> = {
-  NOT_CONFIGURED: "translateErrors.NOT_CONFIGURED",
-  INVALID_KEY: "translateErrors.INVALID_KEY",
-  QUOTA_EXCEEDED: "translateErrors.QUOTA_EXCEEDED",
-  RATE_LIMITED: "translateErrors.RATE_LIMITED",
-  UNSUPPORTED_LANGUAGE: "translateErrors.UNSUPPORTED_LANGUAGE",
-  VENDOR_UNAVAILABLE: "translateErrors.VENDOR_UNAVAILABLE",
-  VENDOR_TIMEOUT: "translateErrors.VENDOR_TIMEOUT",
-  MALFORMED_RESPONSE: "translateErrors.MALFORMED_RESPONSE",
-  EMPTY_SOURCE: "translateErrors.EMPTY_SOURCE",
-};
-
 export function ProductEditor({
   product,
   currency,
@@ -213,17 +180,6 @@ export function ProductEditor({
    */
   const [staged, setStaged] = useState<readonly StagedImage[]>([]);
   /**
-   * Set once the API says no vendor key is configured here.
-   *
-   * STICKY, because that answer cannot change while this page is open: the key
-   * is read from the API's own environment at boot. Remembering it turns a
-   * button that fails every time into one that is disabled beside a sentence
-   * saying why — and nothing else on the form is affected, which is the whole
-   * of "degrade, do not break".
-   */
-  const [translateOff, setTranslateOff] = useState<string | null>(null);
-
-  /**
    * `null` code means the throw was not an API failure, so there is no code to
    * map. `reason` is the envelope's own sub-code, checked BEFORE the coarse
    * `code` table below for the two failures that share `FORBIDDEN` but need
@@ -257,44 +213,6 @@ export function ProductEditor({
     }
 
     return tErrors(ACTION_ERROR_KEYS[code]);
-  }
-
-  /**
-   * The form's translation seam, wired to the server action.
-   *
-   * THE ACTION IS CALLED HERE rather than in the form, for the reason the whole
-   * admin surface works this way: the API bearer lives server-side, and a
-   * DeepL-backed endpoint reachable from the browser is a metered vendor with a
-   * public door. The form owns the copy; this owns the call and the sentence.
-   *
-   * IT RETURNS THE COPY; IT DOES NOT SAVE IT. Nothing here calls
-   * `updateProductAction`. The operator reads the fill, edits it and saves
-   * deliberately — an unreviewed machine translation of customer-facing copy is a
-   * compliance failure, not a time saving.
-   */
-  async function handleTranslate(request: TranslateCopyRequest): Promise<ProductCopyDraft> {
-    const result = await translateProductCopyAction({
-      from: request.from,
-      to: request.to,
-      copy: request.copy,
-    });
-
-    if (result.ok) {
-      return result.data;
-    }
-
-    const reason = translateCopyReasonOf(result.reason);
-    if (reason === null) {
-      // No reason we recognise — a revoked session, an unreadable body, a
-      // network failure. The coarse code still has a sentence, and `message`
-      // stays where it belongs, in the console.
-      throw new TranslateCopyError(messageFor(result.code, result.reason));
-    }
-
-    if (reason === "NOT_CONFIGURED") {
-      setTranslateOff(t(TRANSLATE_REASON_KEYS[reason]));
-    }
-    throw new TranslateCopyError(t(TRANSLATE_REASON_KEYS[reason]));
   }
 
   /**
@@ -442,7 +360,7 @@ export function ProductEditor({
         return;
       }
 
-      if (updated.data.sanitizedLocales.length > 0) {
+      if (updated.data.descriptionSanitized) {
         setSanitizedWarning(t("descriptionSanitized"));
       }
 
@@ -460,7 +378,7 @@ export function ProductEditor({
       return;
     }
 
-    if (created.data.sanitizedLocales.length > 0) {
+    if (created.data.descriptionSanitized) {
       setSanitizedWarning(t("descriptionSanitized"));
     }
 
@@ -613,9 +531,6 @@ export function ProductEditor({
         {...(product === undefined ? {} : { product })}
         currency={currency}
         onSubmit={handleSubmit}
-        onTranslate={handleTranslate}
-        // `exactOptionalPropertyTypes`: the prop is absent, never `undefined`.
-        {...(translateOff === null ? {} : { translateUnavailable: translateOff })}
         submitLabel={product === undefined ? t("submitCreate") : t("submitSave")}
         {...(error === undefined ? {} : { formError: error })}
         helperText={
@@ -658,22 +573,9 @@ export function ProductEditor({
   );
 }
 
-/**
- * The alt text an upload carries, with a blank locale left out entirely.
- *
- * An empty string is not "no alt text": it is alt text that says nothing, and it
- * would be stored as a per-locale value like any other and rendered into the
- * storefront's `<img alt>`. Omitting the key keeps "we have no Spanish alt for
- * this picture" distinguishable from "the Spanish alt is deliberately empty".
- */
-function altOf(image: StagedImage): Record<string, string> {
-  const es = image.altEs.trim();
-  const en = image.altEn.trim();
-
-  return {
-    ...(es === "" ? {} : { es }),
-    ...(en === "" ? {} : { en }),
-  };
+/** The alt text an upload carries, trimmed. "" when none was written. */
+function altOf(image: StagedImage): string {
+  return image.alt.trim();
 }
 
 /**

@@ -1,4 +1,4 @@
-import { Link } from "@/i18n/navigation";
+import Link from "next/link";
 
 import { Icon, type IconName } from "./icon";
 import { SegmentedControl, type SearchParamValue, type Segment } from "./segmented-control";
@@ -77,7 +77,7 @@ export function activeCursor(value: SearchParamValue): string | undefined {
 }
 
 export interface CursorStackOptions {
-  /** Route the list lives on, e.g. `/admin/orders`. `Link` adds the locale. */
+  /** Route the list lives on, e.g. `/admin/orders`. */
   readonly pathname: string;
   /** Everything already in the URL. Unrelated params are carried across. */
   readonly searchParams?: Readonly<Record<string, SearchParamValue>>;
@@ -193,7 +193,7 @@ export interface PaginationLabels {
 
 export interface CursorPaginationProps {
   readonly labels: PaginationLabels;
-  /** Route the list lives on. `Link` adds the locale. */
+  /** Route the list lives on. */
   readonly pathname: string;
   readonly searchParams?: Readonly<Record<string, SearchParamValue>>;
   /** Rows on THIS page. `items.length` — the only count the API gives us. */

@@ -28,7 +28,7 @@ function rate(overrides: Partial<Record<string, unknown>> = {}): AdminShippingRa
   return adminShippingRateSchema.parse({
     id: RATE_ID,
     zoneId: ZONE_CO,
-    name: { es: "Envío nacional", en: "National shipping" },
+    name: "Envío nacional",
     strategy: "FLAT",
     minValue: null,
     maxValue: null,
@@ -176,7 +176,7 @@ describe("ShippingManager — rates", () => {
       ok: true,
       data: rate({
         id: "44444444-4444-4444-8444-444444444444",
-        name: { es: "Envío express" },
+        name: "Envío express",
         priceGross: 2_500_000,
       }),
     });
@@ -187,14 +187,14 @@ describe("ShippingManager — rates", () => {
     await user.click(within(colombia as HTMLElement).getByRole("button", { name: t.rate.add }));
 
     const form = screen.getByRole("form", { name: t.rate.createTitle });
-    await user.type(within(form).getByLabelText(labelled(t.rate.nameEs)), "Envío express");
+    await user.type(within(form).getByLabelText(labelled(t.rate.name)), "Envío express");
     await user.type(within(form).getByLabelText(labelled(t.rate.price)), "25.000");
     await user.click(within(form).getByRole("button", { name: t.rate.create }));
 
     expect(handlers.onCreateRate).toHaveBeenCalledWith(
       ZONE_CO,
       expect.objectContaining({
-        name: { es: "Envío express" },
+        name: "Envío express",
         priceGross: 2_500_000,
         currency: "COP",
       }),

@@ -7,13 +7,11 @@ import {
   discountTypeSchema,
   idSchema,
   isoDateTimeSchema,
-  localeSchema,
   nonNegativeMinorSchema,
   orderSchema,
   paginatedSchema,
   priceTierSchema,
   productSchema,
-  productTranslationSchema,
   refundSchema,
   slugSchema,
   type CurrencyCode,
@@ -72,7 +70,7 @@ export const updateVariantRequestSchema = z
   .object({
     version: z.number().int().min(0),
     sku: z.string().min(1).max(64).optional(),
-    name: z.record(localeSchema, z.string().max(120)).nullable().optional(),
+    name: z.string().max(120).nullable().optional(),
     options: z.record(z.string().max(40), z.string().max(80)).optional(),
     priceGross: nonNegativeMinorSchema.optional(),
     compareAtGross: nonNegativeMinorSchema.nullable().optional(),
@@ -155,7 +153,7 @@ export const addMediaRequestSchema = z
   .object({
     objectKey: z.string().min(1).max(512),
     url: httpUrlSchema,
-    alt: z.record(localeSchema, z.string().max(300)).default({}),
+    alt: z.string().max(300).default(""),
     width: z.number().int().positive(),
     height: z.number().int().positive(),
     sortOrder: z.number().int().min(0).default(0),
@@ -358,7 +356,6 @@ export {
   discountTypeSchema,
   idSchema,
   isoDateTimeSchema,
-  productTranslationSchema,
   slugSchema,
 };
 

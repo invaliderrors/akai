@@ -6,11 +6,10 @@ import { errorCodeSchema, type ErrorCode } from "@akai/contracts";
 import { Icon, type IconName } from "./icon";
 import { EmptyState, ErrorState, Skeleton } from "./states";
 import esMessages from "../../../messages/es.json";
-import enMessages from "../../../messages/en.json";
 
-function renderIntl(node: React.ReactNode, locale: "es" | "en" = "es") {
+function renderIntl(node: React.ReactNode) {
   return render(
-    <NextIntlClientProvider locale={locale} messages={locale === "es" ? esMessages : enMessages}>
+    <NextIntlClientProvider locale="es" messages={esMessages}>
       {node}
     </NextIntlClientProvider>,
   );
@@ -172,28 +171,18 @@ describe("ErrorState", () => {
     expect(screen.getByText(esMessages.errors.RATE_LIMITED)).toBeInTheDocument();
   });
 
-  it("has a catalogue leaf for every ErrorCode in both locales", () => {
+  it("has a catalogue leaf for every ErrorCode", () => {
     // `ErrorState` resolves the cause with `t.has(code) ? t(code) : t("generic")`.
     // That fallback is a safety net for the window between a contract change and
     // a catalogue change; this is what keeps the window loud instead of letting
     // every failure quietly degrade to "Algo ha ido mal".
     const spanish: Readonly<Record<string, string>> = esMessages.errors;
-    const english: Readonly<Record<string, string>> = enMessages.errors;
 
     for (const code of errorCodeSchema.options) {
       expect(Object.keys(spanish)).toContain(code);
-      expect(Object.keys(english)).toContain(code);
     }
   });
 
-  it("renders the English cause under the English catalogue", () => {
-    renderIntl(
-      <ErrorState title="We couldn't load your orders" code="NOT_FOUND" requestId="req_1" />,
-      "en",
-    );
-
-    expect(screen.getByRole("alert")).toHaveTextContent(enMessages.errors.NOT_FOUND);
-  });
 });
 
 describe("ErrorState request id copy control", () => {

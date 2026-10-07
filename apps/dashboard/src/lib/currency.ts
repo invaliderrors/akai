@@ -1,4 +1,4 @@
-import type { CurrencyCode } from "@akai/contracts";
+import { STORE_LOCALE, type CurrencyCode } from "@akai/contracts";
 
 /**
  * The currencies a charge can actually be denominated in.
@@ -47,7 +47,7 @@ export function currencyFlag(code: CurrencyCode): string | null {
 }
 
 /**
- * "EUR 🇪🇺 · Euro", in the reader's language.
+ * "COP 🇨🇴 · peso colombiano", named in Spanish.
  *
  * THE CODE LEADS, AND THE FLAG DOES NOT. A native `<select>` matches type-ahead
  * against the start of the option's text, and an operator reaching this control
@@ -56,17 +56,16 @@ export function currencyFlag(code: CurrencyCode): string | null {
  * so it would swallow every keystroke and make the list of 84 navigable only by
  * scrolling.
  *
- * The name comes from `Intl.DisplayNames`, so it is Spanish for a Spanish
- * operator and English for an English one with no name table to translate or to
- * fall out of date.
+ * The name comes from `Intl.DisplayNames` in `STORE_LOCALE`, so there is no
+ * name table to maintain or to fall out of date.
  */
-export function currencyLabel(code: CurrencyCode, locale: string): string {
+export function currencyLabel(code: CurrencyCode): string {
   const flag = currencyFlag(code);
   const head = flag === null ? code : `${code} ${flag}`;
 
   // `of()` returns undefined for a code ICU does not know, and returns the code
   // itself under a minimal-ICU build. Either way the code alone is a usable
   // label, so there is nothing to fall back to but silence.
-  const name = new Intl.DisplayNames([locale], { type: "currency" }).of(code);
+  const name = new Intl.DisplayNames([STORE_LOCALE], { type: "currency" }).of(code);
   return name === undefined || name === code ? head : `${head} · ${name}`;
 }

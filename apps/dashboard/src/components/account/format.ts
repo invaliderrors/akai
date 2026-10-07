@@ -1,4 +1,4 @@
-import type { CurrencyCode, Locale, Minor } from "@akai/contracts";
+import { STORE_LOCALE, STORE_TIME_ZONE, type CurrencyCode, type Minor } from "@akai/contracts";
 import { formatMoney } from "@akai/money";
 
 /**
@@ -9,51 +9,35 @@ import { formatMoney } from "@akai/money";
  * parsed contract and are handed straight to the formatter.
  */
 
-/**
- * Narrow next-intl's `string` locale to the platform's `Locale` union.
- *
- * `useLocale()` is typed `string` because next-intl cannot know our routing
- * config. A cast would be the obvious move and the wrong one — this is a real
- * runtime narrowing with a defined fallback, which is what `unknown`-style
- * discipline looks like applied to a widened primitive.
- */
-export function asLocale(value: string): Locale {
-  return value === "en" ? "en" : "es";
-}
-
-export function formatAmount(
-  amount: Minor,
-  currency: CurrencyCode,
-  locale: Locale,
-): string {
-  return formatMoney(amount, currency, locale);
+export function formatAmount(amount: Minor, currency: CurrencyCode): string {
+  return formatMoney(amount, currency);
 }
 
 /**
- * Format an ISO timestamp as a date.
+ * Format an ISO timestamp as a date, in Colombian time.
  *
- * The timezone is pinned to UTC deliberately. Without it the server renders in
- * the container's zone and the browser renders in the visitor's, which produces
- * a React hydration mismatch — and, on orders placed near midnight, a date that
- * visibly changes after the page loads.
+ * The time zone is pinned (`STORE_TIME_ZONE`) deliberately. Without it the
+ * server renders in the container's zone and the browser renders in the
+ * visitor's, which produces a React hydration mismatch — and, on orders placed
+ * near midnight, a date that visibly changes after the page loads.
  */
-export function formatDate(isoDateTime: string, locale: Locale): string {
-  return new Intl.DateTimeFormat(locale === "es" ? "es-CO" : "en-US", {
+export function formatDate(isoDateTime: string): string {
+  return new Intl.DateTimeFormat(STORE_LOCALE, {
     day: "2-digit",
     month: "short",
     year: "numeric",
-    timeZone: "UTC",
+    timeZone: STORE_TIME_ZONE,
   }).format(new Date(isoDateTime));
 }
 
-export function formatDateTime(isoDateTime: string, locale: Locale): string {
-  return new Intl.DateTimeFormat(locale === "es" ? "es-CO" : "en-US", {
+export function formatDateTime(isoDateTime: string): string {
+  return new Intl.DateTimeFormat(STORE_LOCALE, {
     day: "2-digit",
     month: "short",
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
-    timeZone: "UTC",
+    timeZone: STORE_TIME_ZONE,
   }).format(new Date(isoDateTime));
 }
 

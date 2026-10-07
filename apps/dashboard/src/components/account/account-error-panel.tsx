@@ -4,7 +4,7 @@ import { PageTemplate } from "@/components/shell/page-template";
 import { buttonClassName } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import { ErrorState } from "@/components/ui/states";
-import { Link } from "@/i18n/navigation";
+import Link from "next/link";
 import type { ApiError } from "@/lib/api/errors";
 
 /**

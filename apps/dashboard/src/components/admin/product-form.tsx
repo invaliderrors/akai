@@ -2,7 +2,6 @@
 
 import { useId, useState, type FormEvent, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
-import { z } from "zod";
 import {
   computeStackDiscountTiers,
   createProductSchema,
@@ -11,7 +10,6 @@ import {
   type CreateProduct,
   type CreateVariant,
   type CurrencyCode,
-  type Locale,
   type PriceTier,
   type Product,
   type ProductAddOnInput,
@@ -21,7 +19,6 @@ import { sanitizeRichText } from "@akai/rich-text";
 
 import { Button, IconButton } from "@/components/ui/button";
 import { MoneyField, PopupButton, TextArea, TextField } from "@/components/ui/field";
-import { Icon } from "@/components/ui/icon";
 import type { StagedImage } from "@/components/ui/media-uploader";
 import { Notice } from "@/components/ui/notice";
 import { Checkbox } from "@/components/ui/toggle";
@@ -67,22 +64,15 @@ import { VariantImageField, type VariantImageSupport } from "./variant-image";
  *    Rewriting a panel as a `<div>` with an `<h2>` looks identical, silently
  *    un-freezes the form, and removes the group name — so the freeze is
  *    asserted directly in `product-form.test.tsx` rather than left to review,
- *    across a text field, a table cell AND the locale switch.
+ *    across a text field and a table cell.
  *
  * WHAT THE DENSITY PASS CHANGED, AND WHY.
  *
  * The form was ~2000px tall for an empty product with one variant, so no
  * operator ever saw the whole thing at once. Two things made it that tall.
  *
- * FIRST, THE COPY WAS WRITTEN TWICE ON SCREEN. Spanish and English sat in two
- * side-by-side cards, each with Name, Summary and Description — six controls
- * for three pieces of information. They are now ONE field set behind a locale
- * switch. The reason the pair existed was visibility ("the English is behind"),
- * and that is preserved rather than dropped: each segment carries its own
- * completeness indicator, so an empty English is legible WITHOUT switching to
- * it. Both locales stay in `values.translations` the whole time — switching a
- * segment changes which draft is rendered and nothing else, so what was typed
- * in the other language cannot be lost.
+ * FIRST, THE COPY IS ONE FIELD SET. The shop is Spanish only, so Name, Summary
+ * and Description are three plain fields — no per-language tabs.
  *
  * SECOND, ONE VARIANT COST SIX STACKED LABELLED FIELDS. It is now one table
  * row: the column header carries the label, the cell carries the control. The
@@ -132,7 +122,7 @@ interface VariantDraft {
   readonly version: number;
   readonly sku: string;
   /**
-   * The variant's per-locale name — CARRIED, NOT SHOWN.
+   * The variant's name — CARRIED, NOT SHOWN.
    *
    * There is no input for it, and that is deliberate rather than an omission:
    * the value round-trips through `toFormValues` → `buildVariantName` so that
@@ -140,8 +130,7 @@ interface VariantDraft {
    * artboard draws a "Nombre" column for it; the message catalogue has no label
    * for one, so the input is a follow-up and the erasure is not.
    */
-  readonly nameEs: string;
-  readonly nameEn: string;
+  readonly name: string;
   /**
    * The size on the label — "M", "XL", "42", "One size" — and an optional
    * colour ("Black"), both free text as typed.
@@ -150,8 +139,7 @@ interface VariantDraft {
    * when every variant label is null (`product-purchase-panel.tsx`), and the
    * label comes from `variant.name`, which this form never had an input for. So
    * every product built here shipped with unnamed variants and no way to choose
-   * between them. Size (and colour, when set) fills that name, in both locales,
-   * on submit, and becomes the variant's `options` — `{ size, color }`.
+   * between them. Size (and colour, when set) fills that name on submit, and becomes the variant's `options` — `{ size, color }`.
    */
   readonly size: string;
   readonly color: string;
@@ -182,13 +170,6 @@ interface VariantDraft {
    * price and the whole path was inert.
    */
   readonly priceTiers: readonly TierDraft[];
-}
-
-interface TranslationDraft {
-  readonly locale: Locale;
-  readonly name: string;
-  readonly shortDescription: string;
-  readonly description: string;
 }
 
 export interface ProductFormValues {
@@ -265,15 +246,18 @@ export interface ProductFormValues {
    * assignment silently do nothing from this form.
    */
   readonly categoryIds: readonly string[];
-  readonly translations: readonly TranslationDraft[];
+  /** The product's copy. `description` is markup, sanitised on the way out. */
+  readonly name: string;
+  readonly shortDescription: string;
+  readonly description: string;
   readonly variants: readonly VariantDraft[];
 }
 
 /**
- * The translated copy `buildPayload` needs, passed IN rather than looked up.
+ * The messages `buildPayload` needs, passed IN rather than looked up.
  *
  * `buildPayload` is a pure function with its own tests, so it cannot call a
- * hook — and it must not fall back to an English default either, because a
+ * hook — and it must not fall back to a hard-coded default either, because a
  * default that works is a default nobody replaces. The component assembles this
  * from `admin.common.moneyErrors` (a total `Record` over the parser's closed
  * failure union) and `admin.productForm.fieldErrors`, so a new failure mode is
@@ -290,87 +274,6 @@ export interface ProductFormMessages {
   readonly tierDuplicate: string;
   readonly tierPriceTooHigh: string;
 }
-
-/** One locale's product copy — the three fields the copy panel edits. */
-export interface ProductCopyDraft {
-  readonly name: string;
-  readonly shortDescription: string;
-  readonly description: string;
-}
-
-/**
- * What the form asks a translator for.
- *
- * `from` is the locale the operator is NOT looking at and `to` is the one on
- * screen, because the button reads "Traducir desde Español" while the English
- * fields are visible: the direction is stated in the label, so it must be
- * stated in the request rather than inferred by the handler.
- */
-export interface TranslateCopyRequest {
-  readonly from: Locale;
-  readonly to: Locale;
-  readonly copy: ProductCopyDraft;
-}
-
-/**
- * The translation seam.
- *
- * A PROP, not a call. This component may not reach the API — every network call
- * in the admin surface goes through a server action owned by the client
- * boundary above it (`ProductEditor`), which is also where a failure code is
- * turned into a translated sentence. The form only knows how to ask, how to
- * wait, and where to put the answer.
- *
- * A rejection is caught, never re-thrown. It is reported as the handler's own
- * sentence when it rejects with a `TranslateCopyError` — the only shape that
- * promises an already-translated string — and as this form's `translateFailed`
- * for anything else, because any other `Error.message` here is written for a
- * log and rule 9 keeps it away from an operator.
- */
-export type TranslateCopy = (request: TranslateCopyRequest) => Promise<ProductCopyDraft>;
-
-/**
- * A translation failure whose message an operator may READ.
- *
- * The same mechanism as `ConfirmActionError` in `ui/confirm`, and for the same
- * reason. Only the seam's owner (`ProductEditor`) can turn a closed failure
- * code into a sentence from the message catalogue, and a rejected promise
- * carries nothing but an `Error`; `instanceof` is what separates that already
- * translated sentence from an incidental `Error` whose message is the API's own
- * English. Rule 9 governs the second, so the form swaps it for `translateFailed`
- * rather than printing it.
- */
-export class TranslateCopyError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "TranslateCopyError";
-  }
-}
-
-/**
- * The translated copy, NARROWED rather than trusted.
- *
- * `TranslateCopy` says the handler resolves with three strings, but the value
- * crosses a network boundary before it gets here and a promise's type parameter
- * is an assertion, not a proof. A missing `description` would land `undefined`
- * in a controlled input — React then switches the field to uncontrolled and the
- * operator's next keystroke is silently unmanaged. Parsing turns that into a
- * visible "could not translate" instead.
- *
- * EXPORTED so the handler can parse at its own boundary with the same schema
- * rather than writing a second one. The form parses again regardless: two
- * parses of a three-field object cost nothing, and the form cannot know whether
- * the handler it was given did the first one.
- *
- * NOT `.strict()`: that rule is for REQUEST schemas, where an unknown field is
- * an injection surface. Here an extra field is a newer server saying more than
- * we asked for, and dropping it is the right answer.
- */
-export const productCopySchema = z.object({
-  name: z.string(),
-  shortDescription: z.string(),
-  description: z.string(),
-});
 
 /**
  * "Also offer this add-on on every existing product", as the form reports it.
@@ -421,22 +324,6 @@ export interface ProductFormProps {
     variantChanges?: ClassifiedVariantChanges,
   ) => Promise<void>;
   readonly submitLabel: string;
-  /**
-   * Supply it and the copy panel grows a "translate from the other language"
-   * button. Absent — the current state — and the panel renders exactly as it
-   * does today, so the seam costs nothing until it is wired.
-   */
-  readonly onTranslate?: TranslateCopy;
-  /**
-   * Why translation cannot run on this deployment at all, already translated.
-   *
-   * Set only for a refusal no retry can fix — no vendor key configured. The
-   * button then stays visible and DISABLED beside this one line, and every
-   * other control on the form keeps working: an operator told "it is not
-   * configured" writes the copy by hand, where one pressing a button that
-   * silently does nothing does not.
-   */
-  readonly translateUnavailable?: string;
   /**
    * The images control, rendered in the sidebar under the product settings.
    *
@@ -505,24 +392,6 @@ export interface ProductFormProps {
 /** Field-path → message. Keyed by the same dotted path zod reports. */
 type FieldErrors = Readonly<Record<string, string>>;
 
-/**
- * A language is named in its own language, here and in the drawn artboard.
- *
- * NOT translated, and not a message key: "Español" is "Español" to an English
- * reader picking which language to fill in, exactly as a language switcher
- * never says "Spanish / Inglés". The FIELD labels stay in the operator's own
- * locale — they describe the form, not the content.
- */
-const LANGUAGE_NAME: Readonly<Record<Locale, string>> = {
-  es: "Español",
-  en: "English",
-};
-
-/** Spanish first, because it is the storefront's default and the source copy. */
-const LOCALE_ORDER: readonly Locale[] = ["es", "en"];
-
-const DEFAULT_LOCALE: Locale = "es";
-
 const PRODUCT_STATUSES: readonly ProductFormValues["status"][] = [
   "DRAFT",
   "ACTIVE",
@@ -571,8 +440,6 @@ export function ProductForm({
   product,
   currency,
   onSubmit,
-  onTranslate,
-  translateUnavailable,
   submitLabel,
   formError,
 }: ProductFormProps) {
@@ -595,8 +462,7 @@ export function ProductForm({
   /**
    * Whether the size fields and the add-a-variant control are on screen.
    *
-   * HELD OUTSIDE `values`, exactly as `activeLocale` is, and for the same
-   * reason: `dirty` is a structural compare of `values`, so a disclosure kept in
+   * HELD OUTSIDE `values`, because `dirty` is a structural compare of `values`, so a disclosure kept in
    * there would light the "Cambios sin guardar" dot for merely looking at the
    * panel. This is a view of variant 1, never a second model of it — collapsed
    * and expanded bind the same fields, so nothing is copied and nothing is
@@ -611,19 +477,6 @@ export function ProductForm({
   const [submitting, setSubmitting] = useState(false);
   /** Fallback for a rejecting `onSubmit` the parent did not surface itself. */
   const [submitError, setSubmitError] = useState<string | null>(null);
-  /** Which locale's copy is on screen. Never which locales EXIST in state. */
-  const [activeLocale, setActiveLocale] = useState<Locale>(DEFAULT_LOCALE);
-  const [translating, setTranslating] = useState(false);
-  /** The last failure as a sentence the operator may read, or null. */
-  const [translateError, setTranslateError] = useState<string | null>(null);
-  /**
-   * Locales whose copy a machine wrote and no human has read since.
-   *
-   * A LIST OF LOCALES, not a boolean: the panel shows one language at a time,
-   * so "this text is a machine's guess" has to survive a switch away and back,
-   * and has to be visible on the segment of the locale that is off screen.
-   */
-  const [machineFilled, setMachineFilled] = useState<readonly Locale[]>([]);
   /**
    * "Offer this add-on on every product", and which variant they pre-select.
    *
@@ -633,8 +486,6 @@ export function ProductForm({
    * to a different write.
    */
   const [offerEverywhere, setOfferEverywhere] = useState(false);
-  /** A translate press held back because the target already has copy in it. */
-  const [confirmOverwrite, setConfirmOverwrite] = useState(false);
 
   const messages: ProductFormMessages = {
     // Spelled out rather than derived from a key map, because a total `Record`
@@ -664,18 +515,18 @@ export function ProductForm({
   const multiVariant = values.variants.length > 1;
   const sizesShown = variantsExpanded || multiVariant;
 
-  // What the preview draws, resolved to the locale on screen. Staged files carry
+  // What the preview draws. Staged files carry
   // the object URL `MediaUploader` already minted and revokes — minting a second
   // one here would leak it.
   const previewImageList: readonly PreviewImage[] =
     previewImages !== undefined && previewImages.length > 0
       ? previewImages.map((image) => ({
           url: image.previewUrl,
-          alt: activeLocale === "es" ? image.altEs : image.altEn,
+          alt: image.alt,
         }))
       : (product?.media ?? []).map((asset) => ({
           url: asset.url,
-          alt: asset.alt[activeLocale] ?? "",
+          alt: asset.alt,
         }));
 
   const previewVariants: readonly PreviewVariant[] = values.variants.map((variant) => {
@@ -684,7 +535,7 @@ export function ProductForm({
     const compare =
       compareRaw === "" ? null : parseMajorUnitInput(compareRaw, values.currency);
     const size = variantSize(variant);
-    const carried = activeLocale === "es" ? variant.nameEs.trim() : variant.nameEn.trim();
+    const carried = variant.name.trim();
 
     // The shop's four states and its threshold of five, mirrored.
     const typed = Number(variant.initialStock.trim());
@@ -757,9 +608,6 @@ export function ProductForm({
         });
 
   const dirty = !sameValues(values, initial);
-  const activeCopy = translationFor(values, activeLocale);
-  const sourceLocale = otherLocale(activeLocale);
-  const sourceCopy = translationFor(values, sourceLocale);
 
   // The pack's own flat price, parsed — a pack has exactly one variant, so
   // this is always `values.variants[0]`. Feeds the components picker's
@@ -793,30 +641,8 @@ export function ProductForm({
     }));
   }
 
-  function updateTranslation(locale: Locale, patch: Partial<TranslationDraft>): void {
-    setValues((current) => ({
-      ...current,
-      translations: current.translations.map((translation) =>
-        translation.locale === locale ? { ...translation, ...patch } : translation,
-      ),
-    }));
-  }
-
-  /** Drop the unreviewed marker: a human has now taken responsibility for it. */
-  function markReviewed(locale: Locale): void {
-    setMachineFilled((current) => current.filter((entry) => entry !== locale));
-  }
-
-  /**
-   * An operator's own keystroke, as distinct from a machine fill.
-   *
-   * Both end in `updateTranslation`; only this one clears the marker. Clearing
-   * inside `updateTranslation` itself would be simpler and wrong — the fill
-   * calls it too, and would erase the very warning it just raised.
-   */
-  function editTranslation(locale: Locale, patch: Partial<TranslationDraft>): void {
-    markReviewed(locale);
-    updateTranslation(locale, patch);
+  function updateCopy(patch: Partial<Pick<ProductFormValues, "name" | "shortDescription" | "description">>): void {
+    setValues((current) => ({ ...current, ...patch }));
   }
 
   /**
@@ -896,87 +722,12 @@ export function ProductForm({
     );
   }
 
-  /**
-   * The press. Runs the translation, or asks first.
-   *
-   * NEVER CLOBBER WRITTEN COPY. A vendor's guess can be asked for again; a
-   * paragraph an operator typed cannot, and there is no undo on this form. So a
-   * target with any text in it costs one extra press, and a blank one — the
-   * ordinary case, and the whole point of the feature — costs none.
-   */
-  function requestTranslate(): void {
-    setTranslateError(null);
-
-    if (isBlankCopy(activeCopy)) {
-      void handleTranslate();
-      return;
-    }
-    setConfirmOverwrite(true);
-  }
-
-  async function handleTranslate(): Promise<void> {
-    if (onTranslate === undefined || translating) {
-      return;
-    }
-
-    setConfirmOverwrite(false);
-    setTranslateError(null);
-    setTranslating(true);
-    try {
-      const parsed = productCopySchema.safeParse(
-        await onTranslate({
-          from: sourceLocale,
-          to: activeLocale,
-          copy: {
-            name: sourceCopy.name,
-            shortDescription: sourceCopy.shortDescription,
-            description: sourceCopy.description,
-          },
-        }),
-      );
-
-      if (!parsed.success) {
-        setTranslateError(t("translateFailed"));
-        return;
-      }
-
-      updateTranslation(activeLocale, parsed.data);
-      // MARKED, not silently merged. What follows is a machine's guess sitting
-      // in the same boxes as the operator's own prose, and the two are
-      // indistinguishable once they are on screen.
-      setMachineFilled((current) =>
-        current.includes(activeLocale) ? current : [...current, activeLocale],
-      );
-    } catch (cause) {
-      // A `TranslateCopyError` was written for an operator by the seam's owner,
-      // which is the only side that can name the failure. Anything else carries
-      // server-authored English, and rule 9 keeps that away from the form.
-      setTranslateError(
-        cause instanceof TranslateCopyError ? cause.message : t("translateFailed"),
-      );
-    } finally {
-      setTranslating(false);
-    }
-  }
-
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
 
     const built = buildPayload(values, messages);
     if (!built.ok) {
       setErrors(built.errors);
-
-      // The copy panel shows ONE locale at a time, so a rejected save whose only
-      // problem is in the hidden language would look like a form that refuses to
-      // submit for no reason. Switching to the offending locale puts the error
-      // where the operator is already looking — and only when the visible locale
-      // is itself clean, so a switch never hides an error they can see.
-      if (!hasCopyError(built.errors, activeLocale)) {
-        const offending = LOCALE_ORDER.find((locale) => hasCopyError(built.errors, locale));
-        if (offending !== undefined) {
-          setActiveLocale(offending);
-        }
-      }
       return;
     }
 
@@ -1028,142 +779,21 @@ export function ProductForm({
           table take every pixel the window adds. */}
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
         <div className="grid min-w-0 gap-4">
-          {/* THE COPY, ONCE. The legend names the language being edited, so the
-              group a screen reader announces before "Nombre" says which
-              language that name is for — and it changes only when the operator
-              switches, never on a keystroke. */}
-          <Panel
-            title={t("sectionCopy", { language: LANGUAGE_NAME[activeLocale] })}
-            disabled={submitting}
-            actions={
-              <>
-                <LocaleSwitch
-                  label={t("localeSwitch")}
-                  name={`${formId}-copy-locale`}
-                  value={activeLocale}
-                  onChange={setActiveLocale}
-                  status={(locale) => {
-                    const empty = emptyFieldCount(translationFor(values, locale));
-                    const machine = machineFilled.includes(locale);
-                    return {
-                      empty,
-                      machine,
-                      // The sentence a screen reader hears, which is also the
-                      // one a sighted operator reads as a count chip. The
-                      // default-locale note rides along for free: it costs no
-                      // pixels and it is the fact that explains why Spanish is
-                      // first.
-                      text: [
-                        locale === DEFAULT_LOCALE ? t("defaultLocale") : null,
-                        empty > 0 ? t("emptyFields", { count: empty }) : t("localeComplete"),
-                        // Said on the segment as well as in the panel, so the
-                        // fact survives a switch to the other language — which
-                        // is exactly when an operator forgets it.
-                        machine ? t("machineTranslatedShort") : null,
-                      ]
-                        .filter((part): part is string => part !== null)
-                        .join(". "),
-                    };
-                  }}
-                />
-                {onTranslate === undefined ? null : (
-                  <Button
-                    variant="standard"
-                    size="compact"
-                    onClick={requestTranslate}
-                    pending={translating}
-                    pendingLabel={t("translating")}
-                    // Two reasons to stand down, both of them permanent until
-                    // something changes: an empty source can only translate to
-                    // nothing, and a deployment with no vendor key configured
-                    // cannot translate at all.
-                    disabled={isBlankCopy(sourceCopy) || translateUnavailable !== undefined}
-                  >
-                    {t("translate", { language: LANGUAGE_NAME[sourceLocale] })}
-                  </Button>
-                )}
-              </>
-            }
-          >
+          <Panel title={t("sectionCopy")} disabled={submitting}>
             <div className="grid gap-2">
-              {/* DEGRADED, NOT BROKEN. `translateUnavailable` outranks the
-                  failure notice because it arrives WITH one: the press that
-                  discovered the missing key also rejected, and saying "it did
-                  not work" under "it is not configured here" is the same fact
-                  twice, the second time less usefully. */}
-              {translateUnavailable !== undefined ? (
-                <Notice tone="warning" placement="inline">
-                  {translateUnavailable}
-                </Notice>
-              ) : translateError === null ? null : (
-                <Notice tone="danger" placement="inline">
-                  {translateError}
-                </Notice>
-              )}
-              {confirmOverwrite && (
-                <Notice
-                  tone="warning"
-                  placement="inline"
-                  action={
-                    <>
-                      <Button variant="standard" size="compact" onClick={() => void handleTranslate()}>
-                        {t("translateOverwriteConfirm")}
-                      </Button>
-                      <Button
-                        variant="plain"
-                        size="compact"
-                        onClick={() => setConfirmOverwrite(false)}
-                      >
-                        {tUi("cancel")}
-                      </Button>
-                    </>
-                  }
-                >
-                  {t("translateOverwrite", { language: LANGUAGE_NAME[activeLocale] })}
-                </Notice>
-              )}
-              {machineFilled.includes(activeLocale) && (
-                // WHO WROTE THIS TEXT, stated where the text is. An operator who
-                // cannot tell their own copy from a vendor's guess publishes the
-                // guess — and this is the copy customers read and the shop
-                // stands behind.
-                <Notice
-                  tone="warning"
-                  placement="inline"
-                  action={
-                    <Button
-                      variant="standard"
-                      size="compact"
-                      onClick={() => markReviewed(activeLocale)}
-                    >
-                      {t("markReviewed")}
-                    </Button>
-                  }
-                >
-                  {t("machineTranslated")}
-                </Notice>
-              )}
-              {/* KEYED BY LOCALE. Without the key React reuses the same input
-                  instances across a switch, and an uncommitted IME composition
-                  or a mid-word caret from the Spanish field survives into the
-                  English one. */}
               <TextField
-                key={`name-${activeLocale}`}
                 label={t("nameLabel")}
-                name={`name-${activeLocale}`}
-                value={activeCopy.name}
-                onChange={(value) => editTranslation(activeLocale, { name: value })}
-                {...optionalError(errors[`translations.${activeLocale}.name`])}
+                name="name"
+                value={values.name}
+                onChange={(value) => updateCopy({ name: value })}
+                {...optionalError(errors["name"])}
               />
               <TextField
-                key={`summary-${activeLocale}`}
                 label={t("summaryLabel")}
-                name={`summary-${activeLocale}`}
-                value={activeCopy.shortDescription}
-                onChange={(value) =>
-                  editTranslation(activeLocale, { shortDescription: value })
-                }
-                {...optionalError(errors[`translations.${activeLocale}.shortDescription`])}
+                name="summary"
+                value={values.shortDescription}
+                onChange={(value) => updateCopy({ shortDescription: value })}
+                {...optionalError(errors["shortDescription"])}
               />
               {/* THE DESCRIPTION IS MARKUP NOW, and there is deliberately no
                   rich-text editor behind it: the operator types or pastes HTML.
@@ -1174,14 +804,13 @@ export function ProductForm({
                   card the way the storefront actually will, which is the
                   question an operator has (see the commit that moved it). */}
               <TextArea
-                key={`description-${activeLocale}`}
                 label={t("descriptionLabel")}
-                name={`description-${activeLocale}`}
+                name="description"
                 rows={3}
                 hint={t("descriptionHint")}
-                value={activeCopy.description}
-                onChange={(value) => editTranslation(activeLocale, { description: value })}
-                {...optionalError(errors[`translations.${activeLocale}.description`])}
+                value={values.description}
+                onChange={(value) => updateCopy({ description: value })}
+                {...optionalError(errors["description"])}
               />
               {/* APPENDS RATHER THAN INSERTS AT THE CURSOR. `TextArea` exposes
                   no ref for cursor position, and adding one for a single button
@@ -1191,8 +820,8 @@ export function ProductForm({
                 variant="plain"
                 size="compact"
                 onClick={() =>
-                  editTranslation(activeLocale, {
-                    description: `${activeCopy.description}\n<hr class="divider--accent">\n`,
+                  updateCopy({
+                    description: `${values.description}\n<hr class="divider--accent">\n`,
                   })
                 }
               >
@@ -1427,7 +1056,7 @@ export function ProductForm({
                             >
                               <span>
                                 {tier.minQuantity} ×{" "}
-                                {formatMoney(tier.unitPriceGross, values.currency, activeLocale)}
+                                {formatMoney(tier.unitPriceGross, values.currency)}
                               </span>
                               {tier.minQuantity === STACK_DISCOUNT_BEST_PRICE_QUANTITY && (
                                 <span className="text-[10px] font-semibold tracking-wide text-[var(--accent)] uppercase">
@@ -1577,7 +1206,7 @@ export function ProductForm({
                   {categories.map((category) => (
                     <Checkbox
                       key={category.id}
-                      label={category.name[activeLocale] ?? category.slug}
+                      label={category.name}
                       name={`category-${category.id}`}
                       checked={values.categoryIds.includes(category.id)}
                       onChange={(checked) =>
@@ -1615,7 +1244,6 @@ export function ProductForm({
                 <PackComponentsPicker
                   candidates={packComponentCandidates}
                   selected={values.packComponents}
-                  locale={activeLocale}
                   currency={values.currency}
                   packPriceGross={packPriceGross}
                   onChange={(packComponents) =>
@@ -1633,7 +1261,6 @@ export function ProductForm({
               <AddOnPicker
                 candidates={addOnCandidates}
                 selected={values.addOns}
-                locale={activeLocale}
                 onChange={(addOns) => setValues((current) => ({ ...current, addOns }))}
               />
             </Panel>
@@ -1690,8 +1317,8 @@ export function ProductForm({
                           value: variant.id,
                           label:
                             variant.price.gross === 0
-                              ? `${variant.name?.[activeLocale] ?? variant.sku} · ${t("defaultVariantFree")}`
-                              : `${variant.name?.[activeLocale] ?? variant.sku} · ${formatMoney(variant.price.gross, variant.price.currency, activeLocale)}`,
+                              ? `${variant.name ?? variant.sku} · ${t("defaultVariantFree")}`
+                              : `${variant.name ?? variant.sku} · ${formatMoney(variant.price.gross, variant.price.currency)}`,
                         })),
                     ]}
                     onChange={(id) =>
@@ -1820,7 +1447,7 @@ export function ProductForm({
 
           ONE BUTTON, not the three the artboard draws. "Guardar y publicar" would
           fold two operations the API keeps apart — publishing has its own rules
-          and its own error naming the missing variant or translation, and it
+          and its own error naming the missing variant or copy, and it
           lives on `ProductEditor` beside Unpublish. "Descartar" is the browser's
           back button plus an unsaved-changes prompt, which is a guard this form
           does not yet install; shipping the button without the guard would make
@@ -1872,120 +1499,15 @@ export function ProductForm({
       <ProductPreviewDialog
         open={previewOpen}
         onClose={() => setPreviewOpen(false)}
-        locale={activeLocale}
         currency={values.currency}
-        name={activeCopy.name}
-        shortDescription={activeCopy.shortDescription}
-        description={activeCopy.description}
+        name={values.name}
+        shortDescription={values.shortDescription}
+        description={values.description}
         images={previewImageList}
         variants={previewVariants}
         addOns={previewAddOns}
       />
     </form>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// The locale switch
-// ---------------------------------------------------------------------------
-
-/** What one segment says about its locale, beyond its name. */
-interface LocaleStatus {
-  /** How many of the three copy fields are still blank. */
-  readonly empty: number;
-  /** This locale's copy came from a machine and nobody has read it since. */
-  readonly machine: boolean;
-  /** The whole sentence — announced, and the source of the visible chip. */
-  readonly text: string;
-}
-
-interface LocaleSwitchProps {
-  /** The group's accessible name, already translated. */
-  readonly label: string;
-  /** Radio group name. Must be unique per form instance. */
-  readonly name: string;
-  readonly value: Locale;
-  readonly onChange: (locale: Locale) => void;
-  readonly status: (locale: Locale) => LocaleStatus;
-}
-
-/**
- * The segmented control that swaps which language the copy panel is editing.
- *
- * WHY IT IS NOT `ui/segmented-control`. That component is a row of `<Link>`s:
- * every segment is a URL, chosen by navigating, and the choice is read back off
- * `searchParams`. It is exactly right for a filter over a server-rendered list
- * and exactly wrong here — following one would remount this form and discard
- * every unsaved keystroke in it. The paint is deliberately the same (same track
- * fill, same concentric radii, same selected pill) so the two read as one
- * control; only the mechanism differs.
- *
- * NATIVE RADIOS UNDER THE PAINT, following `ui/toggle`. A real radio group
- * brings arrow-key movement, a single tab stop, and — the reason it matters
- * here — it is a form control, so the enclosing `<fieldset disabled>` freezes
- * the language switch along with everything else while a save is in flight. A
- * row of `<button>`s would need all three re-implemented.
- *
- * THE COMPLETENESS INDICATOR IS THE POINT, not decoration. It is what survived
- * from the two-card layout: an operator has to be able to see that English is
- * empty without switching to it. The count is drawn as a chip and stated in
- * full for a screen reader, so nothing is said in colour alone.
- */
-function LocaleSwitch({ label, name, value, onChange, status }: LocaleSwitchProps) {
-  return (
-    <div
-      role="radiogroup"
-      aria-label={label}
-      className="inline-flex gap-[2px] rounded-[calc(var(--r-control)+2px)] bg-[var(--fill-tertiary)] p-[2px]"
-    >
-      {LOCALE_ORDER.map((locale) => {
-        const selected = locale === value;
-        const state = status(locale);
-
-        return (
-          <label
-            key={locale}
-            className={`inline-flex min-h-[var(--control-h)] cursor-pointer items-center gap-1.5 rounded-[var(--r-control)] px-2.5 text-[13px] font-medium transition-colors motion-reduce:transition-none has-[:focus-visible]:shadow-[0_0_0_4px_var(--focus-ring)] ${
-              selected
-                ? "bg-[var(--bg-grouped-secondary)] text-[var(--label)] shadow-[var(--e-0)]"
-                : "text-[var(--label-secondary)] hover:text-[var(--label)]"
-            }`}
-          >
-            <input
-              type="radio"
-              name={name}
-              value={locale}
-              checked={selected}
-              onChange={() => {
-                onChange(locale);
-              }}
-              className="sr-only"
-            />
-            <span>{LANGUAGE_NAME[locale]}</span>
-            {state.empty > 0 ? (
-              <span
-                aria-hidden="true"
-                className="inline-flex h-[15px] min-w-[15px] items-center justify-center rounded-[var(--r-pill)] bg-[var(--danger-fill)] px-1 text-[10px] font-semibold text-[var(--danger-text)] tabular-nums"
-              >
-                {state.empty}
-              </span>
-            ) : state.machine ? (
-              // Complete, but not by a human. A check mark here would say the
-              // language is done, which is the one thing it is not.
-              <Icon name="triangle-alert" size={12} className="text-[var(--warning)]" />
-            ) : (
-              // `Icon` marks itself `aria-hidden` unless it is given a title,
-              // which is exactly right here: the sr-only sentence below already
-              // says "complete".
-              <Icon name="check" size={12} className="text-[var(--success-text)]" />
-            )}
-            {/* The full sentence, for the accessible name. The chip beside it is
-                the same fact drawn small, so the two can never disagree. */}
-            <span className="sr-only">{state.text}</span>
-          </label>
-        );
-      })}
-    </div>
   );
 }
 
@@ -2002,47 +1524,6 @@ function LocaleSwitch({ label, name, value, onChange, status }: LocaleSwitchProp
  */
 function optionalError(message: string | undefined): { readonly error?: string } {
   return message === undefined ? {} : { error: message };
-}
-
-/** How much of one locale's copy is still blank. Drives the segment's chip. */
-function emptyFieldCount(translation: TranslationDraft): number {
-  return [translation.name, translation.shortDescription, translation.description].filter(
-    (value) => value.trim() === "",
-  ).length;
-}
-
-function isBlankCopy(translation: TranslationDraft): boolean {
-  return emptyFieldCount(translation) === 3;
-}
-
-/** With two locales, "the other one" is a function rather than a lookup. */
-function otherLocale(locale: Locale): Locale {
-  return locale === "es" ? "en" : "es";
-}
-
-/**
- * One locale's draft, always.
- *
- * `toFormValues` seeds every locale in `LOCALE_ORDER`, so the fallback is
- * unreachable — but `find` is `T | undefined` under `noUncheckedIndexedAccess`
- * and a `!` to dodge that is banned repo-wide. An empty draft renders empty
- * fields, which is the correct behaviour for a locale that somehow has no row,
- * where a crash is not.
- */
-function translationFor(values: ProductFormValues, locale: Locale): TranslationDraft {
-  return (
-    values.translations.find((translation) => translation.locale === locale) ?? {
-      locale,
-      name: "",
-      shortDescription: "",
-      description: "",
-    }
-  );
-}
-
-/** Whether any of this locale's copy fields was rejected. */
-function hasCopyError(errors: FieldErrors, locale: Locale): boolean {
-  return Object.keys(errors).some((path) => path.startsWith(`translations.${locale}.`));
 }
 
 /**
@@ -2063,8 +1544,7 @@ interface PanelProps {
   readonly title: string;
   readonly description?: string;
   /**
-   * Controls that belong to the panel rather than to a field in it — the locale
-   * switch and the translate button.
+   * Controls that belong to the panel rather than to a field in it.
    *
    * Rendered as a SIBLING of the legend, not inside it: a `<legend>` takes
    * phrasing content, and a radio group is not phrasing content. From `sm` up
@@ -2162,7 +1642,7 @@ export function stagedVariantImages(
  * the API uses. Re-implementing "slug must be kebab-case" here would be a second
  * copy of a rule that already exists.
  *
- * THE ONE PLACE ENGLISH STILL REACHES AN OPERATOR is a zod issue's own
+ * THE ONE PLACE A NON-CATALOGUE STRING REACHES AN OPERATOR is a zod issue's own
  * `issue.message` ("String must contain at most 200 character(s)"), and it is
  * the deliberate remaining debt: those messages belong to the contract, the
  * catalogue authors no keys for them, and inventing a per-issue message table
@@ -2416,27 +1896,9 @@ export function buildPayload(
     // never has to ask for that explicitly.
     ...(values.kind === "PACK" ? { packComponents: values.packComponents } : {}),
     addOns: values.addOns,
-    translations: values.translations
-      .filter((translation) => translation.name.trim().length > 0)
-      .map((translation) => ({
-        locale: translation.locale,
-        name: translation.name.trim(),
-        shortDescription: translation.shortDescription.trim(),
-        // SANITISED ON THE WAY OUT, with the same function the preview drew
-        // with and the API applies on write. Not because this client is
-        // trusted to be the last word — it is not, and the API sanitising
-        // again is what actually enforces the policy — but because a form
-        // that previews one string and posts another has a sanitiser in name
-        // only. `sanitizeRichText` is idempotent, so the API's own call over
-        // this value changes nothing and what the operator saw is what is
-        // stored, byte for byte.
-        //
-        // `shortDescription` is deliberately NOT put through it: the summary
-        // renders as plain text, so escaping would turn an operator's
-        // "10 < 20" into a visible "10 &lt; 20". Escaping is right for one for
-        // exactly the reason it is wrong for the other.
-        description: sanitizeRichText(translation.description.trim()),
-      })),
+    name: values.name.trim(),
+    shortDescription: values.shortDescription.trim(),
+    description: sanitizeRichText(values.description.trim()),
     variants,
     categoryIds: values.categoryIds,
     restrictedCountries: [],
@@ -2444,7 +1906,7 @@ export function buildPayload(
 
   if (!parsed.success) {
     for (const issue of parsed.error.issues) {
-      const path = mapIssuePath(issue.path, values);
+      const path = mapIssuePath(issue.path);
       // First error per field wins: a stack of messages under one input is
       // noise, and zod reports the most specific failure first.
       errors[path] ??= issue.message;
@@ -2480,16 +1942,6 @@ export interface ClassifiedVariantChanges {
   readonly updatedVariants: readonly VariantUpdate[];
   /** Rows whose reorder threshold or backorder policy differs from what is stored. */
   readonly inventoryPolicyChanges: readonly InventoryPolicyUpdate[];
-}
-
-function sameName(
-  a: Partial<Record<Locale, string>> | null,
-  b: Partial<Record<Locale, string>> | null,
-): boolean {
-  if (a === null || b === null) {
-    return a === b;
-  }
-  return a.es === b.es && a.en === b.en;
 }
 
 function sameOptions(a: Record<string, string>, b: Record<string, string>): boolean {
@@ -2584,7 +2036,7 @@ export function classifyVariantChanges(
     const patch: UpdateVariantRequest = {
       version: draft.version,
       ...(built.sku === existing.sku ? {} : { sku: built.sku }),
-      ...(sameName(built.name, existing.name) && sameOptions(built.options, existing.options)
+      ...(built.name === existing.name && sameOptions(built.options, existing.options)
         ? {}
         : { name: built.name, options: built.options }),
       ...(built.priceGross === existing.price.gross ? {} : { priceGross: built.priceGross }),
@@ -2621,25 +2073,8 @@ export function classifyVariantChanges(
   return { newVariants, updatedVariants, inventoryPolicyChanges };
 }
 
-/**
- * Map a zod issue path onto the form's field ids.
- *
- * `translations.0.name` is meaningless to the operator, who sees a box under a
- * "Español" heading. Rewriting the index to a locale is what lets the message
- * land under the right field — and, now that one locale is on screen at a time,
- * what lets `handleSubmit` work out which language to switch to.
- */
-function mapIssuePath(
-  path: readonly (string | number)[],
-  values: ProductFormValues,
-): string {
-  const [head, index, ...rest] = path;
-
-  if (head === "translations" && typeof index === "number") {
-    const locale = values.translations[index]?.locale ?? index;
-    return ["translations", locale, ...rest].join(".");
-  }
-
+/** Map a zod issue path onto the form's field ids: the dotted path itself. */
+function mapIssuePath(path: readonly (string | number)[]): string {
   return path.join(".");
 }
 
@@ -2663,9 +2098,7 @@ interface VariantSize {
 }
 
 /**
- * The label a shopper reads: "M", or "M / Black" when a colour is set. The
- * same in both locales — sizes and the operator's colour names are not
- * translated here.
+ * The label a shopper reads: "M", or "M / Negro" when a colour is set.
  */
 function sizeLabel(size: VariantSize): string {
   return size.color === "" ? size.size : `${size.size} / ${size.color}`;
@@ -2708,27 +2141,18 @@ function shouldOpenVariants(values: ProductFormValues): boolean {
   );
 }
 
-function buildVariantName(
-  variant: VariantDraft,
-): Partial<Record<Locale, string>> | null {
+function buildVariantName(variant: VariantDraft): string | null {
   const size = variantSize(variant);
   if (size !== null) {
     // A size OVERRIDES the carried name, because the operator just typed it and
     // the carried value is whatever was stored before they did.
-    const label = sizeLabel(size);
-    return { es: label, en: label };
+    return sizeLabel(size);
   }
-  const name: Partial<Record<Locale, string>> = {};
-  if (variant.nameEs.trim().length > 0) {
-    name.es = variant.nameEs.trim();
-  }
-  if (variant.nameEn.trim().length > 0) {
-    name.en = variant.nameEn.trim();
-  }
-  // Null rather than {} for a single-variant product: the contract models "this
-  // product has no variant-level name" as null, and an empty object would render
+  // Null rather than "" for a single-variant product: the contract models "this
+  // product has no variant-level name" as null, and an empty string would render
   // as a blank label rather than falling back to the product name.
-  return Object.keys(name).length === 0 ? null : name;
+  const name = variant.name.trim();
+  return name.length === 0 ? null : name;
 }
 
 /** Seed the form from an existing product, or from blank defaults. */
@@ -2754,12 +2178,9 @@ export function toFormValues(
       offerOnNewProducts: false,
       newProductDefaultVariantId: null,
       stackDiscountEnabled: false,
-      translations: LOCALE_ORDER.map((locale) => ({
-        locale,
-        name: "",
-        shortDescription: "",
-        description: "",
-      })),
+      name: "",
+      shortDescription: "",
+      description: "",
       variants: [emptyVariant()],
     };
   }
@@ -2789,23 +2210,14 @@ export function toFormValues(
       defaultVariantId: ref.defaultVariantId,
     })),
     categoryIds: product.categories.map((category) => category.id),
-    translations: LOCALE_ORDER.map((locale) => {
-      const existing = product.translations.find(
-        (translation) => translation.locale === locale,
-      );
-      return {
-        locale,
-        name: existing?.name ?? "",
-        shortDescription: existing?.shortDescription ?? "",
-        description: existing?.description ?? "",
-      };
-    }),
+    name: product.name,
+    shortDescription: product.shortDescription,
+    description: product.description,
     variants: product.variants.map((variant) => ({
       key: variant.id,
       version: variant.version,
       sku: variant.sku,
-      nameEs: variant.name?.es ?? "",
-      nameEn: variant.name?.en ?? "",
+      name: variant.name ?? "",
       // Read size and colour back from the variant's OPTIONS, the structured
       // source the name was built from. A variant with no `size` option (a name
       // like "Pack de inicio") leaves these blank and its name keeps being
@@ -2850,8 +2262,7 @@ function emptyVariant(): VariantDraft {
     // to `addVariant`, which has no version to send.
     version: 0,
     sku: "",
-    nameEs: "",
-    nameEn: "",
+    name: "",
     size: "",
     color: "",
     priceGross: "",

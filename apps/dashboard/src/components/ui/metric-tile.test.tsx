@@ -7,7 +7,7 @@ import { MetricTile, MetricTileSkeleton, type DeltaSentiment, type MetricValue }
 import esMessages from "../../../messages/es.json";
 
 /**
- * `Link` comes from `@/i18n/navigation`, so the attention tile needs the locale
+ * `Link` comes from `next/link`, so the attention tile needs the provider
  * in context, and `MetricTileSkeleton` reads `common.loading` through
  * `Skeleton`. Every render goes through here so no test fails for the wrong
  * reason.
@@ -127,7 +127,7 @@ describe("<MetricTile />", () => {
     const { container } = renderTile(
       <MetricTile
         label="Ingresos netos"
-        value={{ kind: "money", amountMinor: 4_821_490, currency: "COP", locale: "es" }}
+        value={{ kind: "money", amountMinor: 4_821_490, currency: "COP" }}
         delta={{ value: "8,2 %", direction: "up", sentiment: "positive", directionLabel: "sube" }}
         footnote="Bruto menos reembolsos."
       />,
@@ -148,7 +148,7 @@ describe("<MetricTile />", () => {
     const { container } = renderTile(
       <MetricTile
         label="Ingresos totales"
-        value={{ kind: "money", amountMinor: 2_400_000_000, currency: "COP", locale: "es" }}
+        value={{ kind: "money", amountMinor: 2_400_000_000, currency: "COP" }}
       />,
     );
 

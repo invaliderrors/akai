@@ -5,13 +5,11 @@ import { describe, expect, it, vi } from "vitest";
 import { SegmentedControl, type Segment } from "./segmented-control";
 
 /**
- * The locale-aware Link needs a routing context this component never has in a
- * unit test, so it is mocked down to the anchor it renders. The href it is
- * GIVEN is the thing under test — the locale prefix Link adds is next-intl's
- * job and is covered by the e2e locale smoke.
+ * `Link` is mocked down to the anchor it renders: the href it is GIVEN is the
+ * thing under test.
  */
-vi.mock("@/i18n/navigation", () => ({
-  Link: ({
+vi.mock("next/link", () => ({
+  default: ({
     href,
     children,
     className,

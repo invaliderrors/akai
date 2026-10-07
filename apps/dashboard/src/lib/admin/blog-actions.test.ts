@@ -40,7 +40,6 @@ const {
   createBlogPostAction,
   deleteBlogPostAction,
   setBlogPostPublishedAction,
-  translateBlogCopyAction,
   updateBlogPostAction,
 } = await import("./actions");
 
@@ -59,17 +58,12 @@ function adminPost(overrides: Record<string, unknown> = {}) {
     authorId: null,
     createdAt: ISO,
     updatedAt: ISO,
-    translations: [
-      {
-        locale: "es",
-        title: "Título",
-        excerpt: "Resumen",
-        bodyHtml: "<p>Hola</p>",
-        metaTitle: null,
-        metaDescription: null,
-        coverAlt: "",
-      },
-    ],
+    title: "Título",
+    excerpt: "Resumen",
+    bodyHtml: "<p>Hola</p>",
+    metaTitle: null,
+    metaDescription: null,
+    coverAlt: "",
     ...overrides,
   };
 }
@@ -77,17 +71,12 @@ function adminPost(overrides: Record<string, unknown> = {}) {
 const CREATE = {
   slug: "como-combinar-un-oversize",
   category: "STYLE_GUIDES" as const,
-  translations: [
-    {
-      locale: "es" as const,
-      title: "Título",
-      excerpt: "Resumen",
-      bodyHtml: "<p>Hola</p>",
-      metaTitle: null,
-      metaDescription: null,
-      coverAlt: "",
-    },
-  ],
+  title: "Título",
+  excerpt: "Resumen",
+  bodyHtml: "<p>Hola</p>",
+  metaTitle: null,
+  metaDescription: null,
+  coverAlt: "",
 };
 
 beforeEach(() => {
@@ -187,68 +176,5 @@ describe("blog actions", () => {
 
     expect(result.ok).toBe(true);
     expect(calls[0]?.path).toBe(`/admin/blog/posts/${POST_ID}/cover/upload-url`);
-  });
-});
-
-describe("translateBlogCopyAction", () => {
-  const copy = {
-    title: "Qué es Hoodie Kumo",
-    excerpt: "Resumen",
-    bodyHtml: "<p>Hola</p>",
-    metaTitle: "",
-    metaDescription: "",
-    coverAlt: "",
-  };
-
-  it("sends only the non-blank fields, keyed, and merges the answer back", async () => {
-    respond = () => ({
-      status: 200,
-      body: {
-        translations: [
-          { key: "title", text: "What is Hoodie Kumo" },
-          { key: "excerpt", text: "Summary" },
-          { key: "bodyHtml", text: "<p>Hello</p>" },
-        ],
-      },
-    });
-
-    const result = await translateBlogCopyAction({ from: "es", to: "en", copy });
-
-    expect(calls[0]).toMatchObject({
-      path: "/admin/translations",
-      body: {
-        source: "es",
-        target: "en",
-        texts: [
-          { key: "title", text: "Qué es Hoodie Kumo" },
-          { key: "excerpt", text: "Resumen" },
-          { key: "bodyHtml", text: "<p>Hola</p>" },
-        ],
-      },
-    });
-    expect(result).toEqual({
-      ok: true,
-      data: { ...copy, title: "What is Hoodie Kumo", excerpt: "Summary", bodyHtml: "<p>Hello</p>" },
-    });
-  });
-
-  it("answers an all-blank source without spending a request", async () => {
-    const blank = { ...copy, title: "", excerpt: "", bodyHtml: "" };
-
-    const result = await translateBlogCopyAction({ from: "es", to: "en", copy: blank });
-
-    expect(result).toMatchObject({ ok: false, reason: "EMPTY_SOURCE" });
-    expect(calls).toHaveLength(0);
-  });
-
-  it("refuses a same-locale request and a malformed one before the vendor", async () => {
-    await expect(translateBlogCopyAction({ from: "es", to: "es", copy })).resolves.toMatchObject({
-      ok: false,
-      code: "VALIDATION_FAILED",
-    });
-    await expect(translateBlogCopyAction({ from: "es", to: "en" })).resolves.toMatchObject({
-      ok: false,
-    });
-    expect(calls).toHaveLength(0);
   });
 });

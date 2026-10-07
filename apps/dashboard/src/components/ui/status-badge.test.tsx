@@ -6,7 +6,6 @@ import { STATUS_TONE, type StatusDomain } from "@/lib/status";
 
 import { StatusBadge, type StatusBadgeProps } from "./status-badge";
 import esMessages from "../../../messages/es.json";
-import enMessages from "../../../messages/en.json";
 
 /**
  * These tests exist for one reason: the badge must say WHICH thing is pending,
@@ -17,14 +16,10 @@ import enMessages from "../../../messages/en.json";
  * ORDER rendered the same grey "Cancelado", and an operator could not tell from
  * the list which one they were looking at. The rewordings live in the message
  * catalogue and the (domain, member) keying lives in `lib/status`; this file is
- * where the two are proved to meet, against the REAL `es.json` and `en.json`
+ * where the two are proved to meet, against the REAL `es.json`
  * rather than a fixture, because a fixture is exactly the thing that would keep
  * passing after a translator flattened "Pago cancelado" back to "Cancelado".
  */
-
-type AppLocale = "es" | "en";
-
-const LOCALES: readonly AppLocale[] = ["es", "en"];
 
 /** Spelled out rather than derived, so a thirteenth domain fails the count below. */
 const DOMAINS: readonly StatusDomain[] = [
@@ -52,23 +47,19 @@ interface RenderedStatuses {
    * Supplying `onError` replaces the library's default `console.error`, so a
    * missing message is captured here instead of scrolling past in the test
    * output — and an empty array is a real assertion that every member the tone
-   * table knows about also has a translation in this locale. Nothing else in
+   * table knows about also has a label in the catalogue. Nothing else in
    * the suite covers that drift: the catalogue and `STATUS_TONE` are two files
    * that no type connects.
    */
   readonly intlErrors: readonly string[];
 }
 
-function renderStatuses(
-  items: readonly StatusBadgeProps[],
-  locale: AppLocale = "es",
-): RenderedStatuses {
+function renderStatuses(items: readonly StatusBadgeProps[]): RenderedStatuses {
   const intlErrors: string[] = [];
 
   const { container } = render(
-    <NextIntlClientProvider
-      locale={locale}
-      messages={locale === "es" ? esMessages : enMessages}
+    <NextIntlClientProvider locale="es"
+      messages={esMessages}
       onError={(error) => {
         intlErrors.push(`${error.code}: ${error.message}`);
       }}
@@ -133,32 +124,6 @@ describe("<StatusBadge /> — the cross-domain collisions", () => {
     expect(labels).toEqual(["Fallido", "Pago fallido"]);
   });
 
-  it("disambiguates in English too, not only in the default locale", () => {
-    // The rewordings had to be made twice. Leaving `en` alone would have kept
-    // the exact collision the Spanish rewordings exist to break, on the locale
-    // an operator working in English actually sees.
-    const { labels } = renderStatuses(
-      [
-        { domain: "order", value: "PENDING" },
-        { domain: "shipment", value: "PENDING" },
-        { domain: "order", value: "CANCELLED" },
-        { domain: "payment", value: "CANCELLED" },
-        { domain: "order", value: "FAILED" },
-        { domain: "payment", value: "FAILED" },
-      ],
-      "en",
-    );
-
-    expect(labels).toEqual([
-      "Pending",
-      "Shipment pending",
-      "Cancelled",
-      "Payment cancelled",
-      "Failed",
-      "Payment failed",
-    ]);
-  });
-
   it("separates a failed send from a failed order by TONE, not by wording", () => {
     // The fourth collision is not resolved with words: "Fallido" is the right
     // label for both. It is resolved by severity — a failed order is terminal,
@@ -192,12 +157,10 @@ describe("<StatusBadge /> — the catalogue covers the tone table", () => {
     expect(DOMAINS).toHaveLength(Object.keys(STATUS_TONE).length);
   });
 
-  describe.each(LOCALES)("in %s", (locale: AppLocale) => {
-    it.each(DOMAINS)("labels every %s member", (domain: StatusDomain) => {
+  it.each(DOMAINS)("labels every %s member", (domain: StatusDomain) => {
       const members = Object.keys(STATUS_TONE[domain]);
       const { labels, intlErrors } = renderStatuses(
         members.map((value) => ({ domain, value })),
-        locale,
       );
 
       expect(members.length).toBeGreaterThan(0);
@@ -210,7 +173,6 @@ describe("<StatusBadge /> — the catalogue covers the tone table", () => {
         expect(label).not.toBe("");
         expect(label.startsWith("status.")).toBe(false);
       }
-    });
   });
 });
 

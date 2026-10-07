@@ -1,4 +1,4 @@
-import { isMinor, type Locale } from "@akai/contracts";
+import { STORE_LOCALE, STORE_TIME_ZONE, isMinor } from "@akai/contracts";
 import { formatMoney } from "@akai/money";
 import { DEFAULT_CURRENCY, type AdminDiscount } from "@/lib/admin/schemas";
 
@@ -49,7 +49,7 @@ export function resolveState(discount: AdminDiscount, now: number): DiscountStat
  * depending on a value in the next column over, and an operator reading it as
  * the wrong one changes a coupon by a factor of a hundred.
  */
-export function formatValue(discount: AdminDiscount, locale: Locale): string {
+export function formatValue(discount: AdminDiscount): string {
   if (discount.type === "FREE_SHIPPING") {
     return "—";
   }
@@ -57,7 +57,7 @@ export function formatValue(discount: AdminDiscount, locale: Locale): string {
   if (discount.type === "PERCENTAGE") {
     // Basis points → a display fraction. This division is DISPLAY ONLY and never
     // re-enters the money path; `value` itself stays the integer 1000.
-    return new Intl.NumberFormat(intlLocale(locale), {
+    return new Intl.NumberFormat(STORE_LOCALE, {
       style: "percent",
       maximumFractionDigits: 2,
     }).format(discount.value / 10_000);
@@ -71,16 +71,12 @@ export function formatValue(discount: AdminDiscount, locale: Locale): string {
   if (!isMinor(amount)) {
     return String(amount);
   }
-  return formatMoney(amount, discount.currency ?? DEFAULT_CURRENCY, locale);
+  return formatMoney(amount, discount.currency ?? DEFAULT_CURRENCY);
 }
 
-export function formatDate(iso: string, locale: Locale): string {
-  return new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "short" }).format(
-    new Date(iso),
-  );
-}
-
-/** es-ES / en-IE, matching @akai/money's own choice so figures agree. */
-export function intlLocale(locale: Locale): string {
-  return locale === "es" ? "es-CO" : "en-US";
+export function formatDate(iso: string): string {
+  return new Intl.DateTimeFormat(STORE_LOCALE, {
+    dateStyle: "short",
+    timeZone: STORE_TIME_ZONE,
+  }).format(new Date(iso));
 }

@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { z } from "zod";
 import { passwordSchema } from "@akai/contracts";
-import { Link } from "@/i18n/navigation";
+import Link from "next/link";
 import { postJson, type BffError } from "@/lib/bff/client";
 import { Alert, ErrorAlert } from "@/components/ui/alert";
 import { TextField } from "@/components/ui/text-field";

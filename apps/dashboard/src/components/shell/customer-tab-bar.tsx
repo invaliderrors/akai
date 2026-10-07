@@ -3,7 +3,8 @@
 import { useTranslations } from "next-intl";
 
 import { Icon } from "@/components/ui/icon";
-import { Link, usePathname } from "@/i18n/navigation";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 import {
   CUSTOMER_NAV_GROUP,

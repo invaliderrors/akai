@@ -6,7 +6,7 @@ import type { AdminBlogPost } from "@akai/contracts";
 
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
-import { useRouter } from "@/i18n/navigation";
+import { useRouter } from "next/navigation";
 import { createBlogCoverUploadUrlAction, updateBlogPostAction } from "@/lib/admin/actions";
 import { uploadBlogCover } from "@/lib/admin/upload-blog-cover";
 import type { UploadFailure } from "@/lib/admin/upload-product-image";

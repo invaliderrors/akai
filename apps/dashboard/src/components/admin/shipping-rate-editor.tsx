@@ -113,24 +113,14 @@ export function ShippingRateEditor({ rate, onSave, onCancel }: ShippingRateEdito
     >
       <fieldset disabled={saving} className="m-0 grid gap-3 border-0 p-0 sm:grid-cols-2">
         <TextField
-          id={`${idPrefix}-name-es`}
-          label={t("rate.nameEs")}
-          name="nameEs"
-          value={values.nameEs}
-          onChange={(value) => update("nameEs", value)}
+          id={`${idPrefix}-name`}
+          label={t("rate.name")}
+          name="name"
+          value={values.name}
+          onChange={(value) => update("name", value)}
           required
           maxLength={120}
-          {...errorProp("nameEs")}
-        />
-        <TextField
-          id={`${idPrefix}-name-en`}
-          label={t("rate.nameEn")}
-          name="nameEn"
-          value={values.nameEn}
-          onChange={(value) => update("nameEn", value)}
-          hint={t("rate.nameEnHint")}
-          maxLength={120}
-          {...errorProp("nameEn")}
+          {...errorProp("name")}
         />
 
         <PopupButton<ShippingStrategy>

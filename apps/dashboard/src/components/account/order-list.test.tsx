@@ -2,14 +2,13 @@ import { render, screen, within } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import { describe, expect, it } from "vitest";
 
-import type { Locale, OrderSummary } from "@akai/contracts";
+import type { OrderSummary } from "@akai/contracts";
 
 import { CursorPagination, type PaginationLabels } from "@/components/ui/pagination";
 import { buildOrderSummary } from "@/lib/account/fixtures";
 
 import { OrderList } from "./order-list";
 import esMessages from "../../../messages/es.json";
-import enMessages from "../../../messages/en.json";
 
 /**
  * WHAT CHANGED, AND WHY THIS FILE LOST HALF ITS TESTS.
@@ -41,16 +40,11 @@ function renderList(
     orders: readonly OrderSummary[];
     footer?: React.ReactNode;
   },
-  locale: Locale = "es",
 ) {
   return render(
-    <NextIntlClientProvider
-      locale={locale}
-      messages={locale === "es" ? esMessages : enMessages}
-    >
+    <NextIntlClientProvider locale="es" messages={esMessages}>
       <OrderList
         orders={props.orders}
-        locale={locale}
         {...(props.footer === undefined ? {} : { footer: props.footer })}
       />
     </NextIntlClientProvider>,
@@ -96,15 +90,6 @@ describe("OrderList", () => {
     expect(row.getByText(/120\.980/)).toBeInTheDocument();
   });
 
-  it("formats money for the active locale", () => {
-    renderList({ orders: [buildOrderSummary()] }, "en");
-
-    // en-IE leads with the symbol, es-ES trails it. This is precisely the
-    // defect @akai/money was written to fix, so it is worth pinning.
-    expect(table().getByText(/\$120,980/)).toBeInTheDocument();
-    expect(table().getByText("Delivered")).toBeInTheDocument();
-  });
-
   it("gives each row link a name that says what following it does", () => {
     renderList({ orders: [buildOrderSummary()] });
 
@@ -113,14 +98,6 @@ describe("OrderList", () => {
     expect(
       table().getByRole("link", { name: "Ver detalle del pedido AK-2026-000123" }),
     ).toHaveAttribute("href", "/orders/AK-2026-000123");
-  });
-
-  it("prefixes detail links with the locale when it is not the default", () => {
-    renderList({ orders: [buildOrderSummary()] }, "en");
-
-    expect(
-      table().getByRole("link", { name: "View details for order AK-2026-000123" }),
-    ).toHaveAttribute("href", "/en/orders/AK-2026-000123");
   });
 
   it("renders the same orders as phone rows, linking to the same detail page", () => {

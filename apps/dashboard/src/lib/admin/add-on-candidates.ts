@@ -4,9 +4,8 @@ import { listProducts } from "./api";
 /**
  * The products that may be offered as add-ons, for the picker in the form.
  *
- * ONE PLACE, because both product pages need it and the locale-name fallback
- * would otherwise be copied into each of them — the third and fourth copy of a
- * rule that is already written twice.
+ * ONE PLACE, because both product pages need it and the candidate shape would
+ * otherwise be copied into each of them.
  *
  * FILTERED CLIENT-SIDE, deliberately. `adminProductListQuerySchema` is
  * `.strict()` and has no `listed` member, so the admin list cannot be asked for
@@ -56,7 +55,7 @@ export interface AddOnCandidateRow {
 /** One variant of an add-on, resolved for the picker. */
 export interface AddOnCandidateVariant {
   readonly id: string;
-  /** Already resolved to the operator's locale, falling back to the SKU. */
+  /** The variant's name, falling back to the SKU. */
   readonly label: string;
   readonly priceGross: number;
   readonly currency: string;
@@ -65,11 +64,10 @@ export interface AddOnCandidateVariant {
 
 export async function loadAddOnCandidates(
   http: AdminHttp,
-  locale: "es" | "en",
   excludeProductId?: string,
 ): Promise<readonly AddOnCandidateRow[]> {
   try {
-    const page = await listProducts(http, { limit: 100, sort: "name", locale });
+    const page = await listProducts(http, { limit: 100, sort: "name" });
 
     return page.items
       .filter((product) => !product.listed)
@@ -84,26 +82,13 @@ export async function loadAddOnCandidates(
         currency: sellable?.price.currency ?? null,
         variants: product.variants.map((variant) => ({
           id: variant.id,
-          // The same fallback chain the product name uses: the operator's
-          // locale, then whichever translation exists, then the SKU — which is
-          // always present and always unique.
-          label:
-            variant.name?.[locale] ??
-            variant.name?.es ??
-            variant.name?.en ??
-            variant.sku,
+          // The SKU stands in for an unnamed variant — always present, always unique.
+          label: variant.name ?? variant.sku,
           priceGross: variant.price.gross,
           currency: variant.price.currency,
           isActive: variant.isActive,
         })),
-        // Same fallback chain the product pages already use for a title:
-        // the operator's locale, then whatever translation exists, then the
-        // slug — which is always present and always unique.
-        name:
-          product.translations.find((translation) => translation.locale === locale)
-            ?.name ??
-          product.translations[0]?.name ??
-          product.slug,
+        name: product.name,
         };
       });
   } catch {

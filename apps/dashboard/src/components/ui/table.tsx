@@ -1,6 +1,6 @@
 import { Fragment, type ReactNode } from "react";
 
-import { Link } from "@/i18n/navigation";
+import Link from "next/link";
 
 import { Icon } from "./icon";
 import { segmentHref, type SearchParamValue } from "./segmented-control";
@@ -143,7 +143,7 @@ export interface Column<Row> {
 export interface TableExpansion<Row> {
   /** The open row's id, straight off `searchParams`. */
   readonly expandedId: string | undefined;
-  /** The route the table sits on. `Link` adds the locale. */
+  /** The route the table sits on. */
   readonly pathname: string;
   readonly searchParams?: Readonly<Record<string, SearchParamValue>>;
   /** Defaults to `expand`. */

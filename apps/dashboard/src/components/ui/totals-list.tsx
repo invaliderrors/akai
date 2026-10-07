@@ -1,4 +1,4 @@
-import type { CurrencyCode, Locale, Minor } from "@akai/contracts";
+import type { CurrencyCode, Minor } from "@akai/contracts";
 import { absolute, negate } from "@akai/money";
 
 import { Money } from "./money";
@@ -60,8 +60,6 @@ const DENSITY: Readonly<Record<TotalsListDensity, DensityMetrics>> = {
 
 export interface TotalsListProps {
   readonly currency: CurrencyCode;
-  /** Narrowed by comparison at the call site (`asLocale`), never cast. */
-  readonly locale: Locale;
   readonly subtotal: TotalsLine;
   /** Rendered as a deduction, and omitted entirely when the amount is zero. */
   readonly discount?: TotalsLine;
@@ -83,7 +81,6 @@ export interface TotalsListProps {
 
 export function TotalsList({
   currency,
-  locale,
   subtotal,
   discount,
   shipping,
@@ -104,10 +101,10 @@ export function TotalsList({
         className === undefined ? "" : ` ${className}`
       }`}
     >
-      <Line line={subtotal} currency={currency} locale={locale} />
-      <Deduction line={discount} currency={currency} locale={locale} />
-      <Line line={shipping} currency={currency} locale={locale} />
-      <Line line={taxIncluded} currency={currency} locale={locale} />
+      <Line line={subtotal} currency={currency} />
+      <Deduction line={discount} currency={currency} />
+      <Line line={shipping} currency={currency} />
+      <Line line={taxIncluded} currency={currency} />
 
       {/* The grand total. Its SIZE is set here because size belongs to the row
           an amount sits in; its WEIGHT comes from Money's `emphasis`, which is
@@ -116,10 +113,10 @@ export function TotalsList({
           either surface repeating a font-weight. */}
       <dt className={`font-semibold text-[var(--label)] ${metrics.total}`}>{total.label}</dt>
       <dd className={`m-0 text-right ${metrics.total}`}>
-        <Money amount={total.amount} currency={currency} locale={locale} emphasis />
+        <Money amount={total.amount} currency={currency} emphasis />
       </dd>
 
-      <Deduction line={refunded} currency={currency} locale={locale} />
+      <Deduction line={refunded} currency={currency} />
     </dl>
   );
 }
@@ -127,7 +124,6 @@ export function TotalsList({
 interface LineProps {
   readonly line: TotalsLine;
   readonly currency: CurrencyCode;
-  readonly locale: Locale;
 }
 
 /**
@@ -135,12 +131,12 @@ interface LineProps {
  * definition-list value by 40px, which in a two-column grid pushes every figure
  * off its right edge.
  */
-function Line({ line, currency, locale }: LineProps) {
+function Line({ line, currency }: LineProps) {
   return (
     <>
       <dt className="text-[var(--label-secondary)]">{line.label}</dt>
       <dd className="m-0 text-right">
-        <Money amount={line.amount} currency={currency} locale={locale} />
+        <Money amount={line.amount} currency={currency} />
       </dd>
     </>
   );
@@ -149,7 +145,6 @@ function Line({ line, currency, locale }: LineProps) {
 interface DeductionProps {
   readonly line: TotalsLine | undefined;
   readonly currency: CurrencyCode;
-  readonly locale: Locale;
 }
 
 /**
@@ -163,7 +158,7 @@ interface DeductionProps {
  * than a hyphen glued onto the front of a formatted string — which is how a
  * hand-rolled `"-" + money(x)` lands the sign on the wrong side of "€49.90".
  */
-function Deduction({ line, currency, locale }: DeductionProps) {
+function Deduction({ line, currency }: DeductionProps) {
   if (line === undefined || line.amount === 0) {
     return null;
   }
@@ -172,7 +167,6 @@ function Deduction({ line, currency, locale }: DeductionProps) {
     <Line
       line={{ label: line.label, amount: negate(absolute(line.amount)) }}
       currency={currency}
-      locale={locale}
     />
   );
 }

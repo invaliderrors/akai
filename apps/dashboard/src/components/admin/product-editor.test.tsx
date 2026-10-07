@@ -6,22 +6,13 @@ import type { ReactNode } from "react";
 import { toMinor, type CurrencyCode, type Product } from "@akai/contracts";
 
 import { ToastProvider } from "@/components/ui/toast";
-import type { ActionResult } from "@/lib/admin/actions";
-import type { ProductCopy } from "@/lib/admin/translate-copy";
 import esMessages from "../../../messages/es.json";
-import enMessages from "../../../messages/en.json";
 
 /**
- * The translation wiring, from the button to the action and back.
- *
- * WHAT IS ACTUALLY UNDER TEST: that a closed failure reason becomes the right
- * sentence in the operator's own language, and that a deployment with no vendor
- * key degrades to a disabled button beside an explanation rather than to a form
- * that cannot be used. The vendor's own English must never appear.
+ * The editor's wiring: staged variant images, the sanitised-description
+ * warning, variant edits and the reason-aware error sentences.
  */
 
-const translateProductCopyAction =
-  vi.fn<(input: unknown) => Promise<ActionResult<ProductCopy>>>();
 const createProductAction = vi.fn<(input: unknown) => Promise<unknown>>();
 const updateProductAction = vi.fn<(id: string, input: unknown) => Promise<unknown>>();
 const addVariantAction = vi.fn<(productId: string, input: unknown) => Promise<unknown>>();
@@ -33,7 +24,6 @@ const setVariantInventoryPolicyAction =
 const uploadProductImage = vi.fn<(deps: unknown, input: unknown) => Promise<unknown>>();
 
 vi.mock("@/lib/admin/actions", () => ({
-  translateProductCopyAction: (input: unknown) => translateProductCopyAction(input),
   createProductAction: (input: unknown) => createProductAction(input),
   updateProductAction: (id: string, input: unknown) => updateProductAction(id, input),
   addVariantAction: (productId: string, input: unknown) =>
@@ -58,22 +48,21 @@ vi.mock("@/lib/admin/upload-product-image", () => ({
   MAX_IMAGE_BYTES: 15 * 1024 * 1024,
 }));
 
-vi.mock("@/i18n/navigation", () => ({
-  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
-  Link: ({ href, children }: { href: string; children: ReactNode }) => (
+vi.mock("next/link", () => ({
+  default: ({ href, children }: { href: string; children: ReactNode }) => (
     <a href={href}>{children}</a>
   ),
 }));
+vi.mock("next/navigation", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/navigation")>()),
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+}));
 
-const { ProductEditor, TRANSLATE_REASON_KEYS } = await import("./product-editor");
+const { ProductEditor } = await import("./product-editor");
 
 const EUR = "EUR" as CurrencyCode;
 const ISO = "2026-07-20T10:00:00.000Z";
 const form = esMessages.admin.productForm;
-const ENGLISH = /English/;
-
-/** The vendor's own prose, of the kind the API logs and never forwards. */
-const VENDOR_ENGLISH = "DeepL responded 456: quota exceeded for this billing period.";
 
 function buildProduct(): Product {
   return {
@@ -81,15 +70,15 @@ function buildProduct(): Product {
     slug: "hoodie-kumo",
     status: "ACTIVE",
     taxClass: "STANDARD",
-    translations: [
-      { locale: "es", name: "Hoodie Kumo", shortDescription: "Sudadera", description: "Descripción" },
-    ],
+    name: "Hoodie Kumo",
+    shortDescription: "Sudadera",
+    description: "Descripción",
     variants: [
       {
         id: "11111111-1111-4111-8111-111111111111",
         productId: "22222222-2222-4222-8222-222222222222",
         sku: "AK-HOOD-M",
-        name: { es: "M / Black", en: "M / Black" },
+        name: "M / Black",
         // Kept consistent with `name` — real data always derives both from the
         // same size fields, and a mismatch here makes an untouched round trip
         // through `toFormValues`/`buildPayload` look like a variant edit.
@@ -144,18 +133,9 @@ function renderEditor() {
   );
 }
 
-/** Switch to the empty English copy and press translate. */
-async function pressTranslate(user: ReturnType<typeof userEvent.setup>): Promise<void> {
-  await user.click(screen.getByRole("radio", { name: ENGLISH }));
-  await user.click(
-    screen.getByRole("button", { name: form.translate.replace("{language}", "Español") }),
-  );
-}
-
 beforeEach(() => {
   // Braced: an arrow body returning the mock would register it as a teardown
   // callback, and Vitest would invoke it again after every test.
-  translateProductCopyAction.mockReset();
   createProductAction.mockReset();
   updateProductAction.mockReset();
   addVariantAction.mockReset();
@@ -165,31 +145,6 @@ beforeEach(() => {
   // jsdom implements neither, and staging a file mints a preview URL for it.
   URL.createObjectURL = () => "blob:preview";
   URL.revokeObjectURL = () => undefined;
-});
-
-describe("TRANSLATE_REASON_KEYS", () => {
-  it("names a real message in BOTH catalogues for every reason", () => {
-    // The map is total over the union by construction — the compiler enforces
-    // that. What it cannot see is whether the key it names exists: next-intl
-    // answers a missing one by printing the key path at an operator.
-    const es: Readonly<Record<string, string>> = form.translateErrors;
-    const en: Readonly<Record<string, string>> = enMessages.admin.productForm.translateErrors;
-
-    for (const [reason, key] of Object.entries(TRANSLATE_REASON_KEYS)) {
-      // The map addresses one namespace, so the leaf is the part after the dot.
-      expect(key, reason).toBe(`translateErrors.${reason}`);
-      expect(typeof es[reason], `es: ${reason}`).toBe("string");
-      // The compiler catches an es-only key; an EN-only one is caught here.
-      expect(typeof en[reason], `en: ${reason}`).toBe("string");
-    }
-  });
-
-  it("gives each reason its own sentence, because each needs a different response", () => {
-    // "No key configured" is permanent, "rate limited" is over in seconds and
-    // "quota spent" is neither — and all three arrive as one coarse CONFLICT.
-    const sentences = Object.values(form.translateErrors);
-    expect(new Set(sentences).size).toBe(sentences.length);
-  });
 });
 
 describe("ProductEditor variant images", () => {
@@ -208,7 +163,7 @@ describe("ProductEditor variant images", () => {
           { id: "55555555-5555-4555-8555-555555555555", sku: "AK-OTHER" },
           { id: WANTED, sku: "AK-HOOD-L" },
         ],
-        sanitizedLocales: [],
+        descriptionSanitized: false,
       },
     });
     uploadProductImage.mockResolvedValue({ ok: true });
@@ -278,7 +233,7 @@ describe("ProductEditor — sanitised-description warning", () => {
       data: {
         id: "44444444-4444-4444-8444-444444444444",
         variants: [{ id: "55555555-5555-4555-8555-555555555555", sku: "AK-HOOD-L" }],
-        sanitizedLocales: [],
+        descriptionSanitized: false,
       },
     });
 
@@ -313,7 +268,7 @@ describe("ProductEditor — sanitised-description warning", () => {
       data: {
         id: "44444444-4444-4444-8444-444444444444",
         variants: [{ id: "55555555-5555-4555-8555-555555555555", sku: "AK-HOOD-L" }],
-        sanitizedLocales: ["es"],
+        descriptionSanitized: true,
       },
     });
 
@@ -344,7 +299,7 @@ describe("ProductEditor — sanitised-description warning", () => {
     const user = userEvent.setup();
     updateProductAction.mockResolvedValue({
       ok: true,
-      data: { id: "22222222-2222-4222-8222-222222222222", sanitizedLocales: ["es", "en"] },
+      data: { id: "22222222-2222-4222-8222-222222222222", descriptionSanitized: true },
     });
 
     renderEditor();
@@ -361,11 +316,11 @@ describe("ProductEditor — sanitised-description warning", () => {
     updateProductAction
       .mockResolvedValueOnce({
         ok: true,
-        data: { id: "22222222-2222-4222-8222-222222222222", sanitizedLocales: ["es"] },
+        data: { id: "22222222-2222-4222-8222-222222222222", descriptionSanitized: true },
       })
       .mockResolvedValueOnce({
         ok: true,
-        data: { id: "22222222-2222-4222-8222-222222222222", sanitizedLocales: [] },
+        data: { id: "22222222-2222-4222-8222-222222222222", descriptionSanitized: false },
       });
 
     renderEditor();
@@ -379,121 +334,12 @@ describe("ProductEditor — sanitised-description warning", () => {
   });
 });
 
-describe("ProductEditor translation", () => {
-  it("fills the form from the action and saves nothing", async () => {
-    const user = userEvent.setup();
-    translateProductCopyAction.mockResolvedValue({
-      ok: true,
-      data: { name: "Hoodie Kumo", shortDescription: "Hoodie", description: "Description" },
-    });
-
-    renderEditor();
-    await pressTranslate(user);
-
-    await waitFor(() =>
-      expect(screen.getByLabelText(form.nameLabel)).toHaveValue("Hoodie Kumo"),
-    );
-    // The request states its direction rather than leaving the action to infer
-    // it: English is on screen, so Spanish is the source.
-    expect(translateProductCopyAction).toHaveBeenCalledWith({
-      from: "es",
-      to: "en",
-      copy: {
-        name: "Hoodie Kumo",
-        shortDescription: "Sudadera",
-        description: "Descripción",
-      },
-    });
-    // PREFILLED, NOT SAVED, and marked as nobody's work yet.
-    expect(screen.getByText(form.machineTranslated)).toBeInTheDocument();
-  });
-
-  it("translates the reason into the operator's language, never the vendor's", async () => {
-    const user = userEvent.setup();
-    translateProductCopyAction.mockResolvedValue({
-      ok: false,
-      code: "CONFLICT",
-      reason: "QUOTA_EXCEEDED",
-      message: VENDOR_ENGLISH,
-    });
-
-    renderEditor();
-    await pressTranslate(user);
-
-    expect(
-      await screen.findByText(form.translateErrors.QUOTA_EXCEEDED),
-    ).toBeInTheDocument();
-    expect(screen.queryByText(VENDOR_ENGLISH)).toBeNull();
-    // The coarse code's sentence would have said "conflicts with the current
-    // state", which tells an operator nothing about a spent allowance.
-    expect(screen.queryByText(esMessages.errors.CONFLICT)).toBeNull();
-  });
-
-  it("says the session expired for UNAUTHENTICATED, regardless of the reason", async () => {
-    // NOT the sign-in-flavoured `errors.UNAUTHENTICATED` — see `messageFor`'s
-    // own note on why that copy was wrong here (item §3's fix). This reason
-    // string is not even a real one (translate-copy reasons and auth-failure
-    // reasons are different enums); the point is that `messageFor` decides on
-    // `code` for this one, not on parsing `reason` first.
-    const user = userEvent.setup();
-    translateProductCopyAction.mockResolvedValue({
-      ok: false,
-      code: "UNAUTHENTICATED",
-      reason: "VENDOR_ON_FIRE",
-      message: VENDOR_ENGLISH,
-    });
-
-    renderEditor();
-    await pressTranslate(user);
-
-    expect(
-      await screen.findByText(esMessages.admin.common.sessionExpired),
-    ).toBeInTheDocument();
-    expect(screen.queryByText(esMessages.errors.UNAUTHENTICATED)).toBeNull();
-    expect(screen.queryByText(VENDOR_ENGLISH)).toBeNull();
-  });
-
-  it("disables translation for the rest of the page once the key is missing", async () => {
-    const user = userEvent.setup();
-    translateProductCopyAction.mockResolvedValue({
-      ok: false,
-      code: "CONFLICT",
-      reason: "NOT_CONFIGURED",
-      message: "No DEEPL_API_KEY is configured.",
-    });
-
-    renderEditor();
-    await pressTranslate(user);
-
-    expect(
-      await screen.findByText(form.translateErrors.NOT_CONFIGURED),
-    ).toBeInTheDocument();
-    // No retry can fix it while this page is open, so the affordance stands
-    // down instead of failing identically on every press.
-    await waitFor(() =>
-      expect(
-        screen.getByRole("button", { name: form.translate.replace("{language}", "Español") }),
-      ).toBeDisabled(),
-    );
-    // DEGRADED, NOT BROKEN: saving still works, and the copy fields still take
-    // typing.
-    expect(screen.getByRole("button", { name: form.submitSave })).toBeEnabled();
-    await user.type(screen.getByLabelText(form.nameLabel), "Hand-written");
-    expect(screen.getByLabelText(form.nameLabel)).toHaveValue("Hand-written");
-  });
-});
-
-/**
- * The fix for item 1d: editing an existing variant's fields, or adding a new
- * one, on the product edit page now actually saves — previously the whole
- * variants section of this form was a silent no-op on update.
- */
 describe("ProductEditor — existing-variant edits and new-variant creation", () => {
   it("saves an existing variant's price through updateVariantAction, carrying its version", async () => {
     const user = userEvent.setup();
     updateProductAction.mockResolvedValue({
       ok: true,
-      data: { id: "22222222-2222-4222-8222-222222222222", sanitizedLocales: [] },
+      data: { id: "22222222-2222-4222-8222-222222222222", descriptionSanitized: false },
     });
     updateVariantAction.mockResolvedValue({ ok: true, data: null });
 
@@ -520,7 +366,7 @@ describe("ProductEditor — existing-variant edits and new-variant creation", ()
     const user = userEvent.setup();
     updateProductAction.mockResolvedValue({
       ok: true,
-      data: { id: "22222222-2222-4222-8222-222222222222", sanitizedLocales: [] },
+      data: { id: "22222222-2222-4222-8222-222222222222", descriptionSanitized: false },
     });
     updateVariantAction.mockResolvedValue({
       ok: false,
@@ -548,7 +394,7 @@ describe("ProductEditor — existing-variant edits and new-variant creation", ()
     const user = userEvent.setup();
     updateProductAction.mockResolvedValue({
       ok: true,
-      data: { id: "22222222-2222-4222-8222-222222222222", sanitizedLocales: [] },
+      data: { id: "22222222-2222-4222-8222-222222222222", descriptionSanitized: false },
     });
     const NEW_VARIANT_ID = "66666666-6666-4666-8666-666666666666";
     addVariantAction.mockResolvedValue({

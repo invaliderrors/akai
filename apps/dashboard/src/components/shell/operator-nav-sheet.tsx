@@ -6,7 +6,8 @@ import { useTranslations } from "next-intl";
 import { Counter, type CounterTone } from "@/components/ui/badge";
 import { Icon } from "@/components/ui/icon";
 import { Dialog } from "@/components/ui/overlay";
-import { Link, usePathname } from "@/i18n/navigation";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 import { accountInitials } from "./account-menu";
 import {

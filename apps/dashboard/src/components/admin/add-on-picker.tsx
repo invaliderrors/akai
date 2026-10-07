@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
-import type { CurrencyCode, Locale, ProductAddOnInput } from "@akai/contracts";
+import type { CurrencyCode, ProductAddOnInput } from "@akai/contracts";
 import { formatMoney, toMinor } from "@akai/money";
 
 import { PopupButton, TextField } from "@/components/ui/field";
@@ -73,11 +73,9 @@ export interface AddOnPickerProps {
    */
   readonly selected: readonly ProductAddOnInput[];
   readonly onChange: (next: readonly ProductAddOnInput[]) => void;
-  /** The locale being edited, so prices read the way the operator expects. */
-  readonly locale: Locale;
 }
 
-export function AddOnPicker({ candidates, selected, onChange, locale }: AddOnPickerProps) {
+export function AddOnPicker({ candidates, selected, onChange }: AddOnPickerProps) {
   const t = useTranslations("admin.productForm");
   const [filter, setFilter] = useState("");
 
@@ -121,7 +119,7 @@ export function AddOnPicker({ candidates, selected, onChange, locale }: AddOnPic
     const price =
       variant.priceGross === 0
         ? t("defaultVariantFree")
-        : formatMoney(toMinor(variant.priceGross), variant.currency as CurrencyCode, locale);
+        : formatMoney(toMinor(variant.priceGross), variant.currency as CurrencyCode);
     return `${variant.label} · ${price}`;
   }
 

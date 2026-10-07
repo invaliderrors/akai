@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { describe, expect, it } from "vitest";
 
-import { Link } from "@/i18n/navigation";
+import Link from "next/link";
 
 import { Badge } from "./badge";
 import { IconButton } from "./button";
@@ -12,7 +12,7 @@ import { DataTable, type Column, type RowTone, type TableExpansion, type TableSe
 import { clearTableSelection, useTableSelection } from "./table-selection";
 
 /**
- * `Link` from `@/i18n/navigation` is next-intl's, and `ErrorState` reads the
+ * `ErrorState` reads the
  * `errors` namespace, so every render goes through one provider — otherwise a
  * test fails for the wrong reason the first time a table grows a link.
  */

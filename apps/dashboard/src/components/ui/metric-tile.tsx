@@ -1,6 +1,6 @@
-import type { CurrencyCode, Locale } from "@akai/contracts";
+import type { CurrencyCode } from "@akai/contracts";
 
-import { Link } from "@/i18n/navigation";
+import Link from "next/link";
 
 import { Icon } from "./icon";
 import { AggregateMoney } from "./money";
@@ -60,7 +60,6 @@ export type MetricValue =
       /** Minor units, unbranded. Display only — an aggregate is never charged. */
       readonly amountMinor: number;
       readonly currency: CurrencyCode;
-      readonly locale: Locale;
     }
   | {
       /**
@@ -142,7 +141,7 @@ const DELTA: Readonly<Record<DeltaSentiment, DeltaSpec>> = {
 export type MetricTileTone = "default" | "attention";
 
 export interface MetricLink {
-  /** Locale-aware path — this renders through `@/i18n/navigation`. */
+  /** An app path, rendered through `next/link`. */
   readonly href: string;
   /** Already translated, and specific: "Ver los 2 pedidos", not "Ver". */
   readonly label: string;
@@ -189,7 +188,6 @@ function MetricFigure({ value }: { readonly value: MetricValue }) {
       <AggregateMoney
         amountMinor={value.amountMinor}
         currency={value.currency}
-        locale={value.locale}
       />
     );
   }

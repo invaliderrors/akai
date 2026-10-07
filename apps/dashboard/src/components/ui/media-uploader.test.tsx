@@ -21,7 +21,7 @@ import esMessages from "../../../messages/es.json";
  * upload is a THREE-STEP dance across two hosts — presign here, PUT to storage,
  * record here — and the ordering is the part that goes silently wrong: attaching
  * before the bytes land produces a product row pointing at a 404. Alt text is
- * required in BOTH locales because `attach` is the only route that can carry it
+ * required because `attach` is the only route that can carry it
  * and there is no route that adds it later. And a removal has to be reversible
  * for as long as the toast says it is, which means the write has to WAIT rather
  * than be undone.
@@ -30,7 +30,9 @@ import esMessages from "../../../messages/es.json";
 const IMAGE = { width: 800, height: 600 };
 
 const refresh = vi.fn();
-vi.mock("@/i18n/navigation", () => ({ useRouter: () => ({ refresh, push: vi.fn() }) }));
+vi.mock("next/navigation", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/navigation")>()), useRouter: () => ({ refresh, push: vi.fn() }),
+}));
 
 const media = esMessages.admin.productMedia;
 
@@ -55,8 +57,7 @@ const labels: MediaUploaderLabels = {
   saving: "Guardando…",
   upload: "Subir",
   altHeading: "Texto alternativo",
-  altEs: media.altEs,
-  altEn: media.altEn,
+  alt: "Texto alternativo de la imagen",
   altRequired: "Falta el texto alternativo.",
   errors: { ...media.errors, reorderFailed: "No hemos podido cambiar el orden." },
 };
@@ -119,7 +120,7 @@ function StagedHarness({
 }
 
 function stagedImage(name: string, preview: string): StagedImage {
-  return { file: png(64, name), previewUrl: preview, altEs: "", altEn: "" };
+  return { file: png(64, name), previewUrl: preview, alt: "" };
 }
 
 function renderStaged(initial: readonly StagedImage[] = []) {
@@ -174,7 +175,7 @@ function renderLive(overrides: LiveOverrides = {}) {
 }
 
 function item(id: string, sortOrder: number, url = `https://cdn.test/${id}.png`): ProductMediaItem {
-  return { id, url, alt: { es: "Frente", en: "Front" }, width: 10, height: 10, sortOrder };
+  return { id, url, alt: "Frente", width: 10, height: 10, sortOrder };
 }
 
 /**
@@ -187,11 +188,10 @@ function dropzone(): HTMLElement {
   return screen.getByLabelText(/Arrastra una imagen/);
 }
 
-/** Pick, name in both locales, commit. The whole live path in one call. */
+/** Pick, describe, commit. The whole live path in one call. */
 async function uploadOne(file = png()): Promise<void> {
   await userEvent.upload(dropzone(), file);
-  await userEvent.type(screen.getByLabelText(media.altEs), "Camiseta de frente");
-  await userEvent.type(screen.getByLabelText(media.altEn), "Tee, front");
+  await userEvent.type(screen.getByLabelText(labels.alt), "Camiseta de frente");
   await userEvent.click(screen.getByRole("button", { name: labels.upload }));
 }
 
@@ -239,18 +239,16 @@ describe("<MediaUploader mode='staged' />", () => {
     expect(screen.getAllByText(media.primary)).toHaveLength(1);
   });
 
-  it("flags a missing English alt as a field error, not a silent gap", async () => {
+  it("flags a missing alt as a field error, not a silent gap", async () => {
     renderStaged([stagedImage("a.png", "blob:a")]);
 
-    await userEvent.type(screen.getByLabelText(media.altEs), "Camiseta de frente");
-
-    const english = screen.getByLabelText(media.altEn);
-    expect(english).toHaveAttribute("aria-invalid", "true");
+    const alt = screen.getByLabelText(labels.alt);
+    expect(alt).toHaveAttribute("aria-invalid", "true");
     expect(screen.getByRole("alert")).toHaveTextContent(labels.altRequired);
 
-    await userEvent.type(english, "Tee, front");
+    await userEvent.type(alt, "Camiseta de frente");
     // Clears the moment the rule passes — no second blur required.
-    expect(english).not.toHaveAttribute("aria-invalid");
+    expect(alt).not.toHaveAttribute("aria-invalid");
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
@@ -339,28 +337,25 @@ describe("<MediaUploader mode='live' />", () => {
     expect(onAttach.mock.calls[0]?.[1]).toMatchObject(IMAGE);
   });
 
-  it("sends BOTH locales of alt text with the only call that can carry them", async () => {
+  it("sends the alt text with the only call that can carry it", async () => {
     const { onAttach } = renderLive();
     await uploadOne();
 
     await waitFor(() => expect(onAttach).toHaveBeenCalled());
     expect(onAttach.mock.calls[0]?.[1]).toMatchObject({
-      alt: { es: "Camiseta de frente", en: "Tee, front" },
+      alt: "Camiseta de frente",
     });
   });
 
-  it("will not upload until both locales are named", async () => {
+  it("will not upload until the image is described", async () => {
     renderLive();
     await userEvent.upload(dropzone(), png());
 
     const commit = screen.getByRole("button", { name: labels.upload });
+    // There is no route that adds alt text later.
     expect(commit).toBeDisabled();
 
-    await userEvent.type(screen.getByLabelText(media.altEs), "Camiseta de frente");
-    // Still short one locale — there is no route that adds alt text later.
-    expect(commit).toBeDisabled();
-
-    await userEvent.type(screen.getByLabelText(media.altEn), "Tee, front");
+    await userEvent.type(screen.getByLabelText(labels.alt), "Camiseta de frente");
     expect(commit).toBeEnabled();
   });
 

@@ -58,7 +58,7 @@ const zoneBody = {
 const rateBody = {
   id: RATE_ID,
   zoneId: ZONE_ID,
-  name: { es: "Envío nacional" },
+  name: "Envío nacional",
   strategy: "FLAT",
   minValue: null,
   maxValue: null,
@@ -123,7 +123,7 @@ describe("shipping actions", () => {
   it("creates and updates rates under their zone's path", async () => {
     respond = () => ({ status: 201, body: rateBody });
     await createShippingRateAction(ZONE_ID, {
-      name: { es: "Envío nacional" },
+      name: "Envío nacional",
       strategy: "FLAT",
       priceGross: 1_500_000,
     });
@@ -140,7 +140,7 @@ describe("shipping actions", () => {
 
   it("refuses a rate with a blank Spanish name before any request", async () => {
     const result = await createShippingRateAction(ZONE_ID, {
-      name: { es: "  " },
+      name: "  ",
       strategy: "FLAT",
       priceGross: 1_500_000,
     });

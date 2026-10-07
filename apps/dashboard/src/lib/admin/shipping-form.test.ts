@@ -24,7 +24,7 @@ const ZONE_OTHER = "22222222-2222-4222-8222-222222222222";
 const STORED: AdminShippingRate = adminShippingRateSchema.parse({
   id: "33333333-3333-4333-8333-333333333333",
   zoneId: ZONE_CO,
-  name: { es: "Envío nacional", en: "National shipping" },
+  name: "Envío nacional",
   strategy: "PRICE",
   minValue: 5_000_000,
   maxValue: 30_000_000,
@@ -41,14 +41,14 @@ const STORED: AdminShippingRate = adminShippingRateSchema.parse({
 function values(overrides: Partial<RateFormValues> = {}): RateFormValues {
   return {
     ...emptyRateValues(),
-    nameEs: "Envío nacional",
+    name: "Envío nacional",
     priceGross: "15.000",
     ...overrides,
   };
 }
 
 describe("buildRatePayload", () => {
-  it("converts whole pesos through the string parser and omits a blank English name", () => {
+  it("converts whole pesos through the string parser and sends the name as is", () => {
     const built = buildRatePayload(
       values({ freeOverSubtotal: "300000", transitDaysMin: "2", transitDaysMax: "5" }),
     );
@@ -56,7 +56,7 @@ describe("buildRatePayload", () => {
     expect(built).toEqual({
       ok: true,
       value: {
-        name: { es: "Envío nacional" },
+        name: "Envío nacional",
         strategy: "FLAT",
         minValue: null,
         maxValue: null,
@@ -95,7 +95,7 @@ describe("buildRatePayload", () => {
   it("names each broken field with a closed code", () => {
     const built = buildRatePayload(
       values({
-        nameEs: " ",
+        name: " ",
         priceGross: "",
         freeOverSubtotal: "0",
         strategy: "WEIGHT",
@@ -108,7 +108,7 @@ describe("buildRatePayload", () => {
     expect(built).toEqual({
       ok: false,
       errors: {
-        nameEs: "REQUIRED",
+        name: "REQUIRED",
         priceGross: "EMPTY",
         freeOverSubtotal: "NOT_POSITIVE",
         maxValue: "BOUNDS_ORDER",
@@ -194,9 +194,9 @@ describe("freeShippingMismatches", () => {
 });
 
 describe("display helpers", () => {
-  it("falls back to the Spanish name", () => {
-    expect(rateDisplayName({ name: { es: "Punto" } }, "en")).toBe("Punto");
-    expect(rateDisplayName(STORED, "en")).toBe("National shipping");
+  it("shows the rate name, trimmed", () => {
+    expect(rateDisplayName({ name: " Punto " })).toBe("Punto");
+    expect(rateDisplayName(STORED)).toBe("Envío nacional");
   });
 
   it("narrows only known reasons", () => {

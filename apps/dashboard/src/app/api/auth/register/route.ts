@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { emailSchema, localeSchema, passwordSchema } from "@akai/contracts";
+import { emailSchema, passwordSchema } from "@akai/contracts";
 import { apiBaseUrl } from "@/lib/api/client";
 import { register } from "@/lib/api/auth";
 import { csrfFailure, forwardApiError, parseBody } from "@/lib/bff/route";
@@ -25,7 +25,6 @@ const requestSchema = z
     password: passwordSchema,
     firstName: z.string().min(1).max(80),
     lastName: z.string().min(1).max(80),
-    preferredLocale: localeSchema.default("es"),
     turnstileToken: z.string().min(1),
     marketingConsent: z.boolean().default(false),
   })

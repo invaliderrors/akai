@@ -48,8 +48,7 @@ export function useMediaLabels(): MediaUploaderLabels {
     saving: ui("saving"),
     upload: ui("upload"),
     altHeading: ui("altHeading"),
-    altEs: ui("altEs"),
-    altEn: ui("altEn"),
+    alt: ui("alt"),
     altRequired: ui("altRequired"),
     errors: {
       // Total over `MediaUploaderError`, which is `UploadFailure` plus this

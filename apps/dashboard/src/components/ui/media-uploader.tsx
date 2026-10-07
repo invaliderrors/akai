@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useId, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
 
 import { ImageDropzone } from "@/components/admin/image-dropzone";
-import { useRouter } from "@/i18n/navigation";
+import { useRouter } from "next/navigation";
 import type { ActionResult } from "@/lib/admin/actions";
 import { uploadProductImage, type UploadDeps, type UploadFailure } from "@/lib/admin/upload-product-image";
 
@@ -20,7 +20,7 @@ import { TOAST_DWELL_MS, useToast } from "./toast";
  * held files in the browser because the presign endpoint is scoped to a
  * `productId` and no object key can be issued before the product row does;
  * `product-media-manager` uploaded straight away because by then there was an id.
- * Everything else about them — the grid, the primary marker, the per-locale alt
+ * Everything else about them — the grid, the primary marker, the alt
  * text, the remove affordance — was the same idea written twice, and the two
  * copies had already drifted (one showed a hint, one showed an empty state, only
  * one measured dimensions). `mode` now carries the single real difference.
@@ -60,15 +60,14 @@ import { TOAST_DWELL_MS, useToast } from "./toast";
 export interface StagedImage {
   readonly file: File;
   readonly previewUrl: string;
-  readonly altEs: string;
-  readonly altEn: string;
+  readonly alt: string;
 }
 
 /** An image already stored against a product. */
 export interface ProductMediaItem {
   readonly id: string;
   readonly url: string;
-  readonly alt: Record<string, string>;
+  readonly alt: string;
   readonly width: number;
   readonly height: number;
   readonly sortOrder: number;
@@ -115,9 +114,9 @@ export interface MediaUploaderLabels {
   readonly upload: string;
   /** Heading of the alt-text group. "Texto alternativo" */
   readonly altHeading: string;
-  readonly altEs: string;
-  readonly altEn: string;
-  /** Shown on whichever locale is blank. "Falta el texto alternativo en inglés." */
+  /** The alt-text field's label. */
+  readonly alt: string;
+  /** Shown while the alt text is blank. */
   readonly altRequired: string;
   readonly errors: Readonly<Record<MediaUploaderError, string>>;
 }
@@ -190,8 +189,7 @@ interface DraftUpload {
   readonly key: string;
   readonly file: File;
   readonly previewUrl: string;
-  readonly altEs: string;
-  readonly altEn: string;
+  readonly alt: string;
   readonly phase: UploadPhase;
 }
 
@@ -200,8 +198,7 @@ interface Tile {
   readonly key: string;
   readonly previewUrl: string;
   readonly name: string;
-  readonly altEs: string;
-  readonly altEn: string;
+  readonly alt: string;
   /** `null` once the image is stored. */
   readonly phase: UploadPhase | null;
   /** The server's id, when there is one. */
@@ -326,8 +323,7 @@ export function MediaUploader(props: MediaUploaderProps) {
             key: `media:${item.id}`,
             previewUrl: item.url,
             name: fileNameFromUrl(item.url, item.id),
-            altEs: item.alt["es"] ?? "",
-            altEn: item.alt["en"] ?? "",
+            alt: item.alt,
             phase: null,
             mediaId: item.id,
           }))
@@ -340,8 +336,7 @@ export function MediaUploader(props: MediaUploaderProps) {
     key: image.previewUrl,
     previewUrl: image.previewUrl,
     name: image.file.name,
-    altEs: image.altEs,
-    altEn: image.altEn,
+    alt: image.alt,
     phase: "draft",
     mediaId: null,
   }));
@@ -350,8 +345,7 @@ export function MediaUploader(props: MediaUploaderProps) {
     key: draft.key,
     previewUrl: draft.previewUrl,
     name: draft.file.name,
-    altEs: draft.altEs,
-    altEn: draft.altEn,
+    alt: draft.alt,
     phase: draft.phase,
     mediaId: null,
   }));
@@ -387,7 +381,7 @@ export function MediaUploader(props: MediaUploaderProps) {
     setResetKey((key) => key + 1);
 
     if (props.mode === "staged") {
-      const added = chosen.map(({ file, previewUrl }) => ({ file, previewUrl, altEs: "", altEn: "" }));
+      const added = chosen.map(({ file, previewUrl }) => ({ file, previewUrl, alt: "" }));
       props.onChange([...props.images, ...added]);
       setSelectedKey(added[0]?.previewUrl ?? null);
       return;
@@ -399,8 +393,7 @@ export function MediaUploader(props: MediaUploaderProps) {
         key: `draft:${String(draftSeq.current)}`,
         file,
         previewUrl,
-        altEs: "",
-        altEn: "",
+        alt: "",
         phase: "draft" as const,
       };
     });
@@ -408,7 +401,7 @@ export function MediaUploader(props: MediaUploaderProps) {
     setSelectedKey(added[0]?.key ?? null);
   }
 
-  function patchAlt(tile: Tile, patch: { readonly altEs?: string; readonly altEn?: string }): void {
+  function patchAlt(tile: Tile, patch: { readonly alt: string }): void {
     if (props.mode === "staged") {
       props.onChange(
         props.images.map((image) => (image.previewUrl === tile.key ? { ...image, ...patch } : image)),
@@ -550,7 +543,7 @@ export function MediaUploader(props: MediaUploaderProps) {
         {
           productId,
           file: draft.file,
-          alt: { es: draft.altEs.trim(), en: draft.altEn.trim() },
+          alt: draft.alt.trim(),
           // Appended. The storefront shows the LOWEST sortOrder, so a new upload
           // must not silently become the product's main image.
           sortOrder: storedTiles.length,
@@ -582,8 +575,7 @@ export function MediaUploader(props: MediaUploaderProps) {
 
   const selectedDraft = selected === undefined ? undefined : drafts.find((draft) => draft.key === selected.key);
   const altEditable = selected !== undefined && (props.mode === "staged" || selectedDraft !== undefined);
-  const esMissing = selected !== undefined && selected.altEs.trim() === "";
-  const enMissing = selected !== undefined && selected.altEn.trim() === "";
+  const altMissing = selected !== undefined && selected.alt.trim() === "";
   const busy = drafts.some((draft) => draft.phase !== "draft");
 
   return (
@@ -766,38 +758,26 @@ export function MediaUploader(props: MediaUploaderProps) {
             </span>
           </p>
 
-          <div className="grid gap-[10px] sm:grid-cols-2">
-            <TextField
-              label={labels.altEs}
-              name="alt-es"
-              value={selected.altEs}
-              onChange={(value) => patchAlt(selected, { altEs: value })}
-              maxLength={300}
-              disabled={disabled}
-              readOnly={!altEditable}
-              {...(altEditable && esMissing ? { error: labels.altRequired } : {})}
-            />
-            <TextField
-              label={labels.altEn}
-              name="alt-en"
-              value={selected.altEn}
-              onChange={(value) => patchAlt(selected, { altEn: value })}
-              maxLength={300}
-              disabled={disabled}
-              readOnly={!altEditable}
-              {...(altEditable && enMissing ? { error: labels.altRequired } : {})}
-            />
-          </div>
+          <TextField
+            label={labels.alt}
+            name="alt"
+            value={selected.alt}
+            onChange={(value) => patchAlt(selected, { alt: value })}
+            maxLength={300}
+            disabled={disabled}
+            readOnly={!altEditable}
+            {...(altEditable && altMissing ? { error: labels.altRequired } : {})}
+          />
 
           {selectedDraft !== undefined && (
             <div className="justify-self-start">
               <Button
                 variant="prominent"
                 onClick={() => void uploadDraft(selectedDraft)}
-                // BOTH locales before the only write that can carry them. There
-                // is no route that updates alt text after the fact, so an image
+                // Alt text before the only write that can carry it. There is no
+                // route that updates alt text after the fact, so an image
                 // attached without it stays without it.
-                disabled={disabled || esMissing || enMissing}
+                disabled={disabled || altMissing}
                 pending={selectedDraft.phase !== "draft"}
                 pendingLabel={selectedDraft.phase === "saving" ? labels.saving : labels.uploading}
               >

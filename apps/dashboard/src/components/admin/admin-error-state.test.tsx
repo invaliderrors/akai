@@ -19,8 +19,8 @@ import esMessages from "../../../messages/es.json";
  * sentences that actually ship.
  */
 
-vi.mock("@/i18n/navigation", () => ({
-  Link: ({
+vi.mock("next/link", () => ({
+  default: ({
     href,
     children,
     className,

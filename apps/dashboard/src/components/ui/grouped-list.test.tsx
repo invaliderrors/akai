@@ -6,8 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ContentRow, DisclosureRow, GroupedList, ValueRow } from "./grouped-list";
 
 /**
- * `Link` from `@/i18n/navigation` is next-intl's, so any row rendered as a link
- * needs the locale in context. Every render goes through here so a test never
+ * Rows read the message catalogue, so any render needs the provider in context. Every render goes through here so a test never
  * fails for the wrong reason when it grows an `href`.
  */
 function renderList(ui: React.ReactNode) {

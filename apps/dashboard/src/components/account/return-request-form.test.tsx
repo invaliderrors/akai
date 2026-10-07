@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { OrderSummary } from "@akai/contracts";
 
-import type { RequestReturnResult } from "@/app/[locale]/(customer)/returns/actions";
+import type { RequestReturnResult } from "@/app/(customer)/returns/actions";
 import { buildOrderSummary } from "@/lib/account/fixtures";
 
 import { ReturnRequestForm, type EligibleOrder } from "./return-request-form";

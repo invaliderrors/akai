@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import type { AdminOrderShipment, CreateShipment, Locale, ShipmentStatus } from "@akai/contracts";
+import type { AdminOrderShipment, CreateShipment, ShipmentStatus } from "@akai/contracts";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -10,7 +10,7 @@ import { TextField } from "@/components/ui/field";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useToast } from "@/components/ui/toast";
 import { formatDateTime } from "@/components/account/format";
-import { useRouter } from "@/i18n/navigation";
+import { useRouter } from "next/navigation";
 import type { ActionResult } from "@/lib/admin/actions";
 import { createShipmentAction, markShipmentDeliveredAction } from "@/lib/admin/actions";
 import { canMarkDelivered, type UnshippedLine } from "@/lib/admin/shipment-display";
@@ -34,7 +34,6 @@ const DEFAULT_HANDLERS: OrderShipmentHandlers = {
 
 export interface OrderShipmentsProps {
   readonly orderNumber: string;
-  readonly locale: Locale;
   /** Oldest first, as the API sends them. */
   readonly shipments: readonly AdminOrderShipment[];
   /**
@@ -58,7 +57,6 @@ export interface OrderShipmentsProps {
  */
 export function OrderShipments({
   orderNumber,
-  locale,
   shipments,
   toShip,
   handlers = DEFAULT_HANDLERS,
@@ -141,7 +139,7 @@ export function OrderShipments({
                   dateTime={shipment.createdAt}
                   className="ms-auto text-[12px] text-[var(--label-secondary)] tabular-nums"
                 >
-                  {t("created", { date: formatDateTime(shipment.createdAt, locale) })}
+                  {t("created", { date: formatDateTime(shipment.createdAt) })}
                 </time>
               </div>
 

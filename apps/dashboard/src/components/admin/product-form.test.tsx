@@ -9,17 +9,13 @@ import { ToastProvider } from "@/components/ui/toast";
 
 import {
   ProductForm,
-  TranslateCopyError,
   buildPayload,
   classifyVariantChanges,
   tierPercent,
   tierPriceFromPercent,
-  productCopySchema,
   stagedVariantImages,
   toFormValues,
-  type ProductCopyDraft,
   type ProductFormMessages,
-  type TranslateCopyRequest,
 } from "./product-form";
 import type { AddOnCandidate } from "./add-on-picker";
 import type { PackComponentCandidate } from "./pack-components-picker";
@@ -27,7 +23,8 @@ import esMessages from "../../../messages/es.json";
 
 // The variant image control reaches `MediaUploader`, which refreshes the server
 // page after a write. Only the tests that pass `variantImages` render it.
-vi.mock("@/i18n/navigation", () => ({
+vi.mock("next/navigation", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/navigation")>()),
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
 
@@ -37,12 +34,8 @@ const ISO = "2026-07-20T10:00:00.000Z";
 const form = esMessages.admin.productForm;
 const variantImage = esMessages.admin.variantImage;
 
-/** The copy panel's two segments, named as the operator sees them. */
-const SPANISH = /Español/;
-const ENGLISH = /English/;
-
 /**
- * The translated copy the pure builder needs, taken from the REAL catalogue.
+ * The messages the pure builder needs, taken from the REAL catalogue.
  *
  * `buildPayload` takes its messages as an argument precisely so it can stay a
  * pure function with no provider — and reading them from `es.json` here rather
@@ -67,20 +60,15 @@ function buildProduct(): Product {
     slug: "hoodie-kumo",
     status: "ACTIVE",
     taxClass: "STANDARD",
-    translations: [
-      {
-        locale: "es",
-        name: "Hoodie Kumo",
-        shortDescription: "Sudadera",
-        description: "Descripción",
-      },
-    ],
+    name: "Hoodie Kumo",
+    shortDescription: "Sudadera",
+    description: "Descripción",
     variants: [
       {
         id: "11111111-1111-4111-8111-111111111111",
         productId: "22222222-2222-4222-8222-222222222222",
         sku: "AK-HOOD-M",
-        name: { es: "M / Black", en: "M / Black" },
+        name: "M / Black",
         // CONSISTENT WITH `name`, deliberately: real stored data always sets
         // the two together (`buildPayload`'s own `options`/`name` pair, below)
         // — a fixture that left this `{}` while `name` implies a size would
@@ -170,24 +158,17 @@ function validValues() {
     // real entry.
     addOns: [] as readonly { id: string; defaultVariantId: string | null }[],
     categoryIds: [] as readonly string[],
-    translations: [
-      {
-        locale: "es" as const,
-        name: "Hoodie Kumo",
-        shortDescription: "Sudadera",
-        description: "Descripción",
-      },
-      { locale: "en" as const, name: "", shortDescription: "", description: "" },
-    ],
+    name: "Hoodie Kumo",
+    shortDescription: "Sudadera",
+    description: "Descripción",
     variants: [
       {
         key: "v1",
         version: 3,
         sku: "AK-HOOD-M",
-        nameEs: "M / Black",
-        nameEn: "M / Black",
+        name: "M / Black",
         // BLANK ON PURPOSE. A filled size overrides the carried name, so seeding
-        // one here would quietly rewrite `nameEs`/`nameEn` for every test in the
+        // one here would quietly rewrite `name` for every test in the
         // file — including the one that clears them to assert a null name.
         size: "",
         color: "",
@@ -221,8 +202,7 @@ function stagedImage(name: string): StagedImage {
   return {
     file: new File([new Uint8Array(8)], name, { type: "image/png" }),
     previewUrl: `blob:${name}`,
-    altEs: "",
-    altEn: "",
+    alt: "",
   };
 }
 
@@ -308,55 +288,36 @@ describe("buildPayload", () => {
     expect(result.errors["slug"]).toBeDefined();
   });
 
-  it("drops empty translations rather than sending blank copy", () => {
-    // The English fields are untouched in validValues(); sending them as empty
-    // strings would publish a product with a blank English name.
-    const result = buildPayload(validValues(), messages);
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.value.translations).toHaveLength(1);
-    expect(result.value.translations[0]?.locale).toBe("es");
-  });
-
-  it("maps a translation error onto its locale, not its array index", () => {
-    // "translations.0.name" means nothing to an operator looking at a box under
-    // an "Español" heading — and it is also what tells the form which locale to
-    // switch to when the rejected copy is the one off screen.
-    const values = validValues();
+  it("sends the copy as plain fields, trimmed", () => {
     const result = buildPayload(
-      {
-        ...values,
-        translations: [
-          { locale: "es", name: "x".repeat(300), shortDescription: "", description: "" },
-          { locale: "en", name: "", shortDescription: "", description: "" },
-        ],
-      },
+      { ...validValues(), name: "  Hoodie Kumo  ", shortDescription: " Sudadera " },
       messages,
     );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.name).toBe("Hoodie Kumo");
+    expect(result.value.shortDescription).toBe("Sudadera");
+    expect(result.value).not.toHaveProperty("translations");
+  });
+
+  it("reports a copy error against the field itself", () => {
+    const result = buildPayload({ ...validValues(), name: "x".repeat(300) }, messages);
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(result.errors["translations.es.name"]).toBeDefined();
+    expect(result.errors["name"]).toBeDefined();
   });
 
-  it("requires at least one translation", () => {
-    const values = validValues();
-    const result = buildPayload(
-      {
-        ...values,
-        translations: [
-          { locale: "es", name: "", shortDescription: "", description: "" },
-          { locale: "en", name: "", shortDescription: "", description: "" },
-        ],
-      },
-      messages,
-    );
+  it("requires a name", () => {
+    const result = buildPayload({ ...validValues(), name: "" }, messages);
 
     expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.errors["name"]).toBeDefined();
   });
 
-  it("sends null rather than {} when a variant has no per-locale name", () => {
-    const result = buildPayload(withVariant({ nameEs: "", nameEn: "" }), messages);
+  it("sends null rather than \"\" when a variant has no name", () => {
+    const result = buildPayload(withVariant({ name: "" }), messages);
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -382,22 +343,14 @@ describe("buildPayload", () => {
     const result = buildPayload(
       {
         ...values,
-        translations: [
-          {
-            locale: "es",
-            name: "Hoodie Kumo",
-            shortDescription: "Sudadera",
-            description: '<p onclick="steal()">Perfil</p><script>alert(1)</script>',
-          },
-          { locale: "en", name: "", shortDescription: "", description: "" },
-        ],
+        description: '<p onclick="steal()">Perfil</p><script>alert(1)</script>',
       },
       messages,
     );
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    const description = result.value.translations[0]?.description;
+    const description = result.value.description;
     // The API sanitises again on write, and that copy is the authoritative one.
     // This assertion is about a different property: a form that previews one
     // string and posts another has a sanitiser in name only.
@@ -412,65 +365,13 @@ describe("buildPayload", () => {
     // the summary through the sanitiser would show a customer "10 &lt; 20".
     const values = validValues();
     const result = buildPayload(
-      {
-        ...values,
-        translations: [
-          {
-            locale: "es",
-            name: "Hoodie Kumo",
-            shortDescription: "38 < 40 cm",
-            description: "",
-          },
-          { locale: "en", name: "", shortDescription: "", description: "" },
-        ],
-      },
+      { ...values, shortDescription: "38 < 40 cm", description: "" },
       messages,
     );
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value.translations[0]?.shortDescription).toBe("38 < 40 cm");
-  });
-});
-
-describe("productCopySchema", () => {
-  /**
-   * The guard between a translation handler and three controlled inputs.
-   *
-   * `TranslateCopy` is typed, but the value it resolves with crossed a network
-   * first — and a missing `description` landing `undefined` in a controlled
-   * input switches that field to uncontrolled, after which the operator's
-   * keystrokes are silently unmanaged. The form parses instead, and shows its
-   * own failure message.
-   */
-  it("rejects a partial payload rather than letting undefined reach an input", () => {
-    expect(productCopySchema.safeParse({ name: "Hoodie Kumo" }).success).toBe(false);
-    expect(
-      productCopySchema.safeParse({
-        name: "Hoodie Kumo",
-        shortDescription: "Hoodie",
-        description: 42,
-      }).success,
-    ).toBe(false);
-  });
-
-  it("accepts the three fields and drops anything extra", () => {
-    const parsed = productCopySchema.safeParse({
-      name: "Hoodie Kumo",
-      shortDescription: "Hoodie",
-      description: "Description",
-      // A newer server saying more than we asked for is not a failure.
-      detectedSourceLocale: "es",
-    });
-
-    expect(parsed.success).toBe(true);
-    if (!parsed.success) return;
-    const copy: ProductCopyDraft = parsed.data;
-    expect(copy).toEqual({
-      name: "Hoodie Kumo",
-      shortDescription: "Hoodie",
-      description: "Description",
-    });
+    expect(result.value.shortDescription).toBe("38 < 40 cm");
   });
 });
 
@@ -844,8 +745,8 @@ describe("toFormValues", () => {
     const stored: Product = {
       ...buildProduct(),
       categories: [
-        { id: "11111111-1111-4111-8111-111111111111", slug: "recuperacion", name: { es: "Recuperación", en: "Recovery" }, sortOrder: 0 },
-        { id: "22222222-2222-4222-8222-222222222222", slug: "rendimiento", name: { es: "Rendimiento", en: "Performance" }, sortOrder: 1 },
+        { id: "11111111-1111-4111-8111-111111111111", slug: "recuperacion", name: "Recuperación", sortOrder: 0 },
+        { id: "22222222-2222-4222-8222-222222222222", slug: "rendimiento", name: "Rendimiento", sortOrder: 1 },
       ],
     };
 
@@ -870,34 +771,24 @@ describe("toFormValues", () => {
     expect(rebuilt.value.listed).toBe(false);
   });
 
-  it("exposes both locales even when the product only has one", () => {
-    // Otherwise an operator can never ADD the English copy to a Spanish-only
-    // product — there would be no draft behind the English segment to type into.
-    const values = toFormValues(buildProduct(), EUR);
-    expect(values.translations.map((t) => t.locale)).toEqual(["es", "en"]);
-  });
-
-  it("carries a variant's per-locale name even though no input shows it", () => {
+  it("carries a variant's name even though no input shows it", () => {
     // There is no "Nombre" cell for a variant, and saving must not erase what
-    // the form cannot display. A variant with no `size` option keeps its
-    // per-locale name exactly as stored.
+    // the form cannot display. A variant with no `size` option keeps its name
+    // exactly as stored.
     const product = buildProduct();
     const unsized: Product = {
       ...product,
       variants: product.variants.map((variant) => ({
         ...variant,
         options: {},
-        name: { es: "Edición limitada", en: "Limited edition" },
+        name: "Edición limitada",
       })),
     };
     const values = toFormValues(unsized, EUR);
     const rebuilt = buildPayload(values, messages);
     expect(rebuilt.ok).toBe(true);
     if (!rebuilt.ok) return;
-    expect(rebuilt.value.variants[0]?.name).toEqual({
-      es: "Edición limitada",
-      en: "Limited edition",
-    });
+    expect(rebuilt.value.variants[0]?.name).toBe("Edición limitada");
   });
 
   it("defaults stackDiscountEnabled to false for a new product", () => {
@@ -969,8 +860,8 @@ describe("<ProductForm /> — pack components alongside add-ons", () => {
 
 describe("<ProductForm /> — category assignment", () => {
   const CATEGORIES = [
-    { id: "11111111-1111-4111-8111-111111111111", slug: "recuperacion", name: { es: "Recuperación", en: "Recovery" }, sortOrder: 0 },
-    { id: "22222222-2222-4222-8222-222222222222", slug: "rendimiento", name: { es: "Rendimiento", en: "Performance" }, sortOrder: 1 },
+    { id: "11111111-1111-4111-8111-111111111111", slug: "recuperacion", name: "Recuperación", sortOrder: 0 },
+    { id: "22222222-2222-4222-8222-222222222222", slug: "rendimiento", name: "Rendimiento", sortOrder: 1 },
   ];
 
   it("renders no panel at all when the page did not supply a category list", () => {
@@ -1102,7 +993,7 @@ describe("classifyVariantChanges", () => {
     }));
 
     expect(result.updatedVariants[0]?.patch).toMatchObject({
-      name: { es: "L / Black", en: "L / Black" },
+      name: "L / Black",
       options: { size: "L", color: "Black" },
     });
   });
@@ -1212,8 +1103,7 @@ describe("classifyVariantChanges", () => {
           key: "new-1",
           version: 0,
           sku: "AK-HOOD-L",
-          nameEs: "",
-          nameEn: "",
+          name: "",
           size: "L",
           color: "Black",
           priceGross: "89.99",
@@ -1490,7 +1380,7 @@ describe("<ProductForm />", () => {
     expect(screen.queryByText(form.unsavedChanges)).not.toBeInTheDocument();
   });
 
-  it("previews the description as the shop will render it, per locale", async () => {
+  it("previews the description as the shop will render it", async () => {
     const user = userEvent.setup();
 
     renderForm(
@@ -1518,13 +1408,10 @@ describe("<ProductForm />", () => {
     );
     await closePreview();
 
-    // The preview belongs to the copy on screen, and it now mirrors the shop:
-    // the storefront omits the description SECTION entirely when there is no
-    // description, so the preview shows no region at all rather than a
-    // dashboard-only "nothing here yet" sentence. The fixture has no English
-    // description, so switching must drop the section — not carry the Spanish
-    // markup over from the segment before.
-    await user.click(screen.getByRole("radio", { name: ENGLISH }));
+    // It mirrors the shop: the storefront omits the description SECTION
+    // entirely when there is no description, so the preview shows no region
+    // at all rather than a dashboard-only "nothing here yet" sentence.
+    await user.clear(screen.getByLabelText(form.descriptionLabel));
     await openPreview();
     expect(
       screen.queryByRole("region", { name: form.previewLabel }),
@@ -1678,8 +1565,8 @@ describe("<ProductForm />", () => {
    * THE FREEZE, asserted directly — it is the easiest thing in the form to
    * lose: swap a `<fieldset>` for a `<div>` and every panel keeps its paint
    * while the whole form quietly stops disabling on submit. Now checked across
-   * a sidebar field, a table cell AND the locale switch, because the table and
-   * the switch are new boxes that a `<div>` rewrite would take with it.
+   * a sidebar field, a copy field AND a table cell, because the table is a
+   * box that a `<div>` rewrite would take with it.
    */
   it("freezes every field while the save is in flight", async () => {
     const user = userEvent.setup();
@@ -1711,7 +1598,6 @@ describe("<ProductForm />", () => {
     expect(slug).toBeDisabled();
     expect(screen.getByLabelText(form.nameLabel)).toBeDisabled();
     expect(screen.getByLabelText(form.skuLabel)).toBeDisabled();
-    expect(screen.getByRole("radio", { name: ENGLISH })).toBeDisabled();
 
     release?.();
     await waitFor(() => expect(slug).toBeEnabled());
@@ -1732,18 +1618,10 @@ describe("<ProductForm />", () => {
     // Losing it is invisible on screen and total in the accessibility tree.
     expect(screen.getByRole("group", { name: form.productTitle })).toBeInTheDocument();
     expect(screen.getByRole("group", { name: form.variantsTitle })).toBeInTheDocument();
-    // The copy panel names the language it is currently editing, so "Nombre" is
-    // never announced without saying which language that name is for.
-    expect(
-      screen.getByRole("group", {
-        name: form.sectionCopy.replace("{language}", "Español"),
-      }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: form.sectionCopy })).toBeInTheDocument();
   });
 
-  it("edits one locale at a time and keeps the other in state", async () => {
-    const user = userEvent.setup();
-
+  it("has one set of copy fields and no language switch — the shop is Spanish only", () => {
     renderForm(
       <ProductForm
         product={buildProduct()}
@@ -1753,182 +1631,10 @@ describe("<ProductForm />", () => {
       />,
     );
 
-    // ONE name field, not two: this is the density win, and the assertion that
-    // fails the day somebody re-adds the second copy card.
     expect(screen.getAllByLabelText(form.nameLabel)).toHaveLength(1);
     expect(screen.getByLabelText(form.nameLabel)).toHaveValue("Hoodie Kumo");
-
-    await user.click(screen.getByRole("radio", { name: ENGLISH }));
-    const englishName = screen.getByLabelText(form.nameLabel);
-    expect(englishName).toHaveValue("");
-    await user.type(englishName, "Hoodie Kumo EN");
-
-    // Back to Spanish: what was typed in English must still exist, and the
-    // Spanish copy must be exactly what it was.
-    await user.click(screen.getByRole("radio", { name: SPANISH }));
-    expect(screen.getByLabelText(form.nameLabel)).toHaveValue("Hoodie Kumo");
-    await user.click(screen.getByRole("radio", { name: ENGLISH }));
-    expect(screen.getByLabelText(form.nameLabel)).toHaveValue("Hoodie Kumo EN");
-  });
-
-  it("counts the empty fields of the locale that is behind without switching to it", async () => {
-    const user = userEvent.setup();
-
-    renderForm(
-      <ProductForm
-        product={buildProduct()}
-        currency={EUR}
-        onSubmit={async () => {}}
-        submitLabel={form.submitSave}
-      />,
-    );
-
-    // The fixture has Spanish copy and no English at all: three empty fields,
-    // stated on the English segment while the Spanish copy is on screen. This
-    // is what the two side-by-side cards used to be for, and it is why the
-    // count is a full sentence rather than a bare red dot.
-    const english = screen.getByRole("radio", { name: ENGLISH });
-    expect(screen.getByText("3 campos vacíos")).toBeInTheDocument();
-
-    await user.click(english);
-    await user.type(screen.getByLabelText(form.nameLabel), "Hoodie Kumo");
-    expect(screen.getByText("2 campos vacíos")).toBeInTheDocument();
-  });
-
-  it("switches to the offending locale when the rejected copy is off screen", async () => {
-    const user = userEvent.setup();
-    const onSubmit = vi.fn<(value: unknown) => Promise<void>>(async () => {});
-
-    renderForm(
-      <ProductForm
-        product={buildProduct()}
-        currency={EUR}
-        onSubmit={onSubmit}
-        submitLabel={form.submitSave}
-      />,
-    );
-
-    // An English name that is too long for the contract, then left behind the
-    // Spanish segment. Without the switch the save would be refused with the
-    // reason drawn on a panel nobody can see.
-    await user.click(screen.getByRole("radio", { name: ENGLISH }));
-    await user.click(screen.getByLabelText(form.nameLabel));
-    // PASTED rather than typed: 300 keystrokes is 300 re-renders of the whole
-    // form, and the test is about where the error lands, not about typing.
-    await user.paste("x".repeat(300));
-    await user.click(screen.getByRole("radio", { name: SPANISH }));
-
-    await user.click(screen.getByRole("button", { name: form.submitSave }));
-
-    expect(onSubmit).not.toHaveBeenCalled();
-    await waitFor(() =>
-      expect(screen.getByRole("radio", { name: ENGLISH })).toBeChecked(),
-    );
-    expect(screen.getByLabelText(form.nameLabel)).toBeInvalid();
-  });
-
-  it("offers translation only when a handler is supplied", () => {
-    // The SOURCE is the language not on screen, and the label says so: with the
-    // Spanish segment selected, the button translates FROM English.
-    const translateLabel = form.translate.replace("{language}", "English");
-
-    const { unmount } = renderForm(
-      <ProductForm
-        product={buildProduct()}
-        currency={EUR}
-        onSubmit={async () => {}}
-        submitLabel={form.submitSave}
-      />,
-    );
-    // Unwired — which is the shipped state — the panel is exactly as it was.
-    expect(screen.queryByRole("button", { name: translateLabel })).toBeNull();
-    unmount();
-
-    renderForm(
-      <ProductForm
-        product={buildProduct()}
-        currency={EUR}
-        onSubmit={async () => {}}
-        onTranslate={async () => ({ name: "", shortDescription: "", description: "" })}
-        submitLabel={form.submitSave}
-      />,
-    );
-    // On the Spanish segment the source is English, which is empty here, so the
-    // button exists and refuses to spend a round trip on nothing.
-    expect(screen.getByRole("button", { name: translateLabel })).toBeDisabled();
-  });
-
-  it("fills the visible locale from the other one and never loses the source", async () => {
-    const user = userEvent.setup();
-    const onTranslate = vi.fn<(request: TranslateCopyRequest) => Promise<ProductCopyDraft>>(
-      async () => ({
-        name: "Hoodie Kumo",
-        shortDescription: "Hoodie",
-        description: "Description",
-      }),
-    );
-
-    renderForm(
-      <ProductForm
-        product={buildProduct()}
-        currency={EUR}
-        onSubmit={async () => {}}
-        onTranslate={onTranslate}
-        submitLabel={form.submitSave}
-      />,
-    );
-
-    await user.click(screen.getByRole("radio", { name: ENGLISH }));
-    await user.click(
-      screen.getByRole("button", { name: form.translate.replace("{language}", "Español") }),
-    );
-
-    await waitFor(() => expect(onTranslate).toHaveBeenCalledTimes(1));
-    // The direction is stated in the request, not inferred: the button says
-    // "from Spanish" while the English fields are on screen.
-    expect(onTranslate.mock.calls[0]?.[0]).toEqual({
-      from: "es",
-      to: "en",
-      copy: {
-        name: "Hoodie Kumo",
-        shortDescription: "Sudadera",
-        description: "Descripción",
-      },
-    });
-
-    await waitFor(() => expect(screen.getByLabelText(form.nameLabel)).toHaveValue("Hoodie Kumo"));
-    expect(screen.getByLabelText(form.summaryLabel)).toHaveValue("Hoodie");
-
-    // The source language is untouched.
-    await user.click(screen.getByRole("radio", { name: SPANISH }));
-    expect(screen.getByLabelText(form.summaryLabel)).toHaveValue("Sudadera");
-  });
-
-  it("reports its own message when the translation fails", async () => {
-    const user = userEvent.setup();
-
-    renderForm(
-      <ProductForm
-        product={buildProduct()}
-        currency={EUR}
-        onSubmit={async () => {}}
-        onTranslate={async () => {
-          // The handler's own English, of the kind an upstream failure produces.
-          throw new Error("translate upstream returned 502");
-        }}
-        submitLabel={form.submitSave}
-      />,
-    );
-
-    await user.click(screen.getByRole("radio", { name: ENGLISH }));
-    await user.click(
-      screen.getByRole("button", { name: form.translate.replace("{language}", "Español") }),
-    );
-
-    // The operator reads this form's sentence, never the handler's own English.
-    expect(await screen.findByText(form.translateFailed)).toBeInTheDocument();
-    expect(screen.queryByText(/502/)).toBeNull();
-    expect(screen.getByLabelText(form.nameLabel)).toHaveValue("");
+    expect(screen.queryByRole("radio", { name: /English|Español/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Traducir/ })).toBeNull();
   });
 
   it("shows the unsaved-changes marker only once something has changed", async () => {
@@ -1949,235 +1655,6 @@ describe("<ProductForm />", () => {
     expect(screen.getByText(form.unsavedChanges)).toBeInTheDocument();
   });
 
-  it("does not treat a locale switch as an unsaved change", async () => {
-    const user = userEvent.setup();
-
-    renderForm(
-      <ProductForm
-        product={buildProduct()}
-        currency={EUR}
-        onSubmit={async () => {}}
-        submitLabel={form.submitSave}
-      />,
-    );
-
-    // Looking at the English copy is not editing it. The marker warns about
-    // work that would be lost, and switching a segment loses nothing.
-    await user.click(screen.getByRole("radio", { name: ENGLISH }));
-    expect(screen.queryByText(form.unsavedChanges)).toBeNull();
-  });
-
-  /**
-   * A product whose copy is written in BOTH languages.
-   *
-   * Every clobber assertion needs one: the button is disabled while the source
-   * is blank, so a product with Spanish only can never reach the case where the
-   * TARGET already has text in it.
-   */
-  function bilingualProduct(): Product {
-    return {
-      ...buildProduct(),
-      translations: [
-        {
-          locale: "es",
-          name: "Hoodie Kumo",
-          shortDescription: "Sudadera",
-          description: "Descripción",
-        },
-        {
-          locale: "en",
-          name: "Written by a human",
-          shortDescription: "Human summary",
-          description: "Human description",
-        },
-      ],
-    };
-  }
-
-  it("asks before it overwrites copy somebody already wrote", async () => {
-    const user = userEvent.setup();
-    const onTranslate = vi.fn<(request: TranslateCopyRequest) => Promise<ProductCopyDraft>>(
-      async () => ({
-        name: "Machine name",
-        shortDescription: "Machine summary",
-        description: "Machine description",
-      }),
-    );
-
-    renderForm(
-      <ProductForm
-        product={bilingualProduct()}
-        currency={EUR}
-        onSubmit={async () => {}}
-        onTranslate={onTranslate}
-        submitLabel={form.submitSave}
-      />,
-    );
-
-    await user.click(screen.getByRole("radio", { name: ENGLISH }));
-    await user.click(
-      screen.getByRole("button", { name: form.translate.replace("{language}", "Español") }),
-    );
-
-    // NOTHING HAS HAPPENED YET. Losing a paragraph an operator typed is worse
-    // than making them press twice, and this form has no undo.
-    expect(onTranslate).not.toHaveBeenCalled();
-    expect(screen.getByLabelText(form.nameLabel)).toHaveValue("Written by a human");
-    expect(
-      screen.getByText(form.translateOverwrite.replace("{language}", "English")),
-    ).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: form.translateOverwriteConfirm }));
-
-    await waitFor(() => expect(onTranslate).toHaveBeenCalledTimes(1));
-    await waitFor(() =>
-      expect(screen.getByLabelText(form.nameLabel)).toHaveValue("Machine name"),
-    );
-  });
-
-  it("keeps the written copy when the overwrite is declined", async () => {
-    const user = userEvent.setup();
-    const onTranslate = vi.fn<(request: TranslateCopyRequest) => Promise<ProductCopyDraft>>(
-      async () => ({ name: "Machine name", shortDescription: "", description: "" }),
-    );
-
-    renderForm(
-      <ProductForm
-        product={bilingualProduct()}
-        currency={EUR}
-        onSubmit={async () => {}}
-        onTranslate={onTranslate}
-        submitLabel={form.submitSave}
-      />,
-    );
-
-    await user.click(screen.getByRole("radio", { name: ENGLISH }));
-    await user.click(
-      screen.getByRole("button", { name: form.translate.replace("{language}", "Español") }),
-    );
-    await user.click(screen.getByRole("button", { name: esMessages.ui.cancel }));
-
-    expect(onTranslate).not.toHaveBeenCalled();
-    expect(screen.getByLabelText(form.nameLabel)).toHaveValue("Written by a human");
-    expect(
-      screen.queryByText(form.translateOverwrite.replace("{language}", "English")),
-    ).toBeNull();
-  });
-
-  it("marks machine-written copy as unreviewed until somebody edits it", async () => {
-    const user = userEvent.setup();
-
-    renderForm(
-      <ProductForm
-        // Spanish only, so the English target is blank and no confirmation is
-        // asked for — the ordinary path this feature exists for.
-        product={buildProduct()}
-        currency={EUR}
-        onSubmit={async () => {}}
-        onTranslate={async () => ({
-          name: "Hoodie Kumo",
-          shortDescription: "Hoodie",
-          description: "Description",
-        })}
-        submitLabel={form.submitSave}
-      />,
-    );
-
-    await user.click(screen.getByRole("radio", { name: ENGLISH }));
-    await user.click(
-      screen.getByRole("button", { name: form.translate.replace("{language}", "Español") }),
-    );
-
-    // An operator who cannot tell their own copy from a vendor's guess ships the
-    // guess — and this is the copy customers read.
-    expect(await screen.findByText(form.machineTranslated)).toBeInTheDocument();
-    // Said on the segment too, so it survives a switch to the other language.
-    expect(
-      screen.getByRole("radio", { name: new RegExp(form.machineTranslatedShort) }),
-    ).toBeInTheDocument();
-
-    // A keystroke IS the review: the operator has now taken responsibility for
-    // the text.
-    await user.type(screen.getByLabelText(form.nameLabel), "!");
-    expect(screen.queryByText(form.machineTranslated)).toBeNull();
-  });
-
-  it("clears the unreviewed marker when the operator confirms instead of editing", async () => {
-    const user = userEvent.setup();
-
-    renderForm(
-      <ProductForm
-        product={buildProduct()}
-        currency={EUR}
-        onSubmit={async () => {}}
-        onTranslate={async () => ({
-          name: "Hoodie Kumo",
-          shortDescription: "Hoodie",
-          description: "Description",
-        })}
-        submitLabel={form.submitSave}
-      />,
-    );
-
-    await user.click(screen.getByRole("radio", { name: ENGLISH }));
-    await user.click(
-      screen.getByRole("button", { name: form.translate.replace("{language}", "Español") }),
-    );
-    await user.click(await screen.findByRole("button", { name: form.markReviewed }));
-
-    // A translation that is right as it stands still has to be READ, and saying
-    // so is the whole of the review. Editing is not the only way to do it.
-    expect(screen.queryByText(form.machineTranslated)).toBeNull();
-  });
-
-  it("renders the handler's own sentence when it names the failure", async () => {
-    const user = userEvent.setup();
-    const quotaSentence = form.translateErrors.QUOTA_EXCEEDED;
-
-    renderForm(
-      <ProductForm
-        product={buildProduct()}
-        currency={EUR}
-        onSubmit={async () => {}}
-        onTranslate={async () => {
-          // The seam's owner is the only side that can name the failure, and
-          // this class is what promises the string is already translated.
-          throw new TranslateCopyError(quotaSentence);
-        }}
-        submitLabel={form.submitSave}
-      />,
-    );
-
-    await user.click(screen.getByRole("radio", { name: ENGLISH }));
-    await user.click(
-      screen.getByRole("button", { name: form.translate.replace("{language}", "Español") }),
-    );
-
-    expect(await screen.findByText(quotaSentence)).toBeInTheDocument();
-    // Not stacked on the generic one: a specific reason replaces it.
-    expect(screen.queryByText(form.translateFailed)).toBeNull();
-  });
-
-  it("disables translation with one line when the deployment has no vendor key", async () => {
-    renderForm(
-      <ProductForm
-        product={bilingualProduct()}
-        currency={EUR}
-        onSubmit={async () => {}}
-        onTranslate={async () => ({ name: "", shortDescription: "", description: "" })}
-        translateUnavailable={form.translateErrors.NOT_CONFIGURED}
-        submitLabel={form.submitSave}
-      />,
-    );
-
-    expect(
-      screen.getByRole("button", { name: form.translate.replace("{language}", "English") }),
-    ).toBeDisabled();
-    expect(screen.getByText(form.translateErrors.NOT_CONFIGURED)).toBeInTheDocument();
-    // DEGRADED, NOT BROKEN: the rest of the form is untouched.
-    expect(screen.getByRole("button", { name: form.submitSave })).toBeEnabled();
-    expect(screen.getByLabelText(form.slugLabel)).toBeEnabled();
-  });
 });
 
 /**
@@ -2203,16 +1680,13 @@ function twoVariants(
 }
 
 describe("variant size and colour", () => {
-  it("names a sized variant in BOTH locales, not just the one on screen", () => {
-    // The name is what the storefront renders as the picker's label, and it
-    // renders per shopper — so a save has to write both languages at once. An
-    // operator editing Spanish copy cannot be asked to switch tabs to make the
-    // English shop work.
+  it("names a sized variant after its size", () => {
+    // The name is what the storefront renders as the picker's label.
     const result = buildPayload(withVariant({ size: "M", color: "" }), messages);
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value.variants[0]?.name).toEqual({ es: "M", en: "M" });
+    expect(result.value.variants[0]?.name).toBe("M");
     expect(result.value.variants[0]?.options).toEqual({ size: "M" });
   });
 
@@ -2221,7 +1695,7 @@ describe("variant size and colour", () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value.variants[0]?.name).toEqual({ es: "XL / Black", en: "XL / Black" });
+    expect(result.value.variants[0]?.name).toBe("XL / Black");
     expect(result.value.variants[0]?.options).toEqual({ size: "XL", color: "Black" });
   });
 
@@ -2291,7 +1765,7 @@ describe("variant size and colour", () => {
     const legacy: Product = {
       ...product,
       variants: [
-        { ...variant, options: {}, name: { es: "Pack de inicio", en: "Starter pack" } },
+        { ...variant, options: {}, name: "Pack de inicio" },
       ],
     };
 
@@ -2301,10 +1775,7 @@ describe("variant size and colour", () => {
     const result = buildPayload(values, messages);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value.variants[0]?.name).toEqual({
-      es: "Pack de inicio",
-      en: "Starter pack",
-    });
+    expect(result.value.variants[0]?.name).toBe("Pack de inicio");
   });
 });
 

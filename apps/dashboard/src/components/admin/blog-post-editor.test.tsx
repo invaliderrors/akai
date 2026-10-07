@@ -6,15 +6,13 @@ import type { ReactNode } from "react";
 import { adminBlogPostSchema, type AdminBlogPost } from "@akai/contracts";
 
 import type { ActionResult } from "@/lib/admin/actions";
-import { EMPTY_BLOG_COPY, type BlogCopy } from "@/lib/admin/blog-copy";
+import { EMPTY_BLOG_COPY } from "@/lib/admin/blog-copy";
 import esMessages from "../../../messages/es.json";
-import enMessages from "../../../messages/en.json";
 
 const createBlogPostAction = vi.fn<(input: unknown) => Promise<ActionResult<{ id: string }>>>();
 const updateBlogPostAction =
   vi.fn<(id: string, input: unknown) => Promise<ActionResult<{ id: string }>>>();
 const deleteBlogPostAction = vi.fn<(id: string) => Promise<ActionResult<null>>>();
-const translateBlogCopyAction = vi.fn<(input: unknown) => Promise<ActionResult<BlogCopy>>>();
 
 const push = vi.fn<(href: string) => void>();
 const refresh = vi.fn<() => void>();
@@ -23,14 +21,16 @@ vi.mock("@/lib/admin/actions", () => ({
   createBlogPostAction: (input: unknown) => createBlogPostAction(input),
   updateBlogPostAction: (id: string, input: unknown) => updateBlogPostAction(id, input),
   deleteBlogPostAction: (id: string) => deleteBlogPostAction(id),
-  translateBlogCopyAction: (input: unknown) => translateBlogCopyAction(input),
   createBlogCoverUploadUrlAction: vi.fn(),
   setBlogPostPublishedAction: vi.fn(),
 }));
 
-vi.mock("@/i18n/navigation", () => ({
+vi.mock("next/link", () => ({
+  default: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a>,
+}));
+vi.mock("next/navigation", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/navigation")>()),
   useRouter: () => ({ push, refresh }),
-  Link: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a>,
 }));
 
 const { BlogPostEditor, buildBlogPostPayload, toBlogFormValues } = await import("./blog-post-editor");
@@ -51,17 +51,12 @@ function buildPost(overrides: Record<string, unknown> = {}): AdminBlogPost {
     authorId: null,
     createdAt: ISO,
     updatedAt: ISO,
-    translations: [
-      {
-        locale: "es",
-        title: "Qué es Hoodie Kumo",
-        excerpt: "Resumen",
-        bodyHtml: "<p>Hola</p>",
-        metaTitle: null,
-        metaDescription: null,
-        coverAlt: "",
-      },
-    ],
+    title: "Qué es Hoodie Kumo",
+    excerpt: "Resumen",
+    bodyHtml: "<p>Hola</p>",
+    metaTitle: null,
+    metaDescription: null,
+    coverAlt: "",
     ...overrides,
   });
 }
@@ -84,7 +79,6 @@ beforeEach(() => {
   createBlogPostAction.mockReset();
   updateBlogPostAction.mockReset();
   deleteBlogPostAction.mockReset();
-  translateBlogCopyAction.mockReset();
   push.mockReset();
   refresh.mockReset();
 });
@@ -93,14 +87,10 @@ describe("buildBlogPostPayload", () => {
   const values = {
     slug: "como-combinar-un-oversize",
     category: "STYLE_GUIDES" as const,
-    includeEnglish: false,
-    copy: {
-      es: { ...EMPTY_BLOG_COPY, title: " Título ", excerpt: "Resumen", bodyHtml: "<p>x</p>" },
-      en: EMPTY_BLOG_COPY,
-    },
+    copy: { ...EMPTY_BLOG_COPY, title: " Título ", excerpt: "Resumen", bodyHtml: "<p>x</p>" },
   };
 
-  it("builds a Spanish-only create, trimming and nulling blank meta (D8c)", () => {
+  it("builds a create with the copy inline, trimming and nulling blank meta", () => {
     const built = buildBlogPostPayload(values, "create");
 
     expect(built).toEqual({
@@ -109,31 +99,26 @@ describe("buildBlogPostPayload", () => {
       value: {
         slug: "como-combinar-un-oversize",
         category: "STYLE_GUIDES",
-        translations: [
-          {
-            locale: "es",
-            title: "Título",
-            excerpt: "Resumen",
-            bodyHtml: "<p>x</p>",
-            metaTitle: null,
-            metaDescription: null,
-            coverAlt: "",
-          },
-        ],
+        title: "Título",
+        excerpt: "Resumen",
+        bodyHtml: "<p>x</p>",
+        metaTitle: null,
+        metaDescription: null,
+        coverAlt: "",
       },
     });
   });
 
-  it("requires every English field once English is included", () => {
-    const built = buildBlogPostPayload({ ...values, includeEnglish: true }, "create");
+  it("requires the title, the excerpt and the body", () => {
+    const built = buildBlogPostPayload({ ...values, copy: EMPTY_BLOG_COPY }, "create");
 
     expect(built).toEqual({
       ok: false,
-      errors: { "en.title": "REQUIRED", "en.excerpt": "REQUIRED", "en.bodyHtml": "REQUIRED" },
+      errors: { title: "REQUIRED", excerpt: "REQUIRED", bodyHtml: "REQUIRED" },
     });
   });
 
-  it("flags a missing or malformed slug and a missing Spanish body", () => {
+  it("flags a missing or malformed slug and a missing body", () => {
     expect(buildBlogPostPayload({ ...values, slug: "" }, "create")).toMatchObject({
       ok: false,
       errors: { slug: "REQUIRED" },
@@ -144,15 +129,22 @@ describe("buildBlogPostPayload", () => {
     });
     expect(
       buildBlogPostPayload(
-        { ...values, copy: { ...values.copy, es: { ...values.copy.es, bodyHtml: "  " } } },
+        { ...values, copy: { ...values.copy, bodyHtml: "  " } },
         "edit",
       ),
-    ).toMatchObject({ ok: false, errors: { "es.bodyHtml": "REQUIRED" } });
+    ).toMatchObject({ ok: false, errors: { bodyHtml: "REQUIRED" } });
   });
 
-  it("seeds English as included only when the post has an English row", () => {
-    expect(toBlogFormValues(buildPost()).includeEnglish).toBe(false);
-    expect(toBlogFormValues(undefined).includeEnglish).toBe(false);
+  it("seeds the form from the post's own copy", () => {
+    expect(toBlogFormValues(buildPost()).copy).toEqual({
+      title: "Qué es Hoodie Kumo",
+      excerpt: "Resumen",
+      bodyHtml: "<p>Hola</p>",
+      metaTitle: "",
+      metaDescription: "",
+      coverAlt: "",
+    });
+    expect(toBlogFormValues(undefined).copy).toEqual(EMPTY_BLOG_COPY);
   });
 });
 
@@ -164,9 +156,9 @@ describe("<BlogPostEditor /> — create", () => {
 
     expect(screen.getByText(blog.form.coverAfterCreate)).toBeInTheDocument();
     await user.type(field("slug"), "como-combinar-un-oversize");
-    await user.type(field("es-title"), "Título");
-    await user.type(field("es-excerpt"), "Resumen");
-    await user.type(field("es-body"), "Hola");
+    await user.type(field("title"), "Título");
+    await user.type(field("excerpt"), "Resumen");
+    await user.type(field("body"), "Hola");
     await user.click(screen.getByRole("button", { name: blog.form.submitCreate }));
 
     expect(createBlogPostAction).toHaveBeenCalledWith(
@@ -196,9 +188,9 @@ describe("<BlogPostEditor /> — create", () => {
     renderEditor();
 
     await user.type(field("slug"), "repetido");
-    await user.type(field("es-title"), "T");
-    await user.type(field("es-excerpt"), "E");
-    await user.type(field("es-body"), "B");
+    await user.type(field("title"), "T");
+    await user.type(field("excerpt"), "E");
+    await user.type(field("body"), "B");
     await user.click(screen.getByRole("button", { name: blog.form.submitCreate }));
 
     expect(await screen.findByText(blog.errors.CONFLICT)).toBeInTheDocument();
@@ -209,91 +201,44 @@ describe("<BlogPostEditor /> — create", () => {
     const user = userEvent.setup();
     renderEditor();
 
-    await user.type(field("es-body"), "<h2>Hola</h2>");
+    await user.type(field("body"), "<h2>Hola</h2>");
 
     const preview = screen.getByRole("region", { name: blog.form.previewLabel });
     expect(within(preview).getByRole("heading", { name: "Hola" })).toBeInTheDocument();
   });
 });
 
-describe("<BlogPostEditor /> — English and translation", () => {
-  it("shows the English section only when opted in", async () => {
-    const user = userEvent.setup();
-    renderEditor(buildPost());
-
-    expect(screen.queryByTestId("blog-locale-en")).toBeNull();
-    await user.click(screen.getByLabelText(blog.form.includeEnglish));
-    expect(screen.getByTestId("blog-locale-en")).toBeInTheDocument();
-  });
-
-  it("prefills English from Spanish, flags it as machine-translated, and never saves", async () => {
-    translateBlogCopyAction.mockResolvedValue({
-      ok: true,
-      data: { ...EMPTY_BLOG_COPY, title: "What is Hoodie Kumo", excerpt: "Summary", bodyHtml: "<p>Hi</p>" },
-    });
-    const user = userEvent.setup();
-    renderEditor(buildPost());
-
-    await user.click(screen.getByLabelText(blog.form.includeEnglish));
-    const english = within(screen.getByTestId("blog-locale-en"));
-    await user.click(english.getByRole("button", { name: "Traducir desde español" }));
-
-    expect(translateBlogCopyAction).toHaveBeenCalledWith(
-      expect.objectContaining({ from: "es", to: "en" }),
-    );
-    expect(field("en-title")).toHaveValue("What is Hoodie Kumo");
-    expect(english.getByText(blog.machineTranslated)).toBeInTheDocument();
-    expect(updateBlogPostAction).not.toHaveBeenCalled();
-  });
-
-  it("explains a translation failure by its reason, in the operator's language", async () => {
-    translateBlogCopyAction.mockResolvedValue({
-      ok: false,
-      code: "VALIDATION_FAILED",
-      reason: "NOT_CONFIGURED",
-      message: "DeepL is not configured",
-    });
-    const user = userEvent.setup();
-    renderEditor(buildPost());
-
-    await user.click(screen.getByLabelText(blog.form.includeEnglish));
-    await user.click(screen.getByRole("button", { name: "Traducir desde español" }));
-
-    expect(await screen.findByText(blog.translateErrors.NOT_CONFIGURED)).toBeInTheDocument();
-  });
-
-  it("saves an edit with the English row included", async () => {
+describe("<BlogPostEditor /> — edit", () => {
+  it("saves an edit with the copy inline", async () => {
     updateBlogPostAction.mockResolvedValue({ ok: true, data: { id: POST_ID } });
     const user = userEvent.setup();
     renderEditor(buildPost());
 
-    await user.click(screen.getByLabelText(blog.form.includeEnglish));
-    await user.type(field("en-title"), "Title");
-    await user.type(field("en-excerpt"), "Summary");
-    await user.type(field("en-body"), "Body");
+    await user.clear(field("title"));
+    await user.type(field("title"), "Nuevo título");
     await user.click(screen.getByRole("button", { name: blog.form.submitSave }));
 
     const [, input] = updateBlogPostAction.mock.calls[0] ?? [];
-    expect(input).toMatchObject({
-      translations: [{ locale: "es" }, { locale: "en", title: "Title" }],
-    });
+    expect(input).toMatchObject({ title: "Nuevo título", excerpt: "Resumen" });
+    expect(input).not.toHaveProperty("translations");
     expect(refresh).toHaveBeenCalled();
+  });
+
+  it("has no language opt-in and no translate button — the shop is Spanish only", () => {
+    renderEditor(buildPost());
+
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    expect(screen.queryByRole("button", { name: /Traducir/ })).toBeNull();
   });
 });
 
 describe("messages", () => {
-  it("labels every blog category in both dashboards languages (D8b)", () => {
+  it("labels every blog category (D8b)", () => {
     expect(esMessages.admin.blog.categories).toEqual({
       DROPS: "Drops",
       LOOKBOOK: "Lookbook",
       STYLE_GUIDES: "Guías de estilo",
       NEWS: "Noticias",
-    });
-    expect(enMessages.admin.blog.categories).toEqual({
-      DROPS: "Drops",
-      LOOKBOOK: "Lookbook",
-      STYLE_GUIDES: "Style guides",
-      NEWS: "News",
     });
   });
 });

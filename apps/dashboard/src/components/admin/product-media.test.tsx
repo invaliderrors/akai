@@ -8,7 +8,6 @@ import type { ProductMediaItem } from "@/components/ui/media-uploader";
 
 import { LiveProductMedia, StagedProductMedia } from "./product-media";
 import esMessages from "../../../messages/es.json";
-import enMessages from "../../../messages/en.json";
 
 /**
  * ONE property, and it is the one nothing else can catch.
@@ -21,37 +20,30 @@ import enMessages from "../../../messages/en.json";
  * `ui.altRequired` printed under a photo and the build would stay green.
  *
  * Supplying `onError` replaces that logging, which turns a missing message into
- * a failed assertion here — against the REAL catalogues, in BOTH locales.
+ * a failed assertion here — against the REAL catalogue.
  */
 
-vi.mock("@/i18n/navigation", () => ({
+vi.mock("next/navigation", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/navigation")>()),
   useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
 }));
 
 const ITEM: ProductMediaItem = {
   id: "9f1c6c5e-0000-4000-8000-000000000001",
   url: "https://cdn.example.test/products/camiseta-front.jpg",
-  alt: { es: "Bote de camiseta", en: "Tub of tee" },
+  alt: "Camiseta negra doblada",
   width: 1200,
   height: 1200,
   sortOrder: 0,
 };
 
-const CATALOGUES = [
-  { locale: "es" as const, messages: esMessages },
-  { locale: "en" as const, messages: enMessages },
-];
+const messages = esMessages;
 
-function renderWithIntl(
-  locale: "es" | "en",
-  messages: typeof esMessages,
-  children: ReactNode,
-): readonly string[] {
+function renderWithIntl(children: ReactNode): readonly string[] {
   const errors: string[] = [];
 
   render(
-    <NextIntlClientProvider
-      locale={locale}
+    <NextIntlClientProvider locale="es"
       messages={messages}
       onError={(error) => errors.push(error.message)}
     >
@@ -63,10 +55,8 @@ function renderWithIntl(
 }
 
 describe("<StagedProductMedia />", () => {
-  it.each(CATALOGUES)("supplies every label from the $locale catalogue", ({ locale, messages }) => {
+  it("supplies every label from the catalogue", () => {
     const errors = renderWithIntl(
-      locale,
-      messages,
       <StagedProductMedia images={[]} onChange={() => {}} />,
     );
 
@@ -76,10 +66,8 @@ describe("<StagedProductMedia />", () => {
 });
 
 describe("<LiveProductMedia />", () => {
-  it.each(CATALOGUES)("supplies every label from the $locale catalogue", ({ locale, messages }) => {
+  it("supplies every label from the catalogue", () => {
     const errors = renderWithIntl(
-      locale,
-      messages,
       <LiveProductMedia
         productId="22222222-2222-4222-8222-222222222222"
         items={[ITEM]}

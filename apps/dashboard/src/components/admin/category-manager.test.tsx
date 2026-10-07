@@ -19,8 +19,8 @@ import esMessages from "../../../messages/es.json";
 const t = esMessages.admin.categoryManager;
 
 const ROWS: readonly CategoryRow[] = [
-  { id: "11111111-1111-4111-8111-111111111111", slug: "recuperacion", name: { es: "Recuperación", en: "Recovery" }, productCount: 4 },
-  { id: "22222222-2222-4222-8222-222222222222", slug: "rendimiento", name: { es: "Rendimiento", en: "Performance" }, productCount: 0 },
+  { id: "11111111-1111-4111-8111-111111111111", slug: "recuperacion", name: "Recuperación", productCount: 4 },
+  { id: "22222222-2222-4222-8222-222222222222", slug: "rendimiento", name: "Rendimiento", productCount: 0 },
 ];
 
 function renderManager(rows: readonly CategoryRow[] = ROWS, overrides: Partial<{
@@ -33,13 +33,13 @@ function renderManager(rows: readonly CategoryRow[] = ROWS, overrides: Partial<{
     overrides.onCreate ??
     vi.fn().mockResolvedValue({
       ok: true,
-      data: { id: "new-cat", slug: "sudaderas", name: { es: "Sudaderas", en: "Hoodies" } },
+      data: { id: "new-cat", slug: "sudaderas", name: "Sudaderas" },
     });
   const onRename =
     overrides.onRename ??
     vi.fn().mockResolvedValue({
       ok: true,
-      data: { id: ROWS[0]?.id, slug: "recuperacion", name: { es: "Recuperación total", en: "Full recovery" } },
+      data: { id: ROWS[0]?.id, slug: "recuperacion", name: "Recuperación total" },
     });
   const onReorder = overrides.onReorder ?? vi.fn().mockResolvedValue({ ok: true, data: { reordered: rows.length } });
   const onDelete = overrides.onDelete ?? vi.fn().mockResolvedValue({ ok: true, data: null });
@@ -74,18 +74,17 @@ describe("CategoryManager", () => {
   });
 
   describe("create", () => {
-    it("submits the slug and both locale names, then appends the new row", async () => {
+    it("submits the slug and the name, then appends the new row", async () => {
       const user = userEvent.setup();
       const { onCreate } = renderManager();
 
       await user.type(screen.getByLabelText((content) => content.startsWith(t.slugLabel)), "sudaderas");
-      await user.type(screen.getByLabelText((content) => content.startsWith(t.nameEsLabel)), "Sudaderas");
-      await user.type(screen.getByLabelText((content) => content.startsWith(t.nameEnLabel)), "Hoodies");
+      await user.type(screen.getByLabelText((content) => content.startsWith(t.nameLabel)), "Sudaderas");
       await user.click(screen.getByRole("button", { name: t.create }));
 
       expect(onCreate).toHaveBeenCalledWith({
         slug: "sudaderas",
-        name: { es: "Sudaderas", en: "Hoodies" },
+        name: "Sudaderas",
       });
       expect(await screen.findByText("Sudaderas")).toBeInTheDocument();
     });
@@ -101,8 +100,7 @@ describe("CategoryManager", () => {
       renderManager(ROWS, { onCreate });
 
       await user.type(screen.getByLabelText((content) => content.startsWith(t.slugLabel)), "recuperacion");
-      await user.type(screen.getByLabelText((content) => content.startsWith(t.nameEsLabel)), "Recuperación");
-      await user.type(screen.getByLabelText((content) => content.startsWith(t.nameEnLabel)), "Recovery");
+      await user.type(screen.getByLabelText((content) => content.startsWith(t.nameLabel)), "Recuperación");
       await user.click(screen.getByRole("button", { name: t.create }));
 
       expect(await screen.findByText(t.duplicateSlug)).toBeInTheDocument();
@@ -110,7 +108,7 @@ describe("CategoryManager", () => {
   });
 
   describe("rename", () => {
-    it("edits a row in place and saves the new names", async () => {
+    it("edits a row in place and saves the new name", async () => {
       const user = userEvent.setup();
       const { onRename } = renderManager();
 
@@ -120,14 +118,14 @@ describe("CategoryManager", () => {
 
       await user.click(within(first).getByRole("button", { name: t.renameTrigger }));
 
-      const esInput = within(first).getByLabelText(t.nameEsLabel);
-      await user.clear(esInput);
-      await user.type(esInput, "Recuperación total");
+      const nameInput = within(first).getByLabelText(t.nameLabel);
+      await user.clear(nameInput);
+      await user.type(nameInput, "Recuperación total");
 
       await user.click(within(first).getByRole("button", { name: t.saveRename }));
 
       expect(onRename).toHaveBeenCalledWith(ROWS[0]?.id, {
-        name: { es: "Recuperación total", en: "Recovery" },
+        name: "Recuperación total",
       });
       expect(await screen.findByText("Recuperación total")).toBeInTheDocument();
     });

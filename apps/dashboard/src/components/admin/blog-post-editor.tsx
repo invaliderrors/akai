@@ -10,21 +10,18 @@ import {
   updateBlogPostSchema,
   type AdminBlogPost,
   type BlogCategory,
-  type BlogPostTranslationInput,
   type CreateBlogPost,
-  type Locale,
   type UpdateBlogPost,
 } from "@akai/contracts";
 
 import { Button, buttonClassName } from "@/components/ui/button";
 import { PopupButton, TextArea, TextField } from "@/components/ui/field";
 import { Notice } from "@/components/ui/notice";
-import { Checkbox } from "@/components/ui/toggle";
-import { Link, useRouter } from "@/i18n/navigation";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   createBlogPostAction,
   deleteBlogPostAction,
-  translateBlogCopyAction,
   updateBlogPostAction,
 } from "@/lib/admin/actions";
 import {
@@ -33,7 +30,6 @@ import {
   toBlogCopy,
   type BlogCopy,
 } from "@/lib/admin/blog-copy";
-import { translateCopyReasonOf } from "@/lib/admin/translate-copy";
 
 import { actionErrorKey } from "./affiliate-editor";
 import { BlogCoverField } from "./blog-cover-field";
@@ -43,15 +39,9 @@ import { ConfirmActionError, TypeToConfirmButton } from "./type-to-confirm-butto
 /**
  * The blog post editor — create and edit (spec 2026-09-24 §8).
  *
- * Spanish is always present (the default-locale page is the canonical one);
- * English is opt-in, because decision D8c allows a Spanish-only post, and an
- * English section left half-written must not silently publish. The body is the
- * same raw-HTML textarea + live `RichTextPreview` the product description
- * uses, sanitised by the same allow-list the API applies on save.
- *
- * The DeepL helper PREFILLS the other locale and never saves — the operator
- * reads, edits and saves deliberately, and the section is flagged as machine
- * translated until they do.
+ * One set of copy fields — the shop is Spanish only. The body is the same
+ * raw-HTML textarea + live `RichTextPreview` the product description uses,
+ * sanitised by the same allow-list the API applies on save.
  *
  * The cover can only be set once the post exists: its storage key is scoped to
  * the post's id (`blog/{postId}/…`).
@@ -67,9 +57,7 @@ export type BlogFieldErrors = Readonly<Record<string, BlogFormError>>;
 export interface BlogFormValues {
   readonly slug: string;
   readonly category: BlogCategory;
-  /** English is opt-in (D8c). */
-  readonly includeEnglish: boolean;
-  readonly copy: Readonly<Record<Locale, BlogCopy>>;
+  readonly copy: BlogCopy;
 }
 
 export type BlogBuildResult =
@@ -84,20 +72,6 @@ const FIELD_ERROR_KEYS: Readonly<Record<BlogFormError, string>> = {
   INVALID: "fieldErrors.INVALID",
 };
 
-const TRANSLATE_ERROR_KEYS = {
-  NOT_CONFIGURED: "translateErrors.NOT_CONFIGURED",
-  INVALID_KEY: "translateErrors.INVALID_KEY",
-  QUOTA_EXCEEDED: "translateErrors.QUOTA_EXCEEDED",
-  RATE_LIMITED: "translateErrors.RATE_LIMITED",
-  UNSUPPORTED_LANGUAGE: "translateErrors.UNSUPPORTED_LANGUAGE",
-  VENDOR_UNAVAILABLE: "translateErrors.VENDOR_UNAVAILABLE",
-  VENDOR_TIMEOUT: "translateErrors.VENDOR_TIMEOUT",
-  MALFORMED_RESPONSE: "translateErrors.MALFORMED_RESPONSE",
-  EMPTY_SOURCE: "translateErrors.EMPTY_SOURCE",
-} as const;
-
-const LOCALES: readonly Locale[] = ["es", "en"];
-
 const LEGEND_CLASS =
   "mb-2 p-0 text-[11px] font-semibold tracking-[0.06em] text-[var(--label-secondary)] uppercase";
 
@@ -111,54 +85,14 @@ export function BlogPostEditor({ post }: BlogPostEditorProps) {
   const [errors, setErrors] = useState<BlogFieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const [translating, setTranslating] = useState<Locale | null>(null);
-  const [translateError, setTranslateError] = useState<string | null>(null);
-  const [machineTranslated, setMachineTranslated] = useState<ReadonlySet<Locale>>(new Set());
 
-  function patchCopy(locale: Locale, next: Partial<BlogCopy>): void {
-    setValues((current) => ({
-      ...current,
-      copy: { ...current.copy, [locale]: { ...current.copy[locale], ...next } },
-    }));
-    // Any human edit counts as a review of that locale's machine translation.
-    setMachineTranslated((current) => {
-      if (!current.has(locale)) return current;
-      const copy = new Set(current);
-      copy.delete(locale);
-      return copy;
-    });
+  function patchCopy(next: Partial<BlogCopy>): void {
+    setValues((current) => ({ ...current, copy: { ...current.copy, ...next } }));
   }
 
   function errorProp(field: string): { readonly error?: string } {
     const code = errors[field];
     return code === undefined ? {} : { error: t(FIELD_ERROR_KEYS[code]) };
-  }
-
-  async function translateInto(target: Locale): Promise<void> {
-    const source: Locale = target === "es" ? "en" : "es";
-    setTranslateError(null);
-    setTranslating(target);
-    try {
-      const result = await translateBlogCopyAction({
-        from: source,
-        to: target,
-        copy: values.copy[source],
-      });
-      if (!result.ok) {
-        const reason = translateCopyReasonOf(result.reason);
-        setTranslateError(t(reason === null ? "translateFailed" : TRANSLATE_ERROR_KEYS[reason]));
-        return;
-      }
-      setValues((current) => ({
-        ...current,
-        copy: { ...current.copy, [target]: result.data },
-      }));
-      setMachineTranslated((current) => new Set(current).add(target));
-    } catch {
-      setTranslateError(t("translateFailed"));
-    } finally {
-      setTranslating(null);
-    }
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
@@ -243,125 +177,75 @@ export function BlogPostEditor({ post }: BlogPostEditorProps) {
         <BlogCoverField post={post} />
       )}
 
-      <Checkbox
-        label={t("form.includeEnglish")}
-        name="includeEnglish"
-        checked={values.includeEnglish}
-        onChange={(checked) => setValues((current) => ({ ...current, includeEnglish: checked }))}
-        disabled={submitting}
-      />
-
-      {translateError === null ? null : (
-        <Notice tone="danger" placement="inline">
-          {translateError}
-        </Notice>
-      )}
-
-      {LOCALES.filter((locale) => locale === "es" || values.includeEnglish).map((locale) => {
-        const copy = values.copy[locale];
-        const other: Locale = locale === "es" ? "en" : "es";
-        const canTranslate = locale === "es" ? values.includeEnglish : true;
-        return (
-          <fieldset
-            key={locale}
-            className="m-0 grid min-w-0 gap-3 border-0 p-0"
-            disabled={submitting}
-            data-testid={`blog-locale-${locale}`}
-          >
-            <legend className={LEGEND_CLASS}>{t(`form.locales.${locale}`)}</legend>
-
-            {canTranslate ? (
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  type="button"
-                  variant="standard"
-                  size="compact"
-                  pending={translating === locale}
-                  pendingLabel={t("translating")}
-                  disabled={translating !== null}
-                  onClick={() => {
-                    void translateInto(locale);
-                  }}
-                >
-                  {t("translate", { language: t(`form.languageNames.${other}`) })}
-                </Button>
-              </div>
-            ) : null}
-
-            {machineTranslated.has(locale) ? (
-              <Notice tone="warning" placement="inline">
-                {t("machineTranslated")}
-              </Notice>
-            ) : null}
+      <fieldset className="m-0 grid min-w-0 gap-3 border-0 p-0" disabled={submitting}>
+            <legend className={LEGEND_CLASS}>{t("form.sectionCopy")}</legend>
 
             <TextField
               label={t("form.titleLabel")}
-              name={`${locale}-title`}
-              value={copy.title}
-              onChange={(next) => patchCopy(locale, { title: next })}
+              name="title"
+              value={values.copy.title}
+              onChange={(next) => patchCopy({ title: next })}
               maxLength={200}
               required
-              {...errorProp(`${locale}.title`)}
+              {...errorProp("title")}
             />
             <TextArea
               label={t("form.excerptLabel")}
-              name={`${locale}-excerpt`}
-              value={copy.excerpt}
-              onChange={(next) => patchCopy(locale, { excerpt: next })}
+              name="excerpt"
+              value={values.copy.excerpt}
+              onChange={(next) => patchCopy({ excerpt: next })}
               rows={3}
               maxLength={500}
               required
               hint={t("form.excerptHint")}
-              {...errorProp(`${locale}.excerpt`)}
+              {...errorProp("excerpt")}
             />
             <TextArea
               label={t("form.bodyLabel")}
-              name={`${locale}-body`}
-              value={copy.bodyHtml}
-              onChange={(next) => patchCopy(locale, { bodyHtml: next })}
+              name="body"
+              value={values.copy.bodyHtml}
+              onChange={(next) => patchCopy({ bodyHtml: next })}
               rows={14}
               required
               hint={t("form.bodyHint")}
-              {...errorProp(`${locale}.bodyHtml`)}
+              {...errorProp("bodyHtml")}
             />
             <RichTextPreview
-              html={copy.bodyHtml}
+              html={values.copy.bodyHtml}
               label={t("form.previewLabel")}
               emptyLabel={t("form.previewEmpty")}
             />
             <div className="grid gap-3 sm:grid-cols-2">
               <TextField
                 label={t("form.metaTitleLabel")}
-                name={`${locale}-metaTitle`}
-                value={copy.metaTitle}
-                onChange={(next) => patchCopy(locale, { metaTitle: next })}
+                name="metaTitle"
+                value={values.copy.metaTitle}
+                onChange={(next) => patchCopy({ metaTitle: next })}
                 maxLength={200}
                 hint={t("form.metaTitleHint")}
-                {...errorProp(`${locale}.metaTitle`)}
+                {...errorProp("metaTitle")}
               />
               <TextField
                 label={t("form.coverAltLabel")}
-                name={`${locale}-coverAlt`}
-                value={copy.coverAlt}
-                onChange={(next) => patchCopy(locale, { coverAlt: next })}
+                name="coverAlt"
+                value={values.copy.coverAlt}
+                onChange={(next) => patchCopy({ coverAlt: next })}
                 maxLength={300}
                 hint={t("form.coverAltHint")}
-                {...errorProp(`${locale}.coverAlt`)}
+                {...errorProp("coverAlt")}
               />
             </div>
             <TextArea
               label={t("form.metaDescriptionLabel")}
-              name={`${locale}-metaDescription`}
-              value={copy.metaDescription}
-              onChange={(next) => patchCopy(locale, { metaDescription: next })}
+              name="metaDescription"
+              value={values.copy.metaDescription}
+              onChange={(next) => patchCopy({ metaDescription: next })}
               rows={2}
               maxLength={320}
               hint={t("form.metaDescriptionHint")}
-              {...errorProp(`${locale}.metaDescription`)}
+              {...errorProp("metaDescription")}
             />
           </fieldset>
-        );
-      })}
 
       <div id={`${formId}-error`}>
         {formError === null ? null : (
@@ -423,18 +307,10 @@ export function toBlogFormValues(post: AdminBlogPost | undefined): BlogFormValue
     return {
       slug: "",
       category: "STYLE_GUIDES",
-      includeEnglish: false,
-      copy: { es: EMPTY_BLOG_COPY, en: EMPTY_BLOG_COPY },
+      copy: EMPTY_BLOG_COPY,
     };
   }
-  const es = post.translations.find((entry) => entry.locale === "es");
-  const en = post.translations.find((entry) => entry.locale === "en");
-  return {
-    slug: post.slug,
-    category: post.category,
-    includeEnglish: en !== undefined,
-    copy: { es: toBlogCopy(es), en: toBlogCopy(en) },
-  };
+  return { slug: post.slug, category: post.category, copy: toBlogCopy(post) };
 }
 
 const LIMITS = {
@@ -468,31 +344,26 @@ export function buildBlogPostPayload(
     errors["slug"] = "INVALID_SLUG";
   }
 
-  const locales: readonly Locale[] = values.includeEnglish ? ["es", "en"] : ["es"];
-  const translations: BlogPostTranslationInput[] = [];
-
-  for (const locale of locales) {
-    const copy = values.copy[locale];
-    for (const field of REQUIRED_FIELDS) {
-      if (copy[field].trim().length === 0) errors[`${locale}.${field}`] = "REQUIRED";
-    }
-    for (const field of BLOG_COPY_FIELDS) {
-      if (copy[field].trim().length > LIMITS[field]) errors[`${locale}.${field}`] = "TOO_LONG";
-    }
-    translations.push({
-      locale,
-      title: copy.title.trim(),
-      excerpt: copy.excerpt.trim(),
-      bodyHtml: copy.bodyHtml.trim(),
-      metaTitle: blankToNull(copy.metaTitle),
-      metaDescription: blankToNull(copy.metaDescription),
-      coverAlt: copy.coverAlt.trim(),
-    });
+  const { copy } = values;
+  for (const field of REQUIRED_FIELDS) {
+    if (copy[field].trim().length === 0) errors[field] = "REQUIRED";
+  }
+  for (const field of BLOG_COPY_FIELDS) {
+    if (copy[field].trim().length > LIMITS[field]) errors[field] = "TOO_LONG";
   }
 
   if (Object.keys(errors).length > 0) return { ok: false, errors };
 
-  const shared = { slug, category: values.category, translations };
+  const shared = {
+    slug,
+    category: values.category,
+    title: copy.title.trim(),
+    excerpt: copy.excerpt.trim(),
+    bodyHtml: copy.bodyHtml.trim(),
+    metaTitle: blankToNull(copy.metaTitle),
+    metaDescription: blankToNull(copy.metaDescription),
+    coverAlt: copy.coverAlt.trim(),
+  };
 
   if (mode === "create") {
     const parsed = createBlogPostSchema.safeParse(shared);

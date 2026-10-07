@@ -11,12 +11,11 @@ import {
 } from "./filter-bar";
 
 /**
- * The locale-aware Link needs a routing context a unit test never has, so it is
- * mocked down to the anchor it renders. The href it is GIVEN is what is under
- * test; the locale prefix next-intl adds is covered by the e2e locale smoke.
+ * `Link` is mocked down to the anchor it renders. The href it is GIVEN is what
+ * is under test.
  */
-vi.mock("@/i18n/navigation", () => ({
-  Link: ({
+vi.mock("next/link", () => ({
+  default: ({
     href,
     children,
     className,
@@ -85,7 +84,7 @@ function withValues(overrides: {
 }
 
 describe("<FilterBar />", () => {
-  it("is a GET form with no action, so the locale prefix survives an Apply", () => {
+  it("is a GET form with no action, so it submits to the list it filters", () => {
     render(
       <FilterBar
         label="Filtrar pedidos"

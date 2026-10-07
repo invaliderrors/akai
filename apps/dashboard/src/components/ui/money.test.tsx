@@ -2,7 +2,7 @@ import { render } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { describe, expect, it } from "vitest";
 
-import { MINOR_MAX, isMinor, toMinor, type Locale } from "@akai/contracts";
+import { MINOR_MAX, isMinor, toMinor } from "@akai/contracts";
 
 import { AggregateMoney, Money } from "./money";
 
@@ -34,30 +34,26 @@ function figureText(element: HTMLElement): string {
 
 describe("<Money />", () => {
   /**
-   * The four forms drawn in 01 Tokens §"Locale formatting · integer minor units
-   * in". Two locales x two magnitudes is the minimum that pins BOTH differences
-   * that matter — symbol placement, and the fact that es swaps the roles of "."
-   * and "," so a grouped figure read with the wrong locale is out by a factor
-   * of a thousand. COP is shown in whole pesos (the stored amount is centavos).
+   * es-CO, the only display locale: "." groups thousands and COP is shown in
+   * whole pesos (the stored amount is centavos). A grouped figure read with the
+   * wrong separator is out by a factor of a thousand.
    */
-  const CASES: readonly (readonly [Locale, number, string])[] = [
-    ["es", 8_980_000, "$ 89.800"],
-    ["en", 8_980_000, "$89,800"],
-    ["es", 482_149_000, "$ 4.821.490"],
-    ["en", 482_149_000, "$4,821,490"],
+  const CASES: readonly (readonly [number, string])[] = [
+    [8_980_000, "$ 89.800"],
+    [482_149_000, "$ 4.821.490"],
   ];
 
-  for (const [locale, minor, expected] of CASES) {
-    it(`renders ${minor} in ${locale} as ${expected}`, () => {
+  for (const [minor, expected] of CASES) {
+    it(`renders ${minor} as ${expected}`, () => {
       const element = renderFigure(
-        <Money amount={toMinor(minor)} currency="COP" locale={locale} />,
+        <Money amount={toMinor(minor)} currency="COP" />,
       );
       expect(figureText(element)).toBe(expected);
     });
   }
 
   it("uses tabular figures in the proportional face, never monospace", () => {
-    const element = renderFigure(<Money amount={toMinor(8980)} currency="COP" locale="es" />);
+    const element = renderFigure(<Money amount={toMinor(8980)} currency="COP" />);
 
     expect(element.className).toContain("tabular-nums");
     // Mono is reserved for identifiers — SKUs, order numbers, tracking numbers. An
@@ -68,16 +64,16 @@ describe("<Money />", () => {
   it("is always --label, at both weights", () => {
     for (const emphasis of [false, true]) {
       const element = renderFigure(
-        <Money amount={toMinor(8980)} currency="COP" locale="es" emphasis={emphasis} />,
+        <Money amount={toMinor(8980)} currency="COP" emphasis={emphasis} />,
       );
       expect(element.className).toContain("text-[var(--label)]");
     }
   });
 
   it("emphasis moves the weight and never the size", () => {
-    const plain = renderFigure(<Money amount={toMinor(8980)} currency="COP" locale="es" />);
+    const plain = renderFigure(<Money amount={toMinor(8980)} currency="COP" />);
     const emphasised = renderFigure(
-      <Money amount={toMinor(8980)} currency="COP" locale="es" emphasis />,
+      <Money amount={toMinor(8980)} currency="COP" emphasis />,
     );
 
     expect(plain.className).not.toContain("font-semibold");
@@ -93,26 +89,16 @@ describe("<Money />", () => {
 
   it("signs a negative amount with a typographic minus, not a hyphen", () => {
     const element = renderFigure(
-      <Money amount={toMinor(-2_990_000)} currency="COP" locale="es" />,
+      <Money amount={toMinor(-2_990_000)} currency="COP" />,
     );
 
     expect(figureText(element)).toBe("−$ 29.900");
     expect(figureText(element)).not.toContain("-");
   });
 
-  it("lets the locale place the sign rather than prefixing it", () => {
-    // en-US puts the minus OUTSIDE the symbol. A hand-rolled `"-" + formatted`
-    // happens to agree here and would not in a locale that brackets negatives —
-    // which is the reason the amount, not the string, carries the sign.
-    const element = renderFigure(
-      <Money amount={toMinor(-2_990_000)} currency="COP" locale="en" />,
-    );
-    expect(figureText(element)).toBe("−$29,900");
-  });
-
   it("appends a caller class without dropping its own", () => {
     const element = renderFigure(
-      <Money amount={toMinor(8980)} currency="COP" locale="es" className="text-right" />,
+      <Money amount={toMinor(8980)} currency="COP" className="text-right" />,
     );
 
     expect(element.className).toContain("tabular-nums");
@@ -132,7 +118,7 @@ describe("<AggregateMoney />", () => {
     expect(isMinor(OVER_CAP)).toBe(false);
 
     const element = renderFigure(
-      <AggregateMoney amountMinor={OVER_CAP} currency="COP" locale="es" />,
+      <AggregateMoney amountMinor={OVER_CAP} currency="COP" />,
     );
 
     expect(figureText(element)).toBe("$ 24.000.000");
@@ -142,20 +128,16 @@ describe("<AggregateMoney />", () => {
   });
 
   it("renders the same figure as Money for an in-range value", () => {
-    for (const locale of ["es", "en"] as const) {
-      const aggregate = renderFigure(
-        <AggregateMoney amountMinor={8980} currency="COP" locale={locale} />,
-      );
-      const branded = renderFigure(<Money amount={toMinor(8980)} currency="COP" locale={locale} />);
+    const aggregate = renderFigure(<AggregateMoney amountMinor={8980} currency="COP" />);
+    const branded = renderFigure(<Money amount={toMinor(8980)} currency="COP" />);
 
-      expect(figureText(aggregate)).toBe(figureText(branded));
-      expect(aggregate.className).toBe(branded.className);
-    }
+    expect(figureText(aggregate)).toBe(figureText(branded));
+    expect(aggregate.className).toBe(branded.className);
   });
 
   it("carries the same type treatment as a transactional amount", () => {
     const element = renderFigure(
-      <AggregateMoney amountMinor={OVER_CAP} currency="COP" locale="en" emphasis />,
+      <AggregateMoney amountMinor={OVER_CAP} currency="COP" emphasis />,
     );
 
     expect(element.className).toContain("tabular-nums");

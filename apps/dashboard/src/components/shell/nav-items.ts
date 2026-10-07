@@ -108,11 +108,7 @@ export type NavCounts = Partial<Readonly<Record<NavCountId, NavCount>>>;
 
 export interface NavItem {
   readonly id: NavItemId;
-  /**
-   * Unprefixed. `Link` from `@/i18n/navigation` adds the locale segment, and a
-   * hardcoded `/es/...` here is how an English customer gets bounced back to
-   * Spanish on their next click.
-   */
+  /** The app route, e.g. `/orders`. */
   readonly href: string;
   readonly icon: IconName;
   /**

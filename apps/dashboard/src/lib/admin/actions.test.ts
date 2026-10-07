@@ -3,10 +3,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CONTENT_SANITIZED_HEADER } from "./catalog-headers";
 import type { AdminHttpRequest, AdminHttpResponse } from "./http";
-import { translateCopyReasonOf } from "./translate-copy";
 
 /**
- * The translation server action, exercised through a fake transport.
+ * The admin server actions, exercised through a fake transport.
  *
  * WHY THE MOCKS ARE WHERE THEY ARE. `actions.ts` is `"use server"`, so it is
  * reached in production as an HTTP endpoint and reaches the API through the
@@ -14,17 +13,12 @@ import { translateCopyReasonOf } from "./translate-copy";
  * action — so the two seams either side of it are replaced (the session-bound
  * client, and `revalidatePath`, which needs a request scope) and everything in
  * between is the real code, including both zod parses.
- *
- * WHAT IS WORTH ASSERTING HERE, given the API validates again: the requests
- * this action DOES NOT make. A metered vendor is charged per call, so "there
- * was nothing to translate" and "the caller asked for es → es" have to be
- * answered without a round trip, and that is invisible in the response.
  */
 
 const calls: AdminHttpRequest[] = [];
 let respond: (input: AdminHttpRequest) => AdminHttpResponse = () => ({
   status: 200,
-  body: { translations: [] },
+  body: {},
 });
 
 /** A minimal, genuinely valid session — the shape `adminHttp()`'s retry logic reads. */
@@ -87,7 +81,6 @@ const {
   reorderCategoriesAction,
   reorderProductsAction,
   setVariantInventoryPolicyAction,
-  translateProductCopyAction,
   updateAffiliateAction,
   updateCategoryAction,
   updateProductAction,
@@ -106,8 +99,8 @@ function envelope(code: string, reason: string, status: number): AdminHttpRespon
         code,
         reason,
         // Server-authored English. Nothing in this bundle may render it.
-        message: "DeepL rejected the request: quota exceeded for this billing period.",
-        requestId: "req_translate_1",
+        message: "The request was refused.",
+        requestId: "req_1",
         timestamp: ISO,
       },
     },
@@ -152,9 +145,7 @@ function productBody() {
     slug: "hoodie-kumo",
     status: "ACTIVE",
     taxClass: "STANDARD",
-    translations: [
-      { locale: "es", name: "Hoodie Kumo", shortDescription: "Sudadera", description: "" },
-    ],
+    name: "Hoodie Kumo", shortDescription: "Sudadera", description: "",
     variants: [variantBody()],
     media: [],
     categories: [],
@@ -169,7 +160,7 @@ function productBody() {
 function productInput() {
   return createProductSchema.parse({
     slug: "hoodie-kumo",
-    translations: [{ locale: "es", name: "Hoodie Kumo", shortDescription: "Sudadera", description: "" }],
+    name: "Hoodie Kumo", shortDescription: "Sudadera", description: "",
     variants: [{ sku: "AK-HOOD-M", priceGross: 4999, currency: "EUR" }],
   });
 }
@@ -179,143 +170,12 @@ beforeEach(() => {
   // number, but the habit is what matters: a hook that RETURNS a function is
   // registered as a teardown. See the note in product-form.test.tsx.
   calls.length = 0;
-  respond = () => ({ status: 200, body: { translations: [] } });
+  respond = () => ({ status: 200, body: {} });
   session = fakeSession();
   writeSession.mockReset();
   clearSession.mockReset();
   refresh.mockReset();
   revalidatePath.mockReset();
-});
-
-describe("translateProductCopyAction", () => {
-  it("translates the fields that have text and returns the rest blank", async () => {
-    respond = () => ({
-      status: 200,
-      body: {
-        translations: [
-          { key: "name", text: "Hoodie Kumo" },
-          { key: "shortDescription", text: "Hoodie" },
-        ],
-      },
-    });
-
-    const result = await translateProductCopyAction({
-      from: "es",
-      to: "en",
-      copy: { name: "Hoodie Kumo", shortDescription: "Sudadera", description: "" },
-    });
-
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.data).toEqual({
-      name: "Hoodie Kumo",
-      shortDescription: "Hoodie",
-      // Not sent, so not translated, so blank — never the Spanish source text.
-      description: "",
-    });
-
-    expect(calls).toHaveLength(1);
-    expect(calls[0]?.method).toBe("POST");
-    expect(calls[0]?.path).toBe("/admin/translations");
-    expect(calls[0]?.body).toEqual({
-      source: "es",
-      target: "en",
-      texts: [
-        { key: "name", text: "Hoodie Kumo" },
-        { key: "shortDescription", text: "Sudadera" },
-      ],
-    });
-  });
-
-  it("answers an empty source without spending a request", async () => {
-    const result = await translateProductCopyAction({
-      from: "es",
-      to: "en",
-      copy: { name: "", shortDescription: "   ", description: "" },
-    });
-
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    expect(translateCopyReasonOf(result.reason)).toBe("EMPTY_SOURCE");
-    expect(calls).toHaveLength(0);
-  });
-
-  it("refuses a same-locale request without spending a request", async () => {
-    const result = await translateProductCopyAction({
-      from: "en",
-      to: "en",
-      copy: { name: "Hoodie Kumo", shortDescription: "", description: "" },
-    });
-
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    expect(result.code).toBe("VALIDATION_FAILED");
-    expect(calls).toHaveLength(0);
-  });
-
-  it("refuses a body carrying a field nobody declared", async () => {
-    const result = await translateProductCopyAction({
-      from: "es",
-      to: "en",
-      copy: { name: "Hoodie Kumo", shortDescription: "", description: "" },
-      saveImmediately: true,
-    });
-
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    expect(result.code).toBe("VALIDATION_FAILED");
-    expect(calls).toHaveLength(0);
-  });
-
-  it("carries the envelope's reason out, and leaves the vendor's prose behind", async () => {
-    respond = () => envelope("CONFLICT", "QUOTA_EXCEEDED", 409);
-
-    const result = await translateProductCopyAction({
-      from: "es",
-      to: "en",
-      copy: { name: "Hoodie Kumo", shortDescription: "", description: "" },
-    });
-
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    // The coarse code cannot separate "no key" from "quota gone" from "vendor
-    // down" — all three are CONFLICT. The reason is what the operator's sentence
-    // is chosen by.
-    expect(result.code).toBe("CONFLICT");
-    expect(translateCopyReasonOf(result.reason)).toBe("QUOTA_EXCEEDED");
-  });
-
-  it("keeps a reason it does not recognise off the operator's screen", async () => {
-    respond = () => envelope("CONFLICT", "VENDOR_ON_FIRE", 409);
-
-    const result = await translateProductCopyAction({
-      from: "es",
-      to: "en",
-      copy: { name: "Hoodie Kumo", shortDescription: "", description: "" },
-    });
-
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    // `null` sends the caller to the coarse code's sentence, which is exactly
-    // what a dashboard older than its API should do.
-    expect(translateCopyReasonOf(result.reason)).toBeNull();
-  });
-
-  it("does not degrade an unreadable response into empty copy", async () => {
-    // A 200 whose body is not the contract's shape. Writing blanks over the
-    // other locale's copy would be the destructive answer.
-    respond = () => ({ status: 200, body: { translated: "yes" } });
-
-    const result = await translateProductCopyAction({
-      from: "es",
-      to: "en",
-      copy: { name: "Hoodie Kumo", shortDescription: "", description: "" },
-    });
-
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    expect(result.code).toBe("UNPARSEABLE_RESPONSE");
-  });
 });
 
 /**
@@ -382,44 +242,44 @@ describe("adjustInventoryAction", () => {
 });
 
 describe("createProductAction", () => {
-  it("reports no sanitized locale on an ordinary save", async () => {
+  it("reports no sanitised description on an ordinary save", async () => {
     respond = () => ({ status: 201, body: productBody() });
 
     const result = await createProductAction(productInput());
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.data.sanitizedLocales).toEqual([]);
+    expect(result.data.descriptionSanitized).toBe(false);
   });
 
-  it("surfaces the locales the API's sanitiser rewrote", async () => {
+  it("surfaces a description the API's sanitiser rewrote", async () => {
     respond = () => ({
       status: 201,
       body: productBody(),
-      headers: { [CONTENT_SANITIZED_HEADER]: "es" },
+      headers: { [CONTENT_SANITIZED_HEADER]: "description" },
     });
 
     const result = await createProductAction(productInput());
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.data.sanitizedLocales).toEqual(["es"]);
+    expect(result.data.descriptionSanitized).toBe(true);
   });
 });
 
 describe("updateProductAction", () => {
-  it("surfaces the locales the API's sanitiser rewrote on an update too", async () => {
+  it("surfaces a rewritten description on an update too", async () => {
     respond = () => ({
       status: 200,
       body: productBody(),
-      headers: { [CONTENT_SANITIZED_HEADER]: "es,en" },
+      headers: { [CONTENT_SANITIZED_HEADER]: "description" },
     });
 
     const result = await updateProductAction(productBody().id, productInput());
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.data.sanitizedLocales).toEqual(["es", "en"]);
+    expect(result.data.descriptionSanitized).toBe(true);
   });
 });
 
@@ -439,20 +299,20 @@ describe("reorderProductsAction", () => {
 });
 
 describe("createCategoryAction", () => {
-  it("POSTs the slug and both locale names, and reports the created category", async () => {
+  it("POSTs the slug and the name, and reports the created category", async () => {
     respond = () => ({
       status: 201,
       body: {
         id: "11111111-1111-4111-8111-111111111111",
         slug: "sudaderas",
-        name: { es: "Sudaderas", en: "Hoodies" },
+        name: "Sudaderas",
         sortOrder: 4,
       },
     });
 
     const result = await createCategoryAction({
       slug: "sudaderas",
-      name: { es: "Sudaderas", en: "Hoodies" },
+      name: "Sudaderas",
     });
 
     expect(result.ok).toBe(true);
@@ -470,18 +330,18 @@ describe("updateCategoryAction", () => {
       body: {
         id: "11111111-1111-4111-8111-111111111111",
         slug: "recuperacion",
-        name: { es: "Recuperación total", en: "Full recovery" },
+        name: "Recuperación total",
         sortOrder: 0,
       },
     });
 
     const result = await updateCategoryAction("11111111-1111-4111-8111-111111111111", {
-      name: { es: "Recuperación total", en: "Full recovery" },
+      name: "Recuperación total",
     });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.data.name).toEqual({ es: "Recuperación total", en: "Full recovery" });
+    expect(result.data.name).toBe("Recuperación total");
     expect(calls[0]?.method).toBe("PATCH");
     expect(calls[0]?.path).toBe("/admin/categories/11111111-1111-4111-8111-111111111111");
   });

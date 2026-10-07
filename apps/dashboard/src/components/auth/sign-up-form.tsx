@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { z } from "zod";
-import { localeSchema, passwordSchema } from "@akai/contracts";
+import { passwordSchema } from "@akai/contracts";
 import { postJson, type BffError } from "@/lib/bff/client";
 import { Alert, ErrorAlert } from "@/components/ui/alert";
 import { TextField } from "@/components/ui/text-field";
@@ -25,7 +25,6 @@ const responseSchema = z.object({ status: z.literal("accepted") });
 export function SignUpForm() {
   const t = useTranslations("auth.signUp");
   const ta = useTranslations("auth");
-  const locale = useLocale();
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -54,8 +53,6 @@ export function SignUpForm() {
     setSubmitting(true);
     setError(null);
 
-    const parsedLocale = localeSchema.safeParse(locale);
-
     const result = await postJson(
       "/api/auth/register",
       {
@@ -63,7 +60,6 @@ export function SignUpForm() {
         password,
         firstName,
         lastName,
-        preferredLocale: parsedLocale.success ? parsedLocale.data : "es",
         turnstileToken: readTurnstileToken(event.currentTarget),
         marketingConsent,
       },

@@ -5,7 +5,6 @@ import type { MouseEventHandler, ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import esMessages from "../../../messages/es.json";
-import enMessages from "../../../messages/en.json";
 
 /**
  * The account menu.
@@ -16,13 +15,11 @@ import enMessages from "../../../messages/en.json";
  * quietly become false and no layout test would notice.
  */
 
-const pathname = vi.fn<() => string>();
 const replace = vi.fn<(href: string) => void>();
 const refresh = vi.fn<() => void>();
 
 interface LinkMockProps {
   readonly href: string;
-  readonly locale?: string;
   readonly children: ReactNode;
   readonly className?: string;
   readonly role?: string;
@@ -30,17 +27,10 @@ interface LinkMockProps {
   readonly "aria-label"?: string;
 }
 
-vi.mock("@/i18n/navigation", () => ({
-  /**
-   * `locale` lands on `hrefLang`, which is a real attribute meaning exactly
-   * what it is standing in for here — the language of the linked document — so
-   * the language row's TARGET can be asserted without inventing a test-only
-   * hook. next-intl's own prefixing is covered by the e2e locale smoke.
-   */
-  Link: ({ href, locale, children, onClick, ...rest }: LinkMockProps) => (
+vi.mock("next/link", () => ({
+  default: ({ href, children, onClick, ...rest }: LinkMockProps) => (
     <a
       href={href}
-      {...(locale === undefined ? {} : { hrefLang: locale })}
       {...rest}
       // The real Link routes on the client and never lets the browser follow
       // the href. Without the same suppression here jsdom logs an unhandled
@@ -53,7 +43,9 @@ vi.mock("@/i18n/navigation", () => ({
       {children}
     </a>
   ),
-  usePathname: () => pathname(),
+}));
+vi.mock("next/navigation", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/navigation")>()),
   useRouter: () => ({ replace, refresh }),
 }));
 
@@ -64,14 +56,13 @@ vi.mock("@/lib/bff/client", () => ({
 const { AccountMenu, accountInitials } = await import("./account-menu");
 
 interface RenderOptions {
-  readonly locale?: "es" | "en";
   readonly name?: string;
   readonly storeHref?: string;
 }
 
-function renderMenu({ locale = "es", name, storeHref }: RenderOptions = {}) {
+function renderMenu({ name, storeHref }: RenderOptions = {}) {
   return render(
-    <NextIntlClientProvider locale={locale} messages={locale === "en" ? enMessages : esMessages}>
+    <NextIntlClientProvider locale="es" messages={esMessages}>
       <AccountMenu
         email="ana@example.es"
         {...(name === undefined ? {} : { name })}
@@ -88,10 +79,8 @@ async function openMenu(options: RenderOptions = {}) {
 }
 
 beforeEach(() => {
-  pathname.mockReset();
   replace.mockReset();
   refresh.mockReset();
-  pathname.mockReturnValue("/orders");
 });
 
 describe("accountInitials()", () => {
@@ -137,34 +126,14 @@ describe("<AccountMenu />", () => {
     );
   });
 
-  it("offers profile, language and sign-out as menu items", async () => {
+  it("offers profile and sign-out as menu items — and no language switch", async () => {
     await openMenu();
 
     expect(screen.getByRole("menuitem", { name: "Perfil…" })).toHaveAttribute("href", "/profile");
-    expect(screen.getByRole("menuitem", { name: /Idioma/ })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: "Cerrar sesión" })).toBeInTheDocument();
-  });
-
-  it("shows the current language and switches to the other one", async () => {
-    await openMenu();
-
-    const language = screen.getByRole("menuitem", {
-      name: "Idioma: Español. Cambiar idioma: English",
-    });
-    // The VALUE reports where you are; the row's action takes you elsewhere,
-    // and the accessible name has to carry both or activating it is a surprise.
-    expect(language).toHaveTextContent("Español");
-    expect(language).toHaveAttribute("hreflang", "en");
-    expect(language).toHaveAttribute("href", "/orders");
-  });
-
-  it("switches back the other way from English", async () => {
-    await openMenu({ locale: "en" });
-
-    const language = screen.getByRole("menuitem", {
-      name: "Language: English. Switch language: Español",
-    });
-    expect(language).toHaveAttribute("hreflang", "es");
+    // The shop is Spanish only.
+    expect(screen.queryByRole("menuitem", { name: /Idioma/ })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("menuitem")).toHaveLength(2);
   });
 
   it("omits the shop link when no storefront origin is configured", async () => {
@@ -194,7 +163,7 @@ describe("<AccountMenu />", () => {
     expect(profile).toHaveFocus();
 
     await userEvent.keyboard("{ArrowDown}");
-    expect(screen.getByRole("menuitem", { name: /Idioma/ })).toHaveFocus();
+    expect(screen.getByRole("menuitem", { name: "Volver a la tienda" })).toHaveFocus();
 
     await userEvent.keyboard("{End}");
     expect(screen.getByRole("menuitem", { name: "Cerrar sesión" })).toHaveFocus();

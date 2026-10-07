@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { z } from "zod";
-import { Link } from "@/i18n/navigation";
+import Link from "next/link";
 import { postJson } from "@/lib/bff/client";
 import { Alert } from "@/components/ui/alert";
 

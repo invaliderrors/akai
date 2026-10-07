@@ -239,7 +239,6 @@ describe("<RefundForm />", () => {
     renderWithMessages(
       <RefundForm
         currency={EUR}
-        locale="es"
         remainingRefundable={options.remainingRefundable ?? REFUNDABLE}
         refundedTotal={NOTHING_REFUNDED}
         onSubmit={options.onSubmit}

@@ -1,4 +1,4 @@
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import type { Address, Customer, OrderSummary } from "@akai/contracts";
 
 import { PageTemplate } from "@/components/shell/page-template";
@@ -8,7 +8,7 @@ import { Money } from "@/components/ui/money";
 import { EmptyState } from "@/components/ui/states";
 import { StatusBadge } from "@/components/ui/status-badge";
 
-import { asLocale, formatDate, fullName } from "./format";
+import { formatDate, fullName } from "./format";
 import { AddressBlock } from "./order-detail";
 import { UnverifiedEmailNotice } from "./unverified-email-notice";
 
@@ -28,8 +28,8 @@ import { UnverifiedEmailNotice } from "./unverified-email-notice";
  * one renders whichever branch the page takes.
  *
  * NO `"use client"`. `next-intl` ships a `react-server` condition, so
- * `useTranslations` and `useLocale` resolve to the RSC implementations here and
- * to the context hooks when a test pulls this module into a client bundle.
+ * `useTranslations` resolves to the RSC implementation here and
+ * to the context hook when a test pulls this module into a client bundle.
  * The one genuinely interactive piece — the resend control — lives behind its
  * own boundary in `unverified-email-notice.tsx`.
  */
@@ -57,7 +57,6 @@ export function AccountOverview({
   addressCount,
 }: AccountOverviewProps) {
   const t = useTranslations("account.overview");
-  const locale = asLocale(useLocale());
 
   const name = fullName(customer.firstName, customer.lastName);
   const twoStep = customer.twoFactorEnabled;
@@ -105,14 +104,13 @@ export function AccountOverview({
                   // says it without a second copy of the order number.
                   title={<span className="font-mono">{order.orderNumber}</span>}
                   meta={
-                    <time dateTime={order.placedAt}>{formatDate(order.placedAt, locale)}</time>
+                    <time dateTime={order.placedAt}>{formatDate(order.placedAt)}</time>
                   }
                   aside={<StatusBadge domain="order" value={order.status} />}
                   trailing={
                     <Money
                       amount={order.grandTotal}
                       currency={order.currency}
-                      locale={locale}
                       emphasis
                     />
                   }

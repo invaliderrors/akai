@@ -124,7 +124,7 @@ describe("<Counter />", () => {
     // the destination link, and its text has to join that link's name.
     render(
       // `href="#"` only because this is a fixture: the real call site is a
-      // locale-aware `Link` from `@/i18n/navigation`.
+      // `Link` from `next/link`.
       <a href="#">
         Pedidos
         <Counter count={2} label="2 pedidos necesitan una decisión" tone="danger" />

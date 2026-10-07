@@ -24,11 +24,14 @@ vi.mock("@/lib/admin/actions", () => ({
   deleteAffiliateAction: (id: string) => deleteAffiliateAction(id),
 }));
 
-vi.mock("@/i18n/navigation", () => ({
-  useRouter: () => ({ push, refresh }),
-  Link: ({ href, children }: { href: string; children: ReactNode }) => (
+vi.mock("next/link", () => ({
+  default: ({ href, children }: { href: string; children: ReactNode }) => (
     <a href={href}>{children}</a>
   ),
+}));
+vi.mock("next/navigation", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/navigation")>()),
+  useRouter: () => ({ push, refresh }),
 }));
 
 const { AffiliateEditor, actionErrorKey } = await import("./affiliate-editor");

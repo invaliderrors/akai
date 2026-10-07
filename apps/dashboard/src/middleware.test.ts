@@ -92,12 +92,33 @@ describe("anonymous visitors", () => {
     expect(response.cookies.get("akai_csrf")?.value).toBeTruthy();
   });
 
-  it("keeps the locale prefix when redirecting an English visitor", async () => {
-    const response = await middleware(await request("/en/orders"));
+  it("renders a page in place — there is no locale rewrite", async () => {
+    const response = await middleware(await request("/sign-in"));
 
+    expect(response.status).toBe(200);
+    expect(response.headers.get("x-middleware-rewrite")).toBeNull();
+  });
+});
+
+describe("former locale prefixes", () => {
+  it.each([
+    ["/en/orders", "/orders"],
+    ["/en", "/"],
+    ["/es/admin/products", "/admin/products"],
+  ])("301s %s to the bare Spanish path %s", async (from, to) => {
+    const response = await middleware(await request(`${from}?cursor=abc`));
+
+    expect(response.status).toBe(301);
     const location = new URL(response.headers.get("location") ?? "");
-    expect(location.pathname).toBe("/en/sign-in");
-    expect(location.searchParams.get("next")).toBe("/en/orders");
+    expect(location.pathname).toBe(to);
+    expect(location.searchParams.get("cursor")).toBe("abc");
+  });
+
+  it("does not mistake a path that merely starts with the letters for a prefix", async () => {
+    const response = await middleware(await request("/entries"));
+
+    expect(response.status).toBe(307);
+    expect(new URL(response.headers.get("location") ?? "").pathname).toBe("/sign-in");
   });
 });
 

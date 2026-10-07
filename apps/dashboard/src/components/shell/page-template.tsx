@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 import { Icon } from "@/components/ui/icon";
-import { Link } from "@/i18n/navigation";
+import Link from "next/link";
 
 /**
  * The four regions every screen composes, in order: header, filter bar,
@@ -106,7 +106,7 @@ const DESCRIPTION_CLASS: Readonly<Record<PageDensity, string>> = {
 export interface PageBreadcrumbLink {
   /** Already translated. This kit never reaches into a message namespace. */
   readonly label: string;
-  /** Route only — `Link` adds the locale prefix. */
+  /** An app route. */
   readonly href: string;
 }
 

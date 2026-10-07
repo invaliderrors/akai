@@ -10,7 +10,6 @@ import { ToastProvider } from "@/components/ui/toast";
 
 import { VariantImageField, type VariantImageUploads } from "./variant-image";
 import esMessages from "../../../messages/es.json";
-import enMessages from "../../../messages/en.json";
 
 /**
  * The variant image control, at its two seams.
@@ -24,7 +23,7 @@ import enMessages from "../../../messages/en.json";
  * `variantId`, without which the picture lands in the product gallery, and (3)
  * that a variant holds ONE image however many files are dropped on it.
  *
- * The labels come from the REAL catalogues through `onError`, in both locales:
+ * The labels come from the REAL catalogue through `onError`:
  * every string this component passes down is a prop, so a renamed message leaf
  * is not a compile error anywhere — next-intl resolves a missing key at runtime
  * and prints the key path at the operator.
@@ -32,7 +31,8 @@ import enMessages from "../../../messages/en.json";
 
 const refresh = vi.fn();
 
-vi.mock("@/i18n/navigation", () => ({
+vi.mock("next/navigation", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/navigation")>()),
   useRouter: () => ({ refresh, push: vi.fn() }),
 }));
 
@@ -46,16 +46,13 @@ const ui = esMessages.ui;
 const ASSET: MediaAsset = {
   id: "9f1c6c5e-0000-4000-8000-000000000001",
   url: "https://cdn.example.test/products/camiseta-m.jpg",
-  alt: { es: "Camiseta negra, talla M", en: "Black tee, size M" },
+  alt: "Camiseta negra, talla M",
   width: 1200,
   height: 1200,
   sortOrder: 0,
 };
 
-const CATALOGUES = [
-  { locale: "es" as const, messages: esMessages },
-  { locale: "en" as const, messages: enMessages },
-];
+const messages = esMessages;
 
 const png = (name = "tee.png") =>
   new File([new Uint8Array(64)], name, { type: "image/png" });
@@ -109,12 +106,11 @@ function StagedHarness({
   );
 }
 
-function wrap(locale: "es" | "en", messages: typeof esMessages, children: React.ReactNode) {
+function wrap(children: React.ReactNode) {
   const errors: string[] = [];
 
   render(
-    <NextIntlClientProvider
-      locale={locale}
+    <NextIntlClientProvider locale="es"
       messages={messages}
       onError={(error) => errors.push(error.message)}
     >
@@ -163,7 +159,7 @@ afterEach(() => {
 
 describe("<VariantImageField /> — naming", () => {
   it("names the add control after the variant, not after the column", () => {
-    wrap("es", esMessages, <StagedHarness onChange={vi.fn()} />);
+    wrap(<StagedHarness onChange={vi.fn()} />);
 
     // The assertion that fails if the label is ever shortened to "Añadir
     // imagen": nine of those down a column tell a screen-reader user nothing
@@ -175,8 +171,6 @@ describe("<VariantImageField /> — naming", () => {
 
   it("names the thumbnail after the variant once there is an image", () => {
     wrap(
-      "es",
-      esMessages,
       <VariantImageField
         mode="live"
         variantName={SKU}
@@ -192,10 +186,8 @@ describe("<VariantImageField /> — naming", () => {
     expect(screen.queryByRole("button", { name: named(variant.add) })).toBeNull();
   });
 
-  it.each(CATALOGUES)("supplies every label from the $locale catalogue", async ({ locale, messages }) => {
+  it("supplies every label from the catalogue", async () => {
     const errors = wrap(
-      locale,
-      messages,
       <VariantImageField mode="staged" variantName={SKU} image={null} onChange={vi.fn()} />,
     );
 
@@ -215,7 +207,7 @@ describe("<VariantImageField /> — naming", () => {
 describe("<VariantImageField /> — staged", () => {
   it("keeps ONE image however many files are dropped on the variant", async () => {
     const onChange = vi.fn();
-    wrap("es", esMessages, <StagedHarness onChange={onChange} />);
+    wrap(<StagedHarness onChange={onChange} />);
 
     await userEvent.click(screen.getByRole("button", { name: named(variant.add) }));
     await userEvent.upload(screen.getByLabelText(/Arrastra una imagen/), [
@@ -232,7 +224,7 @@ describe("<VariantImageField /> — staged", () => {
 
   it("hands the file back rather than uploading it, because there is no product yet", async () => {
     const onChange = vi.fn();
-    wrap("es", esMessages, <StagedHarness onChange={onChange} />);
+    wrap(<StagedHarness onChange={onChange} />);
 
     await userEvent.click(screen.getByRole("button", { name: named(variant.add) }));
     await userEvent.upload(screen.getByLabelText(/Arrastra una imagen/), png());
@@ -247,8 +239,6 @@ describe("<VariantImageField /> — live", () => {
   it("attaches the object to the VARIANT, not to the product gallery", async () => {
     const deps = uploads();
     wrap(
-      "es",
-      esMessages,
       <VariantImageField
         mode="live"
         variantName={SKU}
@@ -260,8 +250,7 @@ describe("<VariantImageField /> — live", () => {
 
     await userEvent.click(screen.getByRole("button", { name: named(variant.add) }));
     await userEvent.upload(screen.getByLabelText(/Arrastra una imagen/), png());
-    await userEvent.type(screen.getByLabelText(ui.altEs), "Camiseta negra, talla M");
-    await userEvent.type(screen.getByLabelText(ui.altEn), "Black tee, size M");
+    await userEvent.type(screen.getByLabelText(ui.alt), "Camiseta negra, talla M");
     await userEvent.click(screen.getByRole("button", { name: ui.upload }));
 
     await waitFor(() => expect(deps.onAttach).toHaveBeenCalledTimes(1));
@@ -270,7 +259,7 @@ describe("<VariantImageField /> — live", () => {
     expect(deps.onAttach.mock.calls[0]?.[1]).toMatchObject({
       variantId: VARIANT_ID,
       url: "https://cdn.test/tee.png",
-      alt: { es: "Camiseta negra, talla M", en: "Black tee, size M" },
+      alt: "Camiseta negra, talla M",
     });
   });
 });

@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
  * REGRESSION: the HIG role tokens are ADDITIVE, and the legacy block they sit
  * beside is load-bearing for screens nothing in the redesign touches.
  *
- * `app/[locale]/(auth)/` holds five page directories and no layout, so the auth
+ * `app/(auth)/` holds five page directories and no layout, so the auth
  * screens render outside DashboardShell. They are styled entirely by the legacy
  * semantic classes (.btn, .input, .field, .alert, .auth__*), which read the
  * legacy `:root` properties. Retiring one of those names — or one of those
@@ -21,7 +21,7 @@ const GLOBALS = path.resolve(__dirname, "globals.css");
 
 /**
  * The two font variables are declared by `next/font` on the <html> element in
- * `[locale]/layout.tsx`, not in this stylesheet. Every other `var()` in the file
+ * `app/layout.tsx`, not in this stylesheet. Every other `var()` in the file
  * must resolve within the file.
  */
 const DECLARED_BY_NEXT_FONT: readonly string[] = ["--font-schibsted", "--font-jetbrains"];

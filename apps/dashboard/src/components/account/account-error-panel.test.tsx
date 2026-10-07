@@ -8,13 +8,13 @@ import { AccountErrorPanel } from "./account-error-panel";
 import esMessages from "../../../messages/es.json";
 
 /**
- * The sign-in affordance is a locale-aware `Link`, which needs a router this
+ * The sign-in affordance is a `Link`, which needs a router this
  * render has no business standing up. Mocked to a plain anchor so the assertion
  * can be about the accessible name and the destination, which is all this
  * component decides.
  */
-vi.mock("@/i18n/navigation", () => ({
-  Link: ({
+vi.mock("next/link", () => ({
+  default: ({
     href,
     children,
     className,

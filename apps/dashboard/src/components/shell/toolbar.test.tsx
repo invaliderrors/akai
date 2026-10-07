@@ -21,9 +21,7 @@ import type { ToolbarArea } from "./toolbar";
  *   money can move from this page.
  *
  *   THE SEARCH IS AN ORDER-NUMBER LOOKUP. It targets the one search the API
- *   answers, with the locale prefix baked into the form's `action` — a plain
- *   HTML `action` knows nothing about next-intl, and an unprefixed one would
- *   drop an English operator into Spanish on every submit.
+ *   answers, through a plain HTML `action` pointing at the orders list.
  */
 
 interface LinkMockProps {
@@ -33,19 +31,17 @@ interface LinkMockProps {
   readonly "aria-label"?: string;
 }
 
-vi.mock("@/i18n/navigation", () => ({
-  Link: ({ href, children, ...rest }: LinkMockProps) => (
+vi.mock("next/link", () => ({
+  default: ({ href, children, ...rest }: LinkMockProps) => (
     <a href={href} {...rest}>
       {children}
     </a>
   ),
+}));
+vi.mock("next/navigation", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/navigation")>()),
   usePathname: () => "/admin/orders",
   useRouter: () => ({ replace: vi.fn(), refresh: vi.fn() }),
-  // The real one is `createNavigation(routing)`'s; this is the same shape with
-  // the `as-needed` prefixing spelled out, so the assertion below is about what
-  // the toolbar DOES with it rather than about next-intl's own behaviour.
-  getPathname: ({ href, locale }: { href: string; locale: string }) =>
-    locale === "es" ? href : `/${locale}${href}`,
 }));
 
 vi.mock("@/lib/bff/client", () => ({
@@ -56,7 +52,6 @@ const { Toolbar } = await import("./toolbar");
 
 interface RenderOptions {
   readonly area?: ToolbarArea;
-  readonly locale?: "es" | "en";
   readonly sidebarHidden?: boolean;
   readonly navControl?: ReactNode;
   readonly title?: string;
@@ -64,13 +59,12 @@ interface RenderOptions {
 
 function renderToolbar({
   area = "admin",
-  locale = "es",
   sidebarHidden = false,
   navControl,
   title,
 }: RenderOptions = {}) {
   return render(
-    <NextIntlClientProvider locale={locale} messages={esMessages}>
+    <NextIntlClientProvider locale="es" messages={esMessages}>
       <Toolbar
         area={area}
         email="ops@akai.shop"
@@ -130,15 +124,6 @@ describe("<Toolbar />", () => {
     expect(screen.getByRole("searchbox", { name: "Buscar" })).toHaveAttribute(
       "name",
       "orderNumber",
-    );
-  });
-
-  it("carries the locale prefix into the form action", () => {
-    renderToolbar({ locale: "en" });
-
-    expect(screen.getByRole("search", { name: "Buscar" })).toHaveAttribute(
-      "action",
-      "/en/admin/orders",
     );
   });
 

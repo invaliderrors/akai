@@ -1,13 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import {
   toMinor,
   type AdminShippingRate,
   type AdminShippingZoneDetail,
-  type Locale,
-} from "@akai/contracts";
+  } from "@akai/contracts";
 import { formatMoney } from "@akai/money";
 
 import { Badge } from "@/components/ui/badge";
@@ -128,7 +127,6 @@ export function ShippingManager({
   onDeleteRate,
 }: ShippingManagerProps) {
   const t = useTranslations("admin.shipping");
-  const locale: Locale = useLocale() === "en" ? "en" : "es";
   const [zones, setZones] = useState<readonly AdminShippingZoneDetail[]>(() => sortZones(initialZones));
   const [editing, setEditing] = useState<Editing>({ kind: "none" });
   const [saved, setSaved] = useState<string | undefined>(undefined);
@@ -138,7 +136,7 @@ export function ShippingManager({
 
   // `toMinor` re-validates: the advertised figure and the PRICE bounds arrive
   // as plain integers, and formatMoney only accepts a minted Minor.
-  const money = (minor: number): string => formatMoney(toMinor(minor), SHIPPING_CURRENCY, locale);
+  const money = (minor: number): string => formatMoney(toMinor(minor), SHIPPING_CURRENCY);
 
   /** A failure, translated: the domain reason when it has copy, the code otherwise. */
   function failureMessage(result: { readonly code: ActionErrorCode | null; readonly reason: string | null }): string {
@@ -169,7 +167,7 @@ export function ShippingManager({
       {
         key: "name",
         header: t("rate.colName"),
-        cell: (rate) => rateDisplayName(rate, locale) || t("rate.unnamed"),
+        cell: (rate) => rateDisplayName(rate) || t("rate.unnamed"),
       },
       {
         key: "rule",
@@ -266,7 +264,7 @@ export function ShippingManager({
             .map((mismatch) =>
               t("threshold.row", {
                 zone: mismatch.zoneName,
-                rate: rateDisplayName(mismatch.rate, locale) || t("rate.unnamed"),
+                rate: rateDisplayName(mismatch.rate) || t("rate.unnamed"),
                 threshold:
                   mismatch.freeOverSubtotal === null
                     ? t("threshold.none")
@@ -472,7 +470,7 @@ export function ShippingManager({
         item={
           pendingRateDelete === undefined
             ? ""
-            : rateDisplayName(pendingRateDelete.rate, locale) || t("rate.unnamed")
+            : rateDisplayName(pendingRateDelete.rate) || t("rate.unnamed")
         }
         consequence={t("rate.deleteBody")}
         confirmLabel={t("rate.deleteConfirm")}

@@ -9,7 +9,8 @@ const { adjustInventoryAction } = vi.hoisted(() => ({
   adjustInventoryAction: vi.fn(),
 }));
 vi.mock("@/lib/admin/actions", () => ({ adjustInventoryAction }));
-vi.mock("@/i18n/navigation", () => ({
+vi.mock("next/navigation", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/navigation")>()),
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
 

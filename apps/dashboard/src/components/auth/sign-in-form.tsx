@@ -1,14 +1,13 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { z } from "zod";
 import { customerSchema } from "@akai/contracts";
-import { Link, useRouter } from "@/i18n/navigation";
+import Link from "next/link";
 import { postJson } from "@/lib/bff/client";
 import type { BffError } from "@/lib/bff/client";
-import { routing } from "@/i18n/routing";
 import { sanitiseNextPath } from "@/lib/auth/route-policy";
 import { ErrorAlert } from "@/components/ui/alert";
 import { TextField } from "@/components/ui/text-field";
@@ -85,7 +84,7 @@ export function SignInForm() {
     // The session cookie is already set by the BFF response. `refresh()` makes
     // the server components re-render with it — without that, the shell would
     // paint from the cached anonymous RSC payload and look signed out.
-    const destination = sanitiseNextPath(searchParams.get("next"), routing.locales);
+    const destination = sanitiseNextPath(searchParams.get("next"));
     router.replace(destination);
     router.refresh();
     // `submitting` is deliberately left true: the navigation is in flight and

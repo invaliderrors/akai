@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 
 import { Icon } from "@/components/ui/icon";
-import { useRouter } from "@/i18n/navigation";
+import { useRouter } from "next/navigation";
 
 import {
   SIDEBAR_COOKIE_MAX_AGE,

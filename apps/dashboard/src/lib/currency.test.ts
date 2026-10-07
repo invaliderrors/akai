@@ -54,28 +54,20 @@ describe("currencyLabel", () => {
     // The control replaced a three-letter code input, so an operator types
     // "EUR". A leading flag is two code points of regional indicator and would
     // swallow the keystroke, leaving 84 options navigable only by scrolling.
-    expect(currencyLabel("EUR", "es").startsWith("EUR")).toBe(true);
-    expect(currencyLabel("USD", "en").startsWith("USD")).toBe(true);
+    expect(currencyLabel("EUR").startsWith("EUR")).toBe(true);
+    expect(currencyLabel("COP").startsWith("COP")).toBe(true);
   });
 
-  it("carries the flag and the localised name", () => {
-    const english = currencyLabel("EUR", "en");
-    expect(english).toContain("🇪🇺");
-    expect(english.toLowerCase()).toContain("euro");
-  });
-
-  it("names the currency in the reader's language", () => {
-    // The whole reason the name is not a hardcoded table: a Spanish operator
-    // should not read "Japanese Yen".
-    const es = currencyLabel("JPY", "es");
-    const en = currencyLabel("JPY", "en");
-    expect(es).toContain("🇯🇵");
-    expect(en).toContain("🇯🇵");
-    expect(en.toLowerCase()).toContain("yen");
+  it("carries the flag and the Spanish name", () => {
+    // The whole reason the name is not a hardcoded table: ICU already knows
+    // every currency's Spanish name.
+    const peso = currencyLabel("COP");
+    expect(peso).toContain("🇨🇴");
+    expect(peso.toLowerCase()).toContain("peso colombiano");
   });
 
   it("falls back to the bare code when there is no flag", () => {
-    const label = currencyLabel("XOF", "es");
+    const label = currencyLabel("XOF");
     expect(label.startsWith("XOF")).toBe(true);
     // No stray separator where the flag would have been.
     expect(label).not.toContain("XOF  ");
@@ -83,7 +75,7 @@ describe("currencyLabel", () => {
 
   it("produces a distinct label for every supported currency", () => {
     // Two options reading the same is a picker an operator cannot use.
-    const labels = SUPPORTED_CURRENCIES.map((code) => currencyLabel(code, "es"));
+    const labels = SUPPORTED_CURRENCIES.map((code) => currencyLabel(code));
     expect(new Set(labels).size).toBe(labels.length);
   });
 });

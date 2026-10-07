@@ -29,7 +29,6 @@ function renderPreview(overrides: Partial<Parameters<typeof ProductPreviewDialog
       <ProductPreviewDialog
         open
         onClose={() => {}}
-        locale="es"
         currency={EUR}
         name="Sudadera 1"
         shortDescription="Resumen"
