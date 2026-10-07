@@ -6,7 +6,7 @@
 | --- | --- | --- | --- |
 | `apps/storefront` | Astro 7 (SSR) + React islands + Tailwind v4 | 3100 | The shop: catalogue, product pages, cart, checkout |
 | `apps/dashboard` | Next.js 15 | 3101 | Customer accounts (sign-in, orders, addresses) and staff admin |
-| `apps/api` | NestJS 11 + Prisma + PostgreSQL | 3333 | Source of truth: catalogue, carts, orders, payments (Whop), shipping zones/rates, email |
+| `apps/api` | NestJS 11 + Prisma + PostgreSQL | 3333 | Source of truth: catalogue, carts, orders, payments (Wompi), shipping zones/rates, email |
 | `apps/worker` | NestJS | — | Empty shell (the outbox runs in the API process) |
 
 Akai sells in **Colombia only**: prices in COP (IVA 19% included), Colombian
@@ -41,7 +41,8 @@ before `/admin`), `customer@akai.test` / `dev-customer-password-change-me`.
 Outgoing mail lands in Mailpit at http://localhost:8025.
 
 With `PAYMENTS_ENABLED=false` checkout settles orders locally instead of redirecting
-to Whop — handy for development, never for a deployment.
+to Wompi — handy for development, never for a deployment. The payments contract is
+`docs/specs/wompi-integration.md`.
 
 ## Scripts
 
@@ -70,5 +71,9 @@ placeholder.
 - Each app has a Dockerfile (build context: repo root).
 - The database needs the `akai_app` runtime role (see `tools/postgres/init`) before
   `prisma migrate deploy`, so the invariants migration can apply its grants.
-- Pin `WHOP_ENVIRONMENT` explicitly (`sandbox` | `live`).
+- Pin `WOMPI_ENVIRONMENT` explicitly (`sandbox` | `live`) and supply the four Wompi
+  keys of that environment (`WOMPI_PUBLIC_KEY`, `WOMPI_PRIVATE_KEY`,
+  `WOMPI_INTEGRITY_SECRET`, `WOMPI_EVENTS_SECRET`).
+- In the Wompi dashboard set the event URL to `https://<api-host>/v1/webhooks/wompi`
+  (separately for sandbox and production).
 - Add the storefront and dashboard origins to the API's `CORS_ALLOWED_ORIGINS`.

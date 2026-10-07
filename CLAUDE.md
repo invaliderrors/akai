@@ -6,8 +6,8 @@ Guidance for Claude Code (claude.ai/code) working in this repository.
 
 **Akai (赤い, "red")** — a Japanese-style streetwear shop that sells in **Colombia
 only**. An Nx monorepo: a NestJS API + PostgreSQL is the source of truth for
-products, customers, carts, orders, payments (Whop — moving to Wompi in a later
-phase) and shipping zones/rates; a Next.js dashboard serves customers and staff; an
+products, customers, carts, orders, payments (Wompi Web Checkout) and shipping
+zones/rates; a Next.js dashboard serves customers and staff; an
 Astro storefront sells. Bilingual for now: Spanish is the default at `/`, English
 lives at `/en` (Spanish-only is a later phase).
 
@@ -18,10 +18,9 @@ an older project. `TASKS.md` tracks what is left to build.
 
 `docs/specs/` holds one **binding** spec carried over with the platform:
 
-- `2026-09-09-whop-integration-contract.md` — the Whop payments design lock. Where it
-  disagrees with the code, it wins and the code is the defect; a deliberate deviation
-  amends the contract in the same commit. It still mentions the previous shop's
-  catalogue and euros; the payments rules are what binds, until Wompi replaces Whop.
+- `wompi-integration.md` — the Wompi payments design lock. Where it disagrees with the
+  code, it wins and the code is the defect; a deliberate deviation amends the contract
+  in the same commit.
 
 ## Colombia — the market rules
 
@@ -43,7 +42,7 @@ an older project. `TASKS.md` tracks what is left to build.
 - **Identity document**: checkout requires `documentType` (CC, CE, NIT, PP, TI, PPT)
   and `documentNumber`, normalised per type by `normaliseDocumentNumber` (NIT check
   digit verified) and snapshotted on the order (`order.documentType/documentNumber`).
-  Wompi's PSE `customer_data` will be built from it.
+  The Wompi checkout pre-fills `customer-data:legal-id(-type)` from it (PPT → OTHER).
 - **Shipping is manual**: staff record a parcel on the order page (carrier and tracking
   number as free text — `POST /admin/orders/:n/shipments`) and mark it delivered.
   Shipment statuses are PENDING, IN_TRANSIT, DELIVERED, RETURNED, LOST. There is no
@@ -72,7 +71,7 @@ libs/
   email-templates/  SHELL — the live templates sit in apps/api/src/modules/email.
   testing/          Test fakes and builders.
   observability/    Logging, tracing, request-id propagation.
-docs/specs/         The binding Whop spec above.
+docs/specs/         The binding Wompi spec above.
 ```
 
 ## Commands
@@ -171,29 +170,44 @@ unconditional index and break soft-delete. `tools/postgres/init` provisions the
   several `ProductsService` mutations lost their `actorId` and take it back when it ships.
 - **Shipping** is zones + rates (staff-editable in `/admin/shipping`) and a manual
   shipment flow. Sendcloud was removed deliberately (EU carriers); do not restore it.
-- **Payments**: Whop today; Wompi replaces it in the next phase. Leave
-  `apps/api/src/modules/payments` alone until then.
 - Overselling is guarded: checkout reserves every line through
   `ProductInventoryService.reserve` (atomic guarded UPDATE with a TTL).
 
-## Payments — Whop
+## Payments — Wompi
 
-Checkout creates the order and redirects to **Whop hosted checkout**. No Stripe.
+Checkout creates the order and redirects to **Wompi Web Checkout**
+(`checkout.wompi.co/p/`). No Stripe, no card data on our side. Contract:
+`docs/specs/wompi-integration.md`.
 
-- **Our API is the source of truth.** Whop is given our computed `grandTotal`; nothing
-  is mirrored, so nothing drifts. There is no catalogue mirror — do not build one.
-- **An order becomes PAID only via a signature-verified webhook whose reported amount
-  matches ours.** The return URL renders a "processing" page that polls
-  `GET /v1/payments/orders/:number/status`.
-- **The webhook amount is untrusted.** Mismatch, absent or unreadable → `PAYMENT_MISMATCH`
-  + alert, never `PAID`. Compare `data.total`, NEVER `data.amount_after_fees`.
-- Verification is the vendor's (`unwrapWebhook`, called WITHOUT a type argument); the
-  body is parsed with zod.
-- Money crosses the boundary only in `toDecimalString` / `fromDecimalString`
-  (`@akai/money`); `fromDecimalString` rejects excess precision.
-- **Sandbox and live are separate Whop accounts**, chosen by `WHOP_ENVIRONMENT`, pinned
-  explicitly on every deployment (the deployed API may run `NODE_ENV=development`).
-  Everything reads `config.whop`.
+- **Our API is the source of truth.** The checkout URL carries our computed
+  `grandTotal` as `amount-in-cents` (centavos on both sides — no conversion) and a
+  `signature:integrity` = sha256(reference + amount + currency + expiration + integrity
+  secret), built server-side. There is no catalogue mirror — do not build one.
+- **Reference = `<orderNumber>-<attempt>`**, minted under the order row lock and
+  persisted on the attempt's `payment.providerReference` BEFORE the redirect; never
+  reused. The link expires in 25 min, inside the 30-min stock reservation.
+- **An order becomes PAID only from an authentic transaction whose amount AND
+  currency match ours**: a `transaction.updated` event whose checksum verified, or a
+  transaction the API read itself (`GET /v1/transactions/{id}`, private key).
+  Mismatch, absent or unreadable → `PAYMENT_MISMATCH` + alert, never `PAID`, and
+  only an operator leaves that state.
+- **One settlement path** (`WompiSettlementService`) for the webhook
+  (`POST /v1/webhooks/wompi`), the return page (`POST /v1/payments/orders/:n/confirm`
+  with Wompi's `?id=`) and the 5-minute reconciliation sweep. Deduped on
+  `wompi:<transactionId>:<status>` in `provider_event`, in the same transaction as
+  the state change, with the order row locked. DECLINED/VOIDED/ERROR → FAILED +
+  reservations released; PENDING → order untouched.
+- **Verification is ours** (plain SHA-256 checksum over `signature.properties` +
+  timestamp + events secret, constant-time), the body is parsed with zod; the webhook
+  answers 200 for everything authentic, 400 for a bad checksum, 503 without keys.
+  It needs no raw body.
+- **Refunds are manual**: Wompi has no refund API for Web Checkout. Staff refund in
+  the Wompi dashboard and RECORD it at `POST /v1/admin/orders/:n/refunds`
+  (`OrdersService.recordRefund` — the one refund implementation).
+- **Sandbox and live are separate key sets**, chosen by `WOMPI_ENVIRONMENT`, pinned
+  explicitly on every deployment (the deployed API may run `NODE_ENV=development`;
+  production refuses it unset). Base URLs derive from it; key prefixes
+  (`pub_test_`/`pub_prod_` …) must match it. Everything reads `config.wompi`.
 - `PAYMENTS_ENABLED=false` settles orders locally without taking money — development
   only.
 

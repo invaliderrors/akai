@@ -27,7 +27,7 @@ fresh, shop-agnostic base with a new Astro storefront.
 - [x] Typed API client over `@akai/contracts` (server catalog reads, browser cart/checkout client)
 - [x] Session: reads the dashboard's shared sealed cookie; sign-in/account link to the dashboard
 - [x] `/api/revalidate` verifies the API's HMAC (acknowledge-only until a cache exists)
-- [x] Pages: home, products (+category filter, cursor paging), product (variant picker), cart, checkout (Whop redirect), checkout/processing (status poll), 404
+- [x] Pages: home, products (+category filter, cursor paging), product (variant picker), cart, checkout (Wompi Web Checkout redirect), checkout/processing (return-page confirm + status poll), 404
 - [x] First pass of the visual identity (ink / washi / hanko red, Anton + Zen Kaku Gothic New)
 - [x] Dockerfile + docker-compose service
 - [ ] Discount code field in cart
@@ -55,14 +55,22 @@ fresh, shop-agnostic base with a new Astro storefront.
       Colombian mobile; no house number
 - [x] Identity document at checkout (CC, CE, NIT, PP, TI, PPT), snapshotted on the order
 - [x] Seed catalogue in realistic COP prices
-- [ ] Payments: Whop → Wompi (next phase; Wompi's PSE `customer_data` uses the order's document)
+- [x] Payments: Whop → Wompi Web Checkout (signed URL, checksum-verified events, return-page
+      confirmation, reconciliation sweep, manual refunds recorded from the Wompi dashboard;
+      `docs/specs/wompi-integration.md`)
 - [ ] Spanish-only storefront and dashboard (next phase; `en` still works)
 - [ ] Colombian invoicing (DIAN electronic invoice) — not started
 
 ## 7. Before launch
 - [ ] Confirm the production domain (placeholder `akai.shop`) and `SESSION_COOKIE_DOMAIN`
 - [ ] Real shipping rates/carriers for Colombia (seed is one $ 15.000 national rate, free from $ 300.000)
-- [ ] Whop live + sandbox accounts, webhook secret, product id
+- [ ] Create the Wompi sandbox account; set its four keys (`WOMPI_ENVIRONMENT=sandbox`) and its
+      event URL `https://<api>/v1/webhooks/wompi`; run the WOMPI-VERIFY list in
+      `docs/specs/wompi-integration.md` §10 against it
+- [ ] Wompi production account: the four `prod` keys, `WOMPI_ENVIRONMENT=live` pinned, event URL
+      `https://<api>/v1/webhooks/wompi` set in the production dashboard
+- [ ] A consumer for the `notifications` outbox topic (payment-mismatch, duplicate-payment,
+      payment-after-failure and webhook-unparsable alerts currently dead-letter at `/admin/jobs`)
 - [ ] Real catalogue, photography and copy; replace seed placeholders
 - [ ] Legal texts (terms, privacy, returns, imprint) for es/en
 - [ ] Turnstile keys, SMTP provider, S3/CDN for media
