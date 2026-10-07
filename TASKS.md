@@ -23,7 +23,7 @@ fresh, shop-agnostic base with a new Astro storefront.
 ## 4. Astro storefront (`apps/storefront`)
 - [x] Scaffold Astro 7 (SSR, `@astrojs/node`), React islands, Tailwind v4, Nx targets (dev/build/start/typecheck/test/lint)
 - [x] Workspace on Node 22.12+ (Astro 7 requirement; Node 20 is EOL)
-- [x] i18n: `es` default at `/`, `en` at `/en` (middleware rewrite; pages written once under `[locale]/`)
+- [x] Spanish only: pages at their bare paths under `src/pages/`; middleware 301s old `/en/*` links
 - [x] Typed API client over `@akai/contracts` (server catalog reads, browser cart/checkout client)
 - [x] Session: reads the dashboard's shared sealed cookie; sign-in/account link to the dashboard
 - [x] `/api/revalidate` verifies the API's HMAC (acknowledge-only until a cache exists)
@@ -48,7 +48,7 @@ fresh, shop-agnostic base with a new Astro storefront.
       `shipment-sync` topics, SENDCLOUD_* config, private label bucket `S3_BUCKET_PRIVATE`, `pdf-lib`,
       dashboard label UI, api-e2e suites, the Sendcloud spec)
 - [x] Manual shipping kept and surfaced in the dashboard: record carrier + tracking (free text), mark delivered
-- [x] COP everywhere (integer centavos; displayed and entered in whole pesos, es-CO / en-US formatting)
+- [x] COP everywhere (integer centavos; displayed and entered in whole pesos, es-CO formatting)
 - [x] IVA 19% (STANDARD), 5% (REDUCED) for CO; EU VAT-number / reverse-charge fields removed
 - [x] Destinations = `["CO"]`; one "Colombia" zone, one national rate ($ 15.000, free from $ 300.000)
 - [x] Colombian address: departamento (closed list of 33, DANE codes), ciudad, optional postal code,
@@ -58,7 +58,11 @@ fresh, shop-agnostic base with a new Astro storefront.
 - [x] Payments: Whop → Wompi Web Checkout (signed URL, checksum-verified events, return-page
       confirmation, reconciliation sweep, manual refunds recorded from the Wompi dashboard;
       `docs/specs/wompi-integration.md`)
-- [ ] Spanish-only storefront and dashboard (next phase; `en` still works)
+- [x] Spanish only, end to end: no `Locale` enum or `locale` columns; product/blog copy and
+      category/variant/media/shipping-rate names are single Spanish fields; no `/en` routes
+      (storefront 301s them); dashboard without the `[locale]` segment (next-intl kept as the
+      single `es` message catalogue); Spanish-only emails; DeepL translation module and
+      `@akai/i18n` removed; dates in es-CO, America/Bogota
 - [ ] Colombian invoicing (DIAN electronic invoice) — not started
 
 ## 7. Before launch
@@ -72,6 +76,6 @@ fresh, shop-agnostic base with a new Astro storefront.
 - [ ] A consumer for the `notifications` outbox topic (payment-mismatch, duplicate-payment,
       payment-after-failure and webhook-unparsable alerts currently dead-letter at `/admin/jobs`)
 - [ ] Real catalogue, photography and copy; replace seed placeholders
-- [ ] Legal texts (terms, privacy, returns, imprint) for es/en
+- [ ] Legal texts (terms, privacy, returns, imprint)
 - [ ] Turnstile keys, SMTP provider, S3/CDN for media
 - [ ] API placeholders still empty: audit, disputes, gdpr, invoices, metrics, notifications, pricing

@@ -8,8 +8,8 @@ Guidance for Claude Code (claude.ai/code) working in this repository.
 only**. An Nx monorepo: a NestJS API + PostgreSQL is the source of truth for
 products, customers, carts, orders, payments (Wompi Web Checkout) and shipping
 zones/rates; a Next.js dashboard serves customers and staff; an
-Astro storefront sells. Bilingual for now: Spanish is the default at `/`, English
-lives at `/en` (Spanish-only is a later phase).
+Astro storefront sells. **Spanish only (es-CO)**: there is no English, no locale
+routing and no per-language content anywhere — see "Language" below.
 
 The API, dashboard and libs were forked from an earlier shop (a supplements store)
 and generalised. Its supplement-only domain (lots/batches, certificates of analysis,
@@ -26,8 +26,8 @@ an older project. `TASKS.md` tracks what is left to build.
 
 - **Currency is COP**, stored as integer MINOR units = **centavos** (×100):
   $ 89.000 is `8_900_000` — exactly Wompi's `amount_in_cents`. COP is DISPLAYED and
-  ENTERED in whole pesos (`displayFractionDigits` in `@akai/money`; es → `es-CO`,
-  en → `en-US`): "$ 89.000", and the dashboard's money input reads "89000" / "89.000".
+  ENTERED in whole pesos (`displayFractionDigits` in `@akai/money`, always `es-CO`):
+  "$ 89.000", and the dashboard's money input reads "89000" / "89.000".
   `MINOR_MAX` is therefore $ 20.000.000 per amount.
 - **IVA**: prices are IVA-inclusive; `tax_rate` holds CO STANDARD 19% (REDUCED 5%).
   The net/tax/gross split is unchanged. There is no EU VAT-number / reverse charge.
@@ -48,6 +48,24 @@ an older project. `TASKS.md` tracks what is left to build.
   Shipment statuses are PENDING, IN_TRANSIT, DELIVERED, RETURNED, LOST. There is no
   carrier integration.
 
+## Language — Spanish only
+
+- **One language, one field.** Product copy (`name`, `shortDescription`, `description`)
+  and blog copy (`title`, `excerpt`, `bodyHtml`, meta, `coverAlt`) are columns on
+  `product` / `blog_post`; `category.name`, `product_variant.name`, `media_asset.alt`
+  and `shipping_rate.name` are plain strings. There is no `Locale` enum, no `locale`
+  column or request parameter, and no translation table — do not reintroduce one
+  "for later": adding a language is a deliberate data-model change.
+- **Formatting** goes through `STORE_LOCALE` (`es-CO`) and `STORE_TIME_ZONE`
+  (`America/Bogota`) from `@akai/contracts`: money via `@akai/money`, dates via
+  `Intl.DateTimeFormat(STORE_LOCALE, { …, timeZone: STORE_TIME_ZONE })`. A fixed zone
+  also keeps a server-rendered date identical to its hydrated twin.
+- **No `/en`.** Every page lives at its bare path. The storefront middleware 301s old
+  `/en/*` (and `/es/*`) links to it.
+- **User-facing copy is Spanish and lives in one catalogue per app** (storefront
+  `src/i18n/messages.ts`, dashboard `messages/es.json`); the API's error `message`
+  strings stay English — they are for logs and never rendered.
+
 ## Workspace layout
 
 ```
@@ -63,7 +81,6 @@ libs/
   db/               Prisma client, schema, migrations, ownership-scoped repos. SERVER ONLY.
   money/            The ONLY money implementation.
   config/           Zod-validated, fail-fast typed env config (API/worker).
-  i18n/             Shared locale routing (`localePathname`, `storefrontUrl`).
   session/          The ONE sealed-session implementation (AES-256-GCM via Web Crypto),
                     the session payload contract and CSRF primitives.
   rich-text/        The ONE answer to "what HTML is allowed?" (`sanitizeRichText`).
@@ -107,7 +124,7 @@ runs Postgres, MinIO, Mailpit and every app.
 2. **Validate every external input at the boundary** with zod (`.strict()` request
    schemas). A static type must be earned at runtime, not asserted.
 3. **Money is INTEGER minor units end to end.** Never floats, never `Decimal`. Format
-   only through `@akai/money` (`formatMoney(amount, currency, locale)`).
+   only through `@akai/money` (`formatMoney(amount, currency)` — always es-CO).
 4. **No secrets in code.** API/worker config flows through `libs/config`, which fails
    fast on boot; the web apps validate their own env with zod at first use.
 5. **Every module ships tests.** Failing test → minimal implementation → pass → commit.
@@ -220,13 +237,13 @@ Checkout creates the order and redirects to **Wompi Web Checkout**
   (`API_INTERNAL_URL`, `PUBLIC_API_URL`, `PUBLIC_DASHBOARD_URL`, `SESSION_SECRET`,
   `SESSION_COOKIE_NAME`, `REVALIDATE_SIGNING_SECRET`). Public values reach islands as
   PROPS, never via `import.meta.env`, so one image serves every environment.
-- **Locale routing lives in `src/middleware.ts`**: pages are written once under
-  `src/pages/[locale]/`; `/x` is rewritten to `/es/x`, `/en/x` passes, a literal `/es/x`
-  301s to `/x`. Build links with `href(locale, path)` from `src/i18n/routing.ts`. The
-  API builds return URLs with the same rule (`storefrontUrl` in `@akai/i18n`) — e.g.
-  `/checkout/processing?order=…` — so do not rename routes the API links to.
-- **Every user-visible string lives in `src/i18n/messages.ts`.** `es` defines the keys
-  and `en` is typed against it, so a missing translation is a compile error.
+- **Pages live at their bare paths under `src/pages/`** and links are plain paths.
+  `src/middleware.ts` only 301s legacy `/en/*` / `/es/*` URLs (`legacyLocaleRedirect`).
+  The API builds absolute storefront URLs with `storefrontUrl(origin, path, query)`
+  (`apps/api/src/common/storefront-url.ts`) — e.g. `/checkout/processing?order=…` — so
+  do not rename routes the API links to.
+- **Every user-visible string lives in `src/i18n/messages.ts`** — one Spanish
+  catalogue, `t`. Pages import it; islands receive the slice they need as a prop.
 - **Never render a server-supplied message to a shopper.** `ApiError.message` and
   `CartProblem.message` are English for logs. Branch on the closed code enums with
   `errorMessage()` / `t.cartProblems` — total maps, so a new code fails to compile.
@@ -234,8 +251,8 @@ Checkout creates the order and redirects to **Wompi Web Checkout**
   `@akai/contracts` schema and throws `ApiError`. Server catalogue reads live in
   `src/lib/catalog.ts`; browser commerce calls in `src/lib/cart-client.ts`. Nothing
   else calls `fetch` against the API.
-- **Locale-keyed values resolve in ONE place** — `src/lib/view.ts` (active locale →
-  `es` → first). Do not write another fallback chain.
+- **Display fallbacks live in `src/lib/view.ts`** (blank alt → product name, unnamed
+  variant → its options → SKU). Names and alt text are plain strings from the API.
 - **The sellable unit is the VARIANT.** Variant `options` are `{size}` or
   `{size, color}`; a multi-variant product always shows a picker.
 - **Islands** (`src/components/islands/*.tsx`, React): `CartCount`, `AddToCart`,

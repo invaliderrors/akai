@@ -54,7 +54,7 @@ signature, pure), `wompi/wompi-events.ts` (event schemas + checksum, pure),
 | `amount-in-cents` | `order.grandTotal` |
 | `reference` | §4 |
 | `signature:integrity` | §3.1 |
-| `redirect-url` | `storefrontUrl(STOREFRONT_URL, order.locale, "/checkout/processing", {order})` |
+| `redirect-url` | `storefrontUrl(STOREFRONT_URL, "/checkout/processing", {order})` (the storefront is Spanish only; no locale segment) |
 | `expiration-time` | now + **25 min**, ISO-8601 UTC (`Date#toISOString`) |
 | `tax-in-cents:vat` | `order.taxTotal` (IVA contained in the IVA-inclusive total), omitted when 0 |
 | `customer-data:email` / `full-name` | order email / billing name |

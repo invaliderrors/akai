@@ -14,7 +14,6 @@ COPY libs/config/package.json libs/config/
 COPY libs/contracts/package.json libs/contracts/
 COPY libs/db/package.json libs/db/
 COPY libs/email-templates/package.json libs/email-templates/
-COPY libs/i18n/package.json libs/i18n/
 COPY libs/money/package.json libs/money/
 COPY libs/observability/package.json libs/observability/
 COPY libs/rich-text/package.json libs/rich-text/

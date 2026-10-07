@@ -13,8 +13,9 @@ Akai sells in **Colombia only**: prices in COP (IVA 19% included), Colombian
 addresses (departamento + ciudad), the buyer's identity document at checkout, and
 manual shipping (staff record the carrier and tracking number).
 
-Shared code lives in `libs/*` (`contracts`, `db`, `money`, `config`, `i18n`, `session`,
-`rich-text`, …). Spanish is the default locale at `/`, English is at `/en`.
+Shared code lives in `libs/*` (`contracts`, `db`, `money`, `config`, `session`,
+`rich-text`, …). The shop is **Spanish only** (es-CO): every page lives at its bare path,
+and old `/en/...` storefront links 301 to the Spanish page.
 
 See **`CLAUDE.md`** for architecture rules and **`TASKS.md`** for the roadmap.
 
