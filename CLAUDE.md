@@ -4,27 +4,50 @@ Guidance for Claude Code (claude.ai/code) working in this repository.
 
 ## Project
 
-**Akai (赤い, "red")** — a Japanese-style streetwear shop. An Nx monorepo: a NestJS
-API + PostgreSQL is the source of truth for products, customers, carts, orders,
-payments (Whop) and shipping (Sendcloud); a Next.js dashboard serves customers and
-staff; an Astro storefront sells. Bilingual throughout: Spanish is the default at `/`,
-English lives at `/en`.
+**Akai (赤い, "red")** — a Japanese-style streetwear shop that sells in **Colombia
+only**. An Nx monorepo: a NestJS API + PostgreSQL is the source of truth for
+products, customers, carts, orders, payments (Whop — moving to Wompi in a later
+phase) and shipping zones/rates; a Next.js dashboard serves customers and staff; an
+Astro storefront sells. Bilingual for now: Spanish is the default at `/`, English
+lives at `/en` (Spanish-only is a later phase).
 
 The API, dashboard and libs were forked from an earlier shop (a supplements store)
 and generalised. Its supplement-only domain (lots/batches, certificates of analysis,
 product "form", research-use copy) is **deliberately gone** — do not restore it from
 an older project. `TASKS.md` tracks what is left to build.
 
-`docs/specs/` holds two **binding** specs carried over with the platform:
+`docs/specs/` holds one **binding** spec carried over with the platform:
 
 - `2026-09-09-whop-integration-contract.md` — the Whop payments design lock. Where it
   disagrees with the code, it wins and the code is the defect; a deliberate deviation
-  amends the contract in the same commit.
-- `2026-09-24-sendcloud-shipping.md` — the Sendcloud design. Its "spike results" were
-  measured on the previous shop's Sendcloud account and must be re-run on Akai's.
+  amends the contract in the same commit. It still mentions the previous shop's
+  catalogue and euros; the payments rules are what binds, until Wompi replaces Whop.
 
-Both still mention the previous shop's catalogue and a Next.js storefront; the
-payments and shipping rules in them are what binds.
+## Colombia — the market rules
+
+- **Currency is COP**, stored as integer MINOR units = **centavos** (×100):
+  $ 89.000 is `8_900_000` — exactly Wompi's `amount_in_cents`. COP is DISPLAYED and
+  ENTERED in whole pesos (`displayFractionDigits` in `@akai/money`; es → `es-CO`,
+  en → `en-US`): "$ 89.000", and the dashboard's money input reads "89000" / "89.000".
+  `MINOR_MAX` is therefore $ 20.000.000 per amount.
+- **IVA**: prices are IVA-inclusive; `tax_rate` holds CO STANDARD 19% (REDUCED 5%).
+  The net/tax/gross split is unchanged. There is no EU VAT-number / reverse charge.
+- **Destinations** are `["CO"]` (`DESTINATION_COUNTRY_CODES`). Seed: one "Colombia"
+  zone, one flat "Envío nacional" rate ($ 15.000), free from $ 300.000
+  (`FREE_SHIPPING_THRESHOLD_MINOR` = `ADVERTISED_FREE_SHIPPING_THRESHOLD_MINOR`).
+- **Addresses** (`addressFieldsSchema`): `region` is the REQUIRED departamento,
+  normalised to a name from `COLOMBIAN_DEPARTAMENTOS` (33 entries, DANE code + Spanish
+  name); `city` is the municipio; the number goes in `line1` ("Calle 10 # 43-21");
+  `postalCode` is optional (six digits); `phone` is a Colombian mobile normalised to
+  10 digits without +57 — required at checkout. There is no house-number field.
+- **Identity document**: checkout requires `documentType` (CC, CE, NIT, PP, TI, PPT)
+  and `documentNumber`, normalised per type by `normaliseDocumentNumber` (NIT check
+  digit verified) and snapshotted on the order (`order.documentType/documentNumber`).
+  Wompi's PSE `customer_data` will be built from it.
+- **Shipping is manual**: staff record a parcel on the order page (carrier and tracking
+  number as free text — `POST /admin/orders/:n/shipments`) and mark it delivered.
+  Shipment statuses are PENDING, IN_TRANSIT, DELIVERED, RETURNED, LOST. There is no
+  carrier integration.
 
 ## Workspace layout
 
@@ -49,7 +72,7 @@ libs/
   email-templates/  SHELL — the live templates sit in apps/api/src/modules/email.
   testing/          Test fakes and builders.
   observability/    Logging, tracing, request-id propagation.
-docs/specs/         The two binding specs above.
+docs/specs/         The binding Whop spec above.
 ```
 
 ## Commands
@@ -127,8 +150,8 @@ when it handles TOKEN MATERIAL (the dashboard's auth routes).
 `listen()` and the cron sweeps, polling with `FOR UPDATE SKIP LOCKED`. There is no
 pg-boss. `apps/worker` is an empty shell and may not import `apps/api` (module
 boundaries); implementing it means moving handlers deliberately, not duplicating them.
-Registered consumers: `email`, `storefront.revalidate`, `order-fulfilment`. Topics
-without a shipped module dead-letter visibly at `/admin/jobs` by design.
+Registered consumers: `email`, `storefront.revalidate`. Topics without a shipped
+module dead-letter visibly at `/admin/jobs` by design.
 
 **Order numbers** are `AK-YYYY-NNNNNN`, generated in the database
 (`next_order_number()` in the `invariants` migration).
@@ -146,14 +169,10 @@ unconditional index and break soft-delete. `tools/postgres/init` provisions the
 - **Empty `@Module({})` placeholders** registered in `AppModule`: `audit`, `disputes`,
   `gdpr`, `invoices`, `metrics`, `notifications`, `pricing`. `audit` has a waiting job:
   several `ProductsService` mutations lost their `actorId` and take it back when it ships.
-- **Sendcloud (`fulfilment`)** — labels are built (bought only when staff click; one
-  `SendcloudWriteThrottle`; PDFs stored in the private bucket `S3_BUCKET_PRIVATE`).
-  NOT built: pickup-point search + checkout verification/snapshot (Phase 3 — checkout
-  accepts `servicePointId`/`houseNumber` but persists neither), zones/rates admin (5b),
-  tracking webhook + sweep (6).
-- Seeded shipping: each zone has an UNMAPPED `HOME` rate (label purchase skips it as
-  `RATE_NOT_MAPPED` until mapped in `/admin/shipping`) plus pickup-point rates whose
-  Sendcloud codes came from the previous shop's account.
+- **Shipping** is zones + rates (staff-editable in `/admin/shipping`) and a manual
+  shipment flow. Sendcloud was removed deliberately (EU carriers); do not restore it.
+- **Payments**: Whop today; Wompi replaces it in the next phase. Leave
+  `apps/api/src/modules/payments` alone until then.
 - Overselling is guarded: checkout reserves every line through
   `ProductInventoryService.reserve` (atomic guarded UPDATE with a TTL).
 
@@ -209,7 +228,9 @@ Checkout creates the order and redirects to **Whop hosted checkout**. No Stripe.
   `CartView`, `CheckoutForm`, `OrderProcessing`. Cart writes dispatch
   `akai:cart-changed` on `window`; the header badge listens. Everything else is
   `.astro` and ships no JS.
-- Checkout offers `HOME` rates only until the API has pickup-point search.
+- Checkout fixes the country to Colombia, takes the departamento from
+  `COLOMBIAN_DEPARTAMENTOS`, a Colombian mobile and the identity document, and
+  offers every rate the quote returns (there is no delivery type any more).
 - `@astrojs/react` is in `vite.ssr.noExternal` — deps live at the root, and an
   externalised renderer cannot resolve `astro:react:opts` at runtime.
 

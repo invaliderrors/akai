@@ -6,8 +6,12 @@
 | --- | --- | --- | --- |
 | `apps/storefront` | Astro 7 (SSR) + React islands + Tailwind v4 | 3100 | The shop: catalogue, product pages, cart, checkout |
 | `apps/dashboard` | Next.js 15 | 3101 | Customer accounts (sign-in, orders, addresses) and staff admin |
-| `apps/api` | NestJS 11 + Prisma + PostgreSQL | 3333 | Source of truth: catalogue, carts, orders, payments (Whop), shipping (Sendcloud), email |
+| `apps/api` | NestJS 11 + Prisma + PostgreSQL | 3333 | Source of truth: catalogue, carts, orders, payments (Whop), shipping zones/rates, email |
 | `apps/worker` | NestJS | — | Empty shell (the outbox runs in the API process) |
+
+Akai sells in **Colombia only**: prices in COP (IVA 19% included), Colombian
+addresses (departamento + ciudad), the buyer's identity document at checkout, and
+manual shipping (staff record the carrier and tracking number).
 
 Shared code lives in `libs/*` (`contracts`, `db`, `money`, `config`, `i18n`, `session`,
 `rich-text`, …). Spanish is the default locale at `/`, English is at `/en`.
@@ -66,6 +70,5 @@ placeholder.
 - Each app has a Dockerfile (build context: repo root).
 - The database needs the `akai_app` runtime role (see `tools/postgres/init`) before
   `prisma migrate deploy`, so the invariants migration can apply its grants.
-- Pin `WHOP_ENVIRONMENT` explicitly (`sandbox` | `live`) and `SENDCLOUD_MODE=live` only
-  on the live deployment.
+- Pin `WHOP_ENVIRONMENT` explicitly (`sandbox` | `live`).
 - Add the storefront and dashboard origins to the API's `CORS_ALLOWED_ORIGINS`.
