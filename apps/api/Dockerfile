@@ -17,7 +17,10 @@
 FROM node:22.12-alpine AS deps
 WORKDIR /app
 
-RUN corepack enable
+# Node 22.12 bundles corepack 0.29, whose npm signing keys predate npm's key
+# rotation: `pnpm install` dies with "Cannot find matching keyid". Pin a
+# corepack that knows the current keys.
+RUN npm install -g corepack@0.36.0 && corepack enable
 
 # Only the files that affect dependency resolution. Copying the whole tree here
 # would invalidate this layer on every source edit and defeat the split.
@@ -42,7 +45,7 @@ RUN pnpm install --frozen-lockfile
 # --- Stage 2: build ----------------------------------------------------------
 FROM node:22.12-alpine AS build
 WORKDIR /app
-RUN corepack enable
+RUN npm install -g corepack@0.36.0 && corepack enable
 
 # Reuse the pnpm that the deps stage already downloaded.
 #
@@ -76,7 +79,7 @@ ENV NODE_ENV=production
 # access, and nothing this process does needs privilege.
 RUN addgroup -S akai && adduser -S -G akai akai
 
-RUN corepack enable
+RUN npm install -g corepack@0.36.0 && corepack enable
 
 # Reuse the pnpm that the deps stage already downloaded.
 #

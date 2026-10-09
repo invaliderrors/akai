@@ -4,7 +4,10 @@
 
 FROM node:22.12-alpine AS deps
 WORKDIR /app
-RUN corepack enable
+# Node 22.12 bundles corepack 0.29, whose npm signing keys predate npm's key
+# rotation: `pnpm install` dies with "Cannot find matching keyid". Pin a
+# corepack that knows the current keys.
+RUN npm install -g corepack@0.36.0 && corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY apps/api/package.json apps/api/
 COPY apps/worker/package.json apps/worker/
@@ -24,7 +27,7 @@ RUN pnpm install --frozen-lockfile
 
 FROM node:22.12-alpine AS build
 WORKDIR /app
-RUN corepack enable
+RUN npm install -g corepack@0.36.0 && corepack enable
 COPY --from=deps /root/.cache/node/corepack /root/.cache/node/corepack
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
