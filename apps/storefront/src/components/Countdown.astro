@@ -1,0 +1,14 @@
+---
+import { formatCountdown, nextWeekly, type CountdownFormat } from "@/lib/merch";
+
+interface Props {
+  /** ISO instant of the first occurrence; it repeats weekly. */
+  target: string;
+  format: CountdownFormat;
+}
+
+const { target, format } = Astro.props;
+const now = Date.now();
+---
+
+<span data-countdown={target} data-format={format}>{formatCountdown(nextWeekly(target, now) - now, format)}</span>

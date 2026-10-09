@@ -4,6 +4,7 @@ import {
   checkoutSessionResponseSchema,
   confirmPaymentRequestSchema,
   createCheckoutSessionSchema,
+  freeShippingThresholdResponseSchema,
   orderStatusResponseSchema,
   shippingQuoteRequestSchema,
   shippingQuoteResponseSchema,
@@ -84,6 +85,16 @@ export class CartClient {
   /** A pack's lines are added and removed together, by pack instance. */
   removePack(packInstanceId: string): Promise<Cart> {
     return this.cartCall("DELETE", `/cart/packs/${encodeURIComponent(packInstanceId)}`);
+  }
+
+  /** The free-shipping threshold every destination shares, or null. */
+  async freeShippingThreshold() {
+    const { data } = await apiRequest({
+      baseUrl: this.apiUrl,
+      path: "/shipping/free-shipping",
+      schema: freeShippingThresholdResponseSchema,
+    });
+    return data.threshold;
   }
 
   async quote(input: z.input<typeof shippingQuoteRequestSchema>) {

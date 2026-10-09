@@ -3,15 +3,19 @@ import { STORE_LOCALE } from "@akai/contracts";
 
 import Footer from "@/components/Footer.astro";
 import Header from "@/components/Header.astro";
+import CartDrawer from "@/components/islands/CartDrawer";
 import { t } from "@/i18n/messages";
+import { serverEnv } from "@/lib/env";
 import "@/styles/global.css";
 
 interface Props {
   title?: string;
   description?: string | undefined;
+  /** Draw the red thread (赤い糸) down the page. The home page does. */
+  thread?: boolean;
 }
 
-const { title, description = t.meta.description } = Astro.props;
+const { title, description = t.meta.description, thread = false } = Astro.props;
 const fullTitle = title === undefined ? "AKAI — 赤い" : `${title} · AKAI`;
 ---
 
@@ -27,14 +31,51 @@ const fullTitle = title === undefined ? "AKAI — 赤い" : `${title} · AKAI`;
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Anton&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Shippori+Mincho:wght@500;800&family=Noto+Sans+JP:wght@900&family=Manrope:wght@500;600;700;800&family=Space+Mono:wght@400;700&display=swap"
     />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Yomogi&text=%E6%9C%80%E9%AB%98&display=swap" />
   </head>
-  <body class="flex min-h-screen flex-col">
-    <Header />
-    <main class="flex-1">
-      <slot />
-    </main>
-    <Footer />
+  <body>
+    <div data-thread-root class="relative flex min-h-screen flex-col overflow-x-clip">
+      {
+        thread && (
+          <svg
+            data-thread-svg
+            aria-hidden="true"
+            width="100%"
+            height="1000"
+            viewBox="0 0 1000 1000"
+            class="pointer-events-none absolute left-0 top-0 z-[1] overflow-visible"
+          >
+            <path
+              d="M0 0"
+              pathLength="1"
+              fill="none"
+              stroke="var(--color-akai)"
+              stroke-width="2.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              style="stroke-dasharray:1;stroke-dashoffset:1"
+            />
+          </svg>
+        )
+      }
+      <Header />
+      <main class="flex-1">
+        <slot />
+      </main>
+      <Footer />
+    </div>
+    <CartDrawer
+      client:idle
+      apiUrl={serverEnv().PUBLIC_API_URL}
+      checkoutHref="/checkout"
+      productHrefBase="/products"
+      t={t.cart}
+      problems={t.cartProblems}
+    />
+    <script>
+      import "@/scripts/countdown";
+    </script>
   </body>
 </html>

@@ -1,0 +1,434 @@
+---
+import type { CategoryListItem } from "@akai/contracts";
+
+import Countdown from "@/components/Countdown.astro";
+import { t } from "@/i18n/messages";
+import { CATEGORY_SLUGS, EXCLUSIVE_ENDS } from "@/lib/merch";
+
+import { clipAbove, clipPolygon, panelShape, svgPoints, type PanelKey } from "./panel-shapes";
+
+interface Props {
+  categories: readonly CategoryListItem[];
+}
+
+const c = t.home.categories;
+const { categories } = Astro.props;
+const shop = "/products";
+
+const panel = (key: PanelKey, slug: string) => {
+  const desktop = panelShape(key, false);
+  const mobile = panelShape(key, true);
+  const count = categories.find((category) => category.slug === slug)?.productCount;
+  return {
+    href: `${shop}?category=${slug}`,
+    count: count === undefined ? null : `${String(count)} ${count === 1 ? c.style : c.styles}`,
+    style: `--clip:${clipPolygon(desktop)};--clip-m:${clipPolygon(mobile)};--clip-up:${clipAbove(desktop, 40)};--clip-up-m:${clipAbove(mobile, 40)}`,
+    points: svgPoints(desktop),
+    pointsMobile: svgPoints(mobile),
+  };
+};
+
+const f = panel("f", CATEGORY_SLUGS.exclusive);
+const tees = panel("t", CATEGORY_SLUGS.tees);
+const o = panel("o", CATEGORY_SLUGS.oversized);
+const s = panel("s", CATEGORY_SLUGS.sweatshirts);
+const label = (name: string, count: string | null) => (count === null ? name : `${name}, ${count}`);
+---
+
+<section aria-label={c.label} class="cats">
+  <svg aria-hidden="true" width="0" height="0" class="absolute">
+    <defs>
+      <filter id="akai-rough" x="-10%" y="-10%" width="120%" height="120%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.045" numOctaves="2" seed="7"></feTurbulence>
+        <feDisplacementMap in="SourceGraphic" scale="5"></feDisplacementMap>
+      </filter>
+    </defs>
+  </svg>
+  <div data-cat-head class="flex items-center gap-[clamp(10px,1.6vw,20px)]">
+    <span aria-hidden="true" class="kanji text-[clamp(48px,6.4vw,92px)] leading-none">服</span>
+    <h2 class="m-0 font-display text-[clamp(28px,4.7vw,56px)] font-normal leading-[.95] [text-wrap:balance]">{c.title}</h2>
+  </div>
+
+  <div data-cat-grid class="cat-grid">
+    <svg data-cat-layer="b" aria-hidden="true" class="layer layer-back"></svg>
+
+    <a href={f.href} aria-label={label(c.weeklyLabel, f.count)} data-panel="f" data-anim class="panel panel-f" style={f.style}>
+      <span aria-hidden="true" class="fill">
+        <span class="speed"></span>
+        <span class="tone tone-f"></span>
+        <span class="mono note right-[18px] top-4 bg-paper px-[5px] py-[2px]">{c.thisWeeksArt}</span>
+      </span>
+      <svg aria-hidden="true" viewBox="0 0 100 100" preserveAspectRatio="none" class="panel-outline">
+        <polygon points={f.points} class="only-desktop-svg"></polygon>
+        <polygon points={f.pointsMobile} class="only-mobile-svg"></polygon>
+      </svg>
+      <svg aria-hidden="true" viewBox="0 0 210 112" class="don">
+        <text x="4" y="98" fill="var(--color-akai)" stroke="var(--color-ink)" stroke-width="7" stroke-linejoin="round" paint-order="stroke" class="font-display" font-size="100">ドン</text>
+      </svg>
+      <span aria-hidden="true" class="rise">
+        <img src="/brand/yume-separator.png" alt="" width="1024" height="1506" loading="lazy" data-anim class="rise-img" />
+      </span>
+      <span class="caption caption-f">
+        <span class="cap cap-big">{c.weekly}<br />{c.weeklyLine2}</span>
+        <span class="mono chip chip-f">糸 01 · {c.endsIn} <Countdown target={EXCLUSIVE_ENDS} format="minutes" /></span>
+      </span>
+      <span aria-hidden="true" class="hanko">
+        <span class="kanji vertical text-[clamp(20px,2.1vw,27px)] leading-none">限定</span>
+        <span class="speckle"></span>
+      </span>
+    </a>
+
+    <a href={tees.href} aria-label={label(c.graphicTees, tees.count)} data-panel="t" data-anim class="panel panel-t" style={tees.style}>
+      <span aria-hidden="true" class="fill">
+        <span class="tone tone-t"></span>
+        <span class="mono note left-[22px] top-[18px]">{c.teeOnModel}</span>
+      </span>
+      <svg aria-hidden="true" viewBox="0 0 100 100" preserveAspectRatio="none" class="panel-outline">
+        <polygon points={tees.points} class="only-desktop-svg"></polygon>
+        <polygon points={tees.pointsMobile} class="only-mobile-svg"></polygon>
+      </svg>
+      <span class="caption bottom-5 left-[18px] rotate-[-2deg]">
+        <span class="cap">{c.graphicTees}</span>
+        {tees.count !== null && <span class="mono chip">{tees.count}</span>}
+      </span>
+    </a>
+
+    <a href={o.href} aria-label={label(c.oversized, o.count)} data-panel="o" data-anim class="panel panel-o" style={o.style}>
+      <span aria-hidden="true" class="fill">
+        <span class="tone tone-o"></span>
+        <span class="mono note right-[18px] top-5">{c.oversizedShot}</span>
+      </span>
+      <svg aria-hidden="true" viewBox="0 0 100 100" preserveAspectRatio="none" class="panel-outline">
+        <polygon points={o.points} class="only-desktop-svg"></polygon>
+        <polygon points={o.pointsMobile} class="only-mobile-svg"></polygon>
+      </svg>
+      <span class="caption bottom-[22px] right-4 justify-items-end rotate-[1.8deg]">
+        <span class="cap">{c.oversized}</span>
+        {o.count !== null && <span class="mono chip">{o.count}</span>}
+      </span>
+    </a>
+
+    <a href={s.href} aria-label={label(c.sweatshirts, s.count)} data-panel="s" data-anim class="panel panel-s" style={s.style}>
+      <span aria-hidden="true" class="fill">
+        <span class="tone tone-s"></span>
+        <span class="mono note left-5 top-[22px]">{c.crewneckFlat}</span>
+      </span>
+      <svg aria-hidden="true" viewBox="0 0 100 100" preserveAspectRatio="none" class="panel-outline">
+        <polygon points={s.points} class="only-desktop-svg"></polygon>
+        <polygon points={s.pointsMobile} class="only-mobile-svg"></polygon>
+      </svg>
+      <span class="caption bottom-[18px] left-[22px] rotate-[-1.2deg]">
+        <span class="cap">{c.sweatshirts}</span>
+        {s.count !== null && <span class="mono chip">{s.count}</span>}
+      </span>
+    </a>
+
+    <svg data-cat-layer="f" aria-hidden="true" class="layer layer-front"></svg>
+  </div>
+</section>
+
+<style>
+  .cats {
+    position: relative;
+    z-index: 2;
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 16px;
+    box-sizing: border-box;
+  }
+  .cat-grid {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.25fr);
+    gap: 8px;
+    margin-top: 84px;
+  }
+  .layer {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    pointer-events: none;
+  }
+  .layer-back {
+    z-index: 0;
+  }
+  .layer-front {
+    z-index: 5;
+  }
+
+  .panel {
+    position: relative;
+    z-index: 1;
+    display: block;
+    color: var(--color-ink);
+    text-decoration: none;
+    transition: transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  .panel:hover,
+  .panel:focus-visible {
+    z-index: 3;
+    color: var(--color-ink);
+  }
+  .panel-f {
+    grid-area: 1 / 3 / 3 / 4;
+    min-height: clamp(460px, 50vw, 660px);
+  }
+  .panel-t {
+    grid-area: 1 / 1 / 2 / 2;
+    min-height: clamp(240px, 24vw, 330px);
+  }
+  .panel-o {
+    grid-area: 1 / 2 / 2 / 3;
+    min-height: clamp(240px, 24vw, 330px);
+  }
+  .panel-s {
+    grid-area: 2 / 1 / 3 / 3;
+    min-height: clamp(190px, 17vw, 240px);
+  }
+  .panel-f:hover,
+  .panel-f:focus-visible {
+    transform: translate(-2px, -8px) rotate(0.5deg);
+  }
+  .panel-t:hover,
+  .panel-t:focus-visible {
+    transform: translate(-3px, -6px) rotate(-0.7deg);
+  }
+  .panel-o:hover,
+  .panel-o:focus-visible {
+    transform: translate(3px, -6px) rotate(0.6deg);
+  }
+  .panel-s:hover,
+  .panel-s:focus-visible {
+    transform: translate(0, -6px) rotate(-0.4deg);
+  }
+
+  .fill {
+    position: absolute;
+    inset: 0;
+    clip-path: var(--clip);
+    background: var(--color-paper);
+  }
+  .speed {
+    position: absolute;
+    inset: 0;
+    background:
+      repeating-conic-gradient(from 0deg at 50% 34%, var(--color-ink) 0deg 0.8deg, transparent 0.8deg 4.6deg),
+      repeating-conic-gradient(from 1.7deg at 50% 34%, var(--color-ink) 0deg 0.45deg, transparent 0.45deg 7.3deg);
+    mask-image: radial-gradient(ellipse 48% 42% at 50% 34%, transparent 45%, black 100%);
+  }
+  .tone {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(circle, color-mix(in srgb, var(--color-ink) 26%, transparent) 0.95px, transparent 1.25px) 0 0 / 5px 5px,
+      radial-gradient(circle, color-mix(in srgb, var(--color-ink) 10%, transparent) 0.6px, transparent 0.9px) 2.5px 2.5px / 5px 5px;
+  }
+  .panel:hover .tone,
+  .panel:focus-visible .tone {
+    background:
+      radial-gradient(circle, color-mix(in srgb, var(--color-ink) 52%, transparent) 1.25px, transparent 1.6px) 0 0 / 5px 5px,
+      radial-gradient(circle, color-mix(in srgb, var(--color-ink) 22%, transparent) 0.6px, transparent 0.9px) 2.5px 2.5px / 5px 5px;
+  }
+  .tone-f {
+    mask-image: linear-gradient(0deg, black, transparent 42%);
+  }
+  .tone-t {
+    mask-image: linear-gradient(150deg, transparent 12%, black 80%);
+  }
+  .tone-o {
+    mask-image: linear-gradient(210deg, transparent 12%, black 80%);
+  }
+  .tone-s {
+    mask-image: linear-gradient(90deg, transparent 18%, black 88%);
+  }
+  .note {
+    position: absolute;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+  }
+  .panel-outline {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    pointer-events: none;
+  }
+  .panel-outline polygon {
+    fill: none;
+    stroke: var(--color-ink);
+    stroke-width: 3.5;
+    stroke-linejoin: miter;
+    vector-effect: non-scaling-stroke;
+  }
+  .only-mobile-svg {
+    display: none;
+  }
+
+  .don {
+    position: absolute;
+    left: -7%;
+    top: 9%;
+    width: clamp(130px, 15vw, 230px);
+    height: auto;
+    overflow: visible;
+    pointer-events: none;
+    transform: rotate(-15deg) skewX(-6deg);
+    filter: url(#akai-rough);
+  }
+  .rise {
+    position: absolute;
+    inset: 0;
+    clip-path: var(--clip-up);
+    pointer-events: none;
+  }
+  .rise-img {
+    position: absolute;
+    left: 50%;
+    top: -70px;
+    width: min(96%, 460px);
+    height: auto;
+    transform: translate(-50%, 0);
+    transition: transform 0.5s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  .panel-f:hover .rise-img,
+  .panel-f:focus-visible .rise-img {
+    transform: translate(-50%, -8px);
+  }
+
+  .caption {
+    position: absolute;
+    display: grid;
+    justify-items: start;
+  }
+  .caption-f {
+    left: 7%;
+    bottom: 11%;
+    transform: rotate(-2.5deg);
+  }
+  .cap {
+    background: var(--color-white);
+    color: var(--color-ink);
+    border: 2px solid var(--color-ink);
+    padding: 7px 10px 5px;
+    font-family: var(--font-display);
+    font-size: clamp(18px, 1.9vw, 26px);
+    line-height: 1;
+    white-space: nowrap;
+    transition:
+      background 0.2s,
+      color 0.2s;
+  }
+  .cap-big {
+    padding: 8px 12px 6px;
+    font-size: clamp(26px, 3.2vw, 46px);
+    line-height: 0.95;
+    text-shadow: 3px 3px 0 var(--color-akai);
+  }
+  .panel:hover .cap,
+  .panel:focus-visible .cap {
+    background: var(--color-akai);
+    color: var(--color-paper);
+    text-shadow: none;
+  }
+  .chip {
+    background: var(--color-ink);
+    color: var(--color-paper);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    padding: 4px 8px;
+    margin: 0 10px;
+  }
+  .chip-f {
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    padding: 5px 9px;
+    margin: 0 0 0 12px;
+    white-space: nowrap;
+  }
+  .hanko {
+    position: absolute;
+    right: 8%;
+    bottom: 12%;
+    width: clamp(58px, 6vw, 78px);
+    aspect-ratio: 1;
+    display: grid;
+    place-items: center;
+    background: var(--color-akai);
+    color: var(--color-white);
+    border-radius: 7px;
+    box-shadow:
+      inset 0 0 0 4px var(--color-akai),
+      inset 0 0 0 5.5px color-mix(in srgb, var(--color-white) 85%, transparent);
+    transform: rotate(-8deg);
+    filter: url(#akai-rough);
+  }
+  .vertical {
+    writing-mode: vertical-rl;
+  }
+  .speckle {
+    position: absolute;
+    inset: 0;
+    border-radius: 7px;
+    background:
+      radial-gradient(circle at 18% 22%, var(--color-paper) 0 1.3px, transparent 1.8px),
+      radial-gradient(circle at 72% 14%, var(--color-paper) 0 1px, transparent 1.5px),
+      radial-gradient(circle at 84% 58%, var(--color-paper) 0 1.4px, transparent 1.9px),
+      radial-gradient(circle at 30% 80%, var(--color-paper) 0 1.1px, transparent 1.6px),
+      radial-gradient(circle at 62% 88%, var(--color-paper) 0 0.9px, transparent 1.4px),
+      radial-gradient(circle at 12% 52%, var(--color-paper) 0 0.8px, transparent 1.3px),
+      radial-gradient(circle at 90% 30%, var(--color-paper) 0 0.9px, transparent 1.4px),
+      radial-gradient(circle at 48% 8%, var(--color-paper) 0 0.8px, transparent 1.3px),
+      radial-gradient(circle at 40% 62%, var(--color-paper) 0 0.7px, transparent 1.2px);
+  }
+
+  @media (max-width: 1100px) {
+    .cat-grid {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+    .panel-f {
+      grid-area: 1 / 1 / 2 / 3;
+    }
+    .panel-t {
+      grid-area: 2 / 1 / 3 / 2;
+    }
+    .panel-o {
+      grid-area: 2 / 2 / 3 / 3;
+    }
+    .panel-s {
+      grid-area: 3 / 1 / 4 / 3;
+    }
+    .don {
+      left: -10px;
+    }
+  }
+
+  @media (max-width: 760px) {
+    .cat-grid {
+      grid-template-columns: minmax(0, 1fr);
+      margin-top: 72px;
+    }
+    .panel {
+      grid-area: auto;
+    }
+    .fill {
+      clip-path: var(--clip-m);
+    }
+    .rise {
+      clip-path: var(--clip-up-m);
+    }
+    .only-desktop-svg {
+      display: none;
+    }
+    .only-mobile-svg {
+      display: inline;
+    }
+    .don {
+      width: clamp(96px, 26vw, 130px);
+    }
+  }
+</style>

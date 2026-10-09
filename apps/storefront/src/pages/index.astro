@@ -1,47 +1,44 @@
 ---
-import ProductCard from "@/components/ProductCard.astro";
-import { t } from "@/i18n/messages";
+import Categories from "@/components/home/Categories.astro";
+import Hero from "@/components/home/Hero.astro";
+import Offer from "@/components/home/Offer.astro";
+import ProductGrid from "@/components/home/ProductGrid.astro";
+import Reviews from "@/components/home/Reviews.astro";
 import Base from "@/layouts/Base.astro";
-import { listProducts } from "@/lib/catalog";
+import { getFreeShippingThreshold, listCategories, listProducts } from "@/lib/catalog";
+import { cheapestPrice } from "@/lib/view";
 
-const { items } = await listProducts({ sort: "newest", limit: 8 });
+const [newest, bestsellers, categories, freeShipping] = await Promise.all([
+  listProducts({ sort: "newest", limit: 8 }),
+  listProducts({ sort: "best_selling", limit: 8 }),
+  listCategories(),
+  getFreeShippingThreshold(),
+]);
+const hero = newest.items[0] ?? null;
+const heroPrice = hero === null ? null : cheapestPrice(hero);
 ---
 
-<Base>
-  <section class="relative overflow-hidden border-b border-ink">
-    <div class="mx-auto grid max-w-7xl gap-10 px-4 py-20 sm:px-6 lg:grid-cols-[1fr_auto] lg:items-end lg:py-32">
-      <div>
-        <p class="text-xs font-bold uppercase tracking-[0.3em] text-akai">{t.home.kicker}</p>
-        <h1 class="mt-4 font-display text-7xl uppercase leading-[0.9] sm:text-9xl">{t.home.title}</h1>
-        <p class="mt-6 max-w-md text-lg">{t.home.lead}</p>
-        <a href={"/products"} class="btn mt-8">{t.home.cta} →</a>
-      </div>
-      <p
-        aria-hidden="true"
-        class="select-none font-display text-[10rem] leading-none text-akai [writing-mode:vertical-rl] sm:text-[14rem]"
-      >
-        赤い
-      </p>
-    </div>
-  </section>
-
-  <section class="mx-auto max-w-7xl px-4 pt-16 sm:px-6">
-    <div class="mb-8 flex items-end justify-between">
-      <h2 class="font-display text-4xl uppercase">{t.home.newArrivals}</h2>
-      <a href={"/products"} class="text-xs font-bold uppercase tracking-[0.2em] hover:text-akai">
-        {t.home.viewAll} →
-      </a>
-    </div>
-    {
-      items.length === 0 ? (
-        <p class="text-stone">{t.shop.empty}</p>
-      ) : (
-        <div class="grid grid-cols-2 gap-x-4 gap-y-10 md:grid-cols-4">
-          {items.map((product) => (
-            <ProductCard product={product} />
-          ))}
-        </div>
-      )
-    }
-  </section>
+<Base thread>
+  <Hero product={hero} />
+  <div data-thread="R" aria-hidden="true" class="spacer"></div>
+  <Categories categories={categories} />
+  <div data-thread=".45" aria-hidden="true" class="spacer"></div>
+  <ProductGrid newest={newest.items} bestsellers={bestsellers.items} />
+  <div data-thread=".5" aria-hidden="true" class="spacer"></div>
+  <Offer
+    examplePrice={heroPrice === null ? null : { amount: heroPrice.gross, currency: heroPrice.currency }}
+    freeShipping={freeShipping}
+  />
+  <Reviews />
+  <div data-thread=".5" aria-hidden="true" class="h-[clamp(40px,6vw,80px)]"></div>
 </Base>
+
+<style>
+  .spacer {
+    height: clamp(64px, 9vw, 120px);
+  }
+</style>
+
+<script>
+  import "@/scripts/thread";
+</script>

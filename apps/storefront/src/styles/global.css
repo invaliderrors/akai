@@ -1,20 +1,24 @@
 @import "tailwindcss";
 
 /*
- * Akai (赤い, "red"): sumi ink, washi paper, one hanko red. Everything else is
- * restraint — flat colour, hard edges, a condensed display face for headlines
- * and a Japanese-capable gothic for body copy.
+ * Akai (赤い, "red"): sumi ink on washi paper, one hanko red, and a red thread
+ * (赤い糸) that runs through the page. Dela Gothic One shouts the headlines,
+ * Manrope carries the body, Space Mono labels everything, and Shippori Mincho
+ * sets the kanji.
  */
 @theme {
-  --color-ink: #0e0e0e;
-  --color-paper: #f3efe6;
+  --color-ink: #111111;
+  --color-paper: #e8e0d8;
   --color-stone: #8a857b;
   --color-line: #d6d0c3;
-  --color-akai: #d0231c;
-  --color-akai-deep: #a11a14;
+  --color-akai: #d7261e;
+  --color-akai-deep: #8e1a14;
 
-  --font-display: "Anton", "Zen Kaku Gothic New", system-ui, sans-serif;
-  --font-sans: "Zen Kaku Gothic New", system-ui, sans-serif;
+  --font-display: "Dela Gothic One", sans-serif;
+  --font-sans: Manrope, sans-serif;
+  --font-mono: "Space Mono", monospace;
+  --font-mincho: "Shippori Mincho", serif;
+  --font-hand: Yomogi, cursive;
 }
 
 @layer base {
@@ -22,12 +26,54 @@
     background: var(--color-paper);
     color: var(--color-ink);
     font-family: var(--font-sans);
+    font-weight: 600;
     -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    margin: 0;
+    background: var(--color-paper);
+  }
+
+  /* Paper grain, multiplied over everything. */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 800;
+    opacity: 0.06;
+    mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='260' height='260'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.07 0 0 0 0 0.07 0 0 0 0 0.07 0 0 0 1.4 -0.2'/></filter><rect width='260' height='260' filter='url(%23n)'/></svg>");
+  }
+
+  a {
+    color: var(--color-ink);
+  }
+
+  a:hover {
+    color: var(--color-akai);
   }
 
   :focus-visible {
     outline: 2px solid var(--color-akai);
-    outline-offset: 2px;
+    outline-offset: 3px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    [data-anim] {
+      transition: none !important;
+      animation: none !important;
+    }
+  }
+}
+
+@keyframes draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
   }
 }
 
@@ -54,5 +100,69 @@
 
   .rich-text ul {
     @apply mb-3 list-disc pl-5;
+  }
+
+  /* The pill buttons of the design: solid red, and ink outline. */
+  .pill {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 58px;
+    box-sizing: border-box;
+    border-radius: 999px;
+    font-family: var(--font-sans);
+    font-size: 19px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    text-decoration: none;
+    transition:
+      background 0.2s,
+      color 0.2s,
+      border-color 0.2s;
+  }
+
+  .pill-red {
+    background: var(--color-akai);
+    color: var(--color-paper);
+  }
+
+  .pill-red:hover {
+    background: var(--color-ink);
+    color: var(--color-paper);
+  }
+
+  .pill-ink {
+    border: 1.5px solid var(--color-ink);
+    color: var(--color-ink);
+  }
+
+  .pill-ink:hover {
+    border-color: var(--color-akai);
+    color: var(--color-akai);
+  }
+
+  .mono {
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+  }
+
+  .kanji {
+    font-family: var(--font-mincho);
+    font-weight: 800;
+  }
+
+  /* Breakpoints of the design: mobile ≤ 760px, tablet ≤ 1100px. */
+  @media (max-width: 760px) {
+    .only-desktop {
+      display: none !important;
+    }
+  }
+
+  @media (min-width: 761px) {
+    .only-mobile {
+      display: none !important;
+    }
   }
 }

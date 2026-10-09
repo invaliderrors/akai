@@ -1,32 +1,251 @@
 ---
+import Countdown from "@/components/Countdown.astro";
 import CartCount from "@/components/islands/CartCount";
 import { t } from "@/i18n/messages";
 import { serverEnv } from "@/lib/env";
+import { CATEGORY_SLUGS, NEXT_DROP } from "@/lib/merch";
 import { readSession } from "@/lib/session";
 
 const env = serverEnv();
 const session = await readSession(Astro.cookies);
 const dashboard = env.PUBLIC_DASHBOARD_URL.replace(/\/+$/, "");
 const accountHref = session === null ? `${dashboard}/sign-in` : dashboard;
+const accountLabel = session === null ? t.nav.signIn : t.nav.account;
+
+const shop = "/products";
+const category = (slug: string) => `${shop}?category=${slug}`;
+const links = [
+  { label: t.nav.new, kanji: "新作", kanjiFirst: false, href: shop },
+  { label: t.nav.tees, kanji: "", kanjiFirst: false, href: category(CATEGORY_SLUGS.tees) },
+  { label: t.nav.oversized, kanji: "", kanjiFirst: false, href: category(CATEGORY_SLUGS.oversized) },
+  { label: t.nav.sweatshirts, kanji: "", kanjiFirst: false, href: category(CATEGORY_SLUGS.sweatshirts) },
+  { label: t.nav.exclusive, kanji: "限定", kanjiFirst: true, href: category(CATEGORY_SLUGS.exclusive) },
+];
+const year = new Date().getFullYear();
 ---
 
-<header class="sticky top-0 z-20 border-b border-ink bg-paper/95 backdrop-blur">
-  <div class="bg-akai py-1.5 text-center text-[11px] font-bold uppercase tracking-[0.3em] text-paper">
-    {t.nav.banner}
-  </div>
-  <nav class="mx-auto flex max-w-7xl items-center justify-between gap-6 px-4 py-4 sm:px-6">
-    <a href="/" class="font-display text-3xl leading-none tracking-wide" aria-label="Akai">
-      AKAI<span class="text-akai">.</span>
+<div class="topbar mono">
+  <a href="/#drop" class="topbar-offer">{t.nav.offer}</a>
+  <span class="topbar-drop only-desktop">{t.nav.nextDrop} <Countdown target={NEXT_DROP} format="short" /></span>
+</div>
+
+<header data-site-header class="site-header">
+  <div class="bar">
+    <a href="/" aria-label={t.nav.home} class="flex items-center no-underline">
+      <img src="/brand/akai-logo.png" alt="AKAI" width="546" height="173" class="block h-[34px] w-auto" />
     </a>
-    <div class="flex items-center gap-5 text-xs font-bold uppercase tracking-[0.2em]">
-      <a href="/products" class="hover:text-akai">{t.nav.shop}</a>
-      <a href={accountHref} class="hidden hover:text-akai sm:inline">
-        {session === null ? t.nav.signIn : t.nav.account}
-      </a>
-      <a href="/cart" class="flex items-center gap-2 hover:text-akai">
+    <nav class="nav mono only-desktop">
+      {
+        links.map((link) => (
+          <a href={link.href}>
+            {link.kanjiFirst && <span class="kanji text-[14px]">{link.kanji}</span>}
+            {link.label}
+            {!link.kanjiFirst && link.kanji !== "" && <span class="kanji text-[14px]">{link.kanji}</span>}
+          </a>
+        ))
+      }
+    </nav>
+    <div class="tools mono">
+      <a href={shop} class="tool only-desktop">{t.nav.search}</a>
+      <button type="button" class="tool only-desktop">{t.nav.wishlist}</button>
+      <a href={accountHref} class="tool only-desktop">{accountLabel}</a>
+      <a href="/cart" data-cart-open aria-label={t.nav.cart} class="cart">
         {t.nav.cart}
         <CartCount client:load apiUrl={env.PUBLIC_API_URL} />
       </a>
+      <button type="button" data-menu-toggle aria-label={t.nav.menu} aria-expanded="false" class="round only-mobile">
+        <span class="grid gap-[5px]"><span class="burger"></span><span class="burger"></span></span>
+      </button>
     </div>
-  </nav>
+  </div>
 </header>
+
+<div data-menu hidden class="menu">
+  <div class="flex items-center justify-between border-b border-ink pb-3">
+    <img src="/brand/akai-logo.png" alt="AKAI" width="546" height="173" class="block h-7 w-auto" />
+    <button type="button" data-menu-toggle aria-label={t.nav.closeMenu} class="round mono text-[14px]">✕</button>
+  </div>
+  <nav class="mt-2 grid">
+    {
+      links.map((link) => (
+        <a href={link.href} class="menu-link">
+          <span class="font-display text-[clamp(34px,10vw,56px)] leading-[.95]">{link.label.toUpperCase()}</span>
+          <span class="kanji text-[22px]">{link.kanji}</span>
+        </a>
+      ))
+    }
+  </nav>
+  <div class="mono mt-4 flex justify-between text-[11px]">
+    <a href={accountHref}>{accountLabel}</a>
+  </div>
+  <div class="mono mt-auto flex justify-between pt-5 text-[11px]">
+    <span>35.6595° N, 139.7005° E</span><span>AKAI® {year}</span>
+  </div>
+</div>
+
+<style>
+  .topbar {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 34px;
+    padding: 6px 16px;
+    box-sizing: border-box;
+    background: var(--color-akai);
+    color: var(--color-paper);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+  }
+  .topbar-offer {
+    color: var(--color-paper);
+    font-weight: 700;
+    text-decoration: none;
+  }
+  .topbar-offer:hover {
+    color: var(--color-paper);
+    text-decoration: underline;
+  }
+  .topbar-drop {
+    position: absolute;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .site-header {
+    position: sticky;
+    top: 0;
+    z-index: 700;
+    background: var(--color-paper);
+    border-bottom: 1px solid var(--color-ink);
+    padding: 10px 0;
+    transition: padding 0.2s;
+  }
+  .site-header[data-scrolled] {
+    padding: 4px 0;
+  }
+  .bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 0 16px;
+  }
+  .nav {
+    display: flex;
+    gap: 28px;
+    font-size: 12px;
+    letter-spacing: 0.06em;
+  }
+  .nav a {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 12px 0;
+    text-decoration: none;
+  }
+  .tools {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    letter-spacing: 0.06em;
+  }
+  .tool {
+    display: inline-flex;
+    align-items: center;
+    height: 44px;
+    padding: 0 12px;
+    border: 0;
+    background: transparent;
+    font: inherit;
+    text-transform: inherit;
+    letter-spacing: inherit;
+    cursor: pointer;
+    color: var(--color-ink);
+    text-decoration: none;
+  }
+  .tool:hover {
+    color: var(--color-akai);
+  }
+  .cart {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    height: 44px;
+    padding: 0 14px;
+    box-sizing: border-box;
+    border: 1px solid var(--color-ink);
+    border-radius: 999px;
+    color: var(--color-ink);
+    text-decoration: none;
+  }
+  .cart:hover {
+    border-color: var(--color-akai);
+    color: var(--color-akai);
+  }
+  .round {
+    width: 44px;
+    height: 44px;
+    border: 1px solid var(--color-ink);
+    border-radius: 50%;
+    background: transparent;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    color: var(--color-ink);
+  }
+  .burger {
+    width: 16px;
+    height: 1.5px;
+    background: var(--color-ink);
+  }
+
+  .menu {
+    position: fixed;
+    inset: 0;
+    z-index: 850;
+    background: var(--color-paper);
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+    overflow-y: auto;
+  }
+  .menu[hidden] {
+    display: none;
+  }
+  .menu-link {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--color-ink);
+    text-decoration: none;
+    color: var(--color-ink);
+  }
+</style>
+
+<script>
+  const header = document.querySelector<HTMLElement>("[data-site-header]");
+  const onScroll = () => header?.toggleAttribute("data-scrolled", window.scrollY > 40);
+  window.addEventListener("scroll", onScroll, { passive: true });
+  onScroll();
+
+  const menu = document.querySelector<HTMLElement>("[data-menu]");
+  const toggles = document.querySelectorAll<HTMLButtonElement>("[data-menu-toggle]");
+  const setMenu = (open: boolean) => {
+    if (menu === null) return;
+    menu.hidden = !open;
+    toggles.forEach((toggle) => toggle.setAttribute("aria-expanded", String(open)));
+    if (open) menu.querySelector<HTMLElement>("[data-menu-toggle]")?.focus();
+  };
+  toggles.forEach((toggle) => toggle.addEventListener("click", () => setMenu(menu?.hidden ?? false)));
+  window.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && menu !== null && !menu.hidden) setMenu(false);
+  });
+</script>

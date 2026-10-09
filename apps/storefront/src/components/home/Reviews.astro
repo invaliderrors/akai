@@ -1,0 +1,319 @@
+---
+import { t } from "@/i18n/messages";
+
+const r = t.home.reviews;
+const shop = "/products";
+
+/**
+ * Per-card placement for each layout: desktop [width %, margin-top px,
+ * margin-left %, rotation deg, z], then tablet and mobile [margin-top, rotation].
+ */
+const DESKTOP = [
+  [17.5, 30, 0, -3, 2],
+  [19, 0, -2, 2.5, 1],
+  [16.5, 70, -2, -1.5, 3],
+  [20, 16, -2, 3.5, 1],
+  [17, 88, -2, -2.5, 2],
+  [18.5, 40, -2, 1.8, 1],
+] as const;
+const TABLET = [[0, -1.5], [44, 1.2], [12, 1], [56, -1.4], [0, -1], [36, 1.3]] as const;
+const MOBILE = [[0, -2], [16, 1.6], [6, -1.2], [20, 2], [4, -1.6], [12, 1.2]] as const;
+const HALFTONE = ["150deg", "210deg", "165deg", "195deg", "140deg", "220deg"];
+
+const cards = r.items.map((item, i) => {
+  const [w, mt, ml, rot, z] = DESKTOP[i % DESKTOP.length] ?? DESKTOP[0];
+  const [tmt, trot] = TABLET[i % TABLET.length] ?? TABLET[0];
+  const [mmt, mrot] = MOBILE[i % MOBILE.length] ?? MOBILE[0];
+  return {
+    ...item,
+    star: i === 0,
+    hanko: i === 2,
+    saiko: i === 4,
+    style: [
+      `--w:${String(w)}%`,
+      `--mt:${String(mt)}px`,
+      `--ml:${String(ml)}%`,
+      `--rot:${String(rot)}deg`,
+      `--z:${String(z)}`,
+      `--mt-t:${String(tmt)}px`,
+      `--rot-t:${String(trot)}deg`,
+      `--mt-m:${String(mmt)}px`,
+      `--rot-m:${String(mrot)}deg`,
+      `--ht:${HALFTONE[i % HALFTONE.length] ?? "150deg"}`,
+    ].join(";"),
+  };
+});
+---
+
+<section aria-label={r.label} class="reviews">
+  <div class="relative z-[3] flex flex-col items-start gap-3.5">
+    <div class="mono flex items-center gap-3 text-[11px] tracking-[.08em]">
+      <span class="whitespace-nowrap">{r.kicker}</span>
+      <span class="h-px w-16 bg-ink"></span>
+      <span class="kanji text-[15px]">声</span>
+    </div>
+    <h2 class="title">{r.title} <span class="text-akai">{r.thread}</span></h2>
+    <div class="mono flex items-center gap-3 text-[11px] tracking-[.06em]">
+      <img src="/brand/akai-seal.png" alt="" width="203" height="207" class="block h-auto w-7" />{r.sub}
+    </div>
+  </div>
+  <div class="scroller">
+    <div data-wall-track class="track">
+      {
+        cards.map((card) => (
+          <article data-wall-card data-anim class="card" style={card.style}>
+            <div class="photo">
+              <span aria-hidden="true" class="photo-tone"></span>
+              <span class="mono photo-label">{r.photoPlaceholder}</span>
+              {card.star && (
+                <svg aria-hidden="true" viewBox="0 0 40 40" class="star">
+                  <path d="M20 3 L24.6 15.2 L37 15.6 L27.2 23.6 L30.6 36 L20 28.6 L9.4 36 L12.8 23.6 L3 15.6 L15.4 15.2 Z" fill="var(--color-paper)" stroke="var(--color-ink)" stroke-width="2.6" stroke-linejoin="round" />
+                  <path d="M33 3 L34.4 7 L38.5 7.3 L35.2 9.8 L36.4 13.8 L33 11.4 L29.6 13.8 L30.8 9.8 L27.5 7.3 L31.6 7 Z" fill="var(--color-akai)" stroke="var(--color-ink)" stroke-width="1.6" stroke-linejoin="round" />
+                </svg>
+              )}
+              {card.hanko && (
+                <span aria-hidden="true" class="hanko">
+                  <span class="kanji text-[24px] leading-none">赤</span>
+                  <span class="hanko-speckle"></span>
+                </span>
+              )}
+              {card.saiko && (
+                <span aria-hidden="true" class="saiko">
+                  最高
+                </span>
+              )}
+            </div>
+            <div class="grid gap-2 px-[2px] pt-3">
+              <p class="m-0 text-[14px] font-bold leading-[1.35] [text-wrap:pretty]">“{card.quote}”</p>
+              <div class="mono text-[10px] leading-[1.55] tracking-[.06em]">
+                {card.who}
+                <br />
+                {r.productPlaceholder}
+              </div>
+              <a href={shop} class="look mono">{r.shopLook}</a>
+            </div>
+          </article>
+        ))
+      }
+      <svg data-wall-layer aria-hidden="true" class="wall-layer"></svg>
+    </div>
+  </div>
+  <div class="relative z-[3] mt-[30px] flex justify-center">
+    <a href="https://www.instagram.com/akai.wear/" target="_blank" rel="noopener noreferrer" class="pill pill-red px-[34px]">{r.instagram}</a>
+  </div>
+</section>
+
+<style>
+  .reviews {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: clamp(72px, 9vw, 120px) 16px 56px;
+    box-sizing: border-box;
+  }
+  .title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: clamp(44px, 6.6vw, 92px);
+    line-height: 0.9;
+    text-wrap: balance;
+  }
+  .scroller {
+    overflow-x: visible;
+  }
+  .track {
+    position: relative;
+    z-index: 3;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 46px 0 30px;
+    box-sizing: border-box;
+  }
+  .wall-layer {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    pointer-events: none;
+    z-index: 12;
+  }
+  .card {
+    position: relative;
+    z-index: var(--z);
+    flex: 0 0 auto;
+    width: var(--w);
+    margin: var(--mt) 0 0 var(--ml);
+    scroll-snap-align: center;
+    box-sizing: border-box;
+    padding: 10px 10px 16px;
+    background: var(--color-paper);
+    border: 1px solid color-mix(in srgb, var(--color-ink) 20%, transparent);
+    border-radius: 2px;
+    box-shadow:
+      0 1px 0 color-mix(in srgb, var(--color-ink) 12%, transparent),
+      0 12px 22px -14px color-mix(in srgb, var(--color-ink) 45%, transparent);
+    transform: rotate(var(--rot));
+    transform-origin: 50% 16px;
+    transition:
+      transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1),
+      box-shadow 0.35s;
+  }
+  .card:hover,
+  .card:focus-within {
+    z-index: 9;
+    transform: rotate(0deg) scale(1.035);
+    box-shadow:
+      0 2px 0 color-mix(in srgb, var(--color-ink) 12%, transparent),
+      0 24px 36px -18px color-mix(in srgb, var(--color-ink) 55%, transparent);
+  }
+  .photo {
+    position: relative;
+    aspect-ratio: 4 / 5;
+    background: color-mix(in srgb, var(--color-ink) 6%, transparent);
+    border-radius: 1px;
+  }
+  .photo-tone {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle, color-mix(in srgb, var(--color-ink) 20%, transparent) 1.1px, transparent 1.5px) 0 0 / 6px 6px;
+    mask-image: linear-gradient(var(--ht), transparent 22%, black);
+  }
+  .photo-label {
+    position: absolute;
+    left: 10px;
+    bottom: 9px;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+  }
+  .star {
+    position: absolute;
+    right: -14px;
+    top: -12px;
+    width: 46px;
+    height: 46px;
+    overflow: visible;
+    transform: rotate(14deg);
+    filter: url(#akai-rough);
+  }
+  .hanko {
+    position: absolute;
+    left: -12px;
+    bottom: 14px;
+    width: 46px;
+    height: 46px;
+    display: grid;
+    place-items: center;
+    background: var(--color-akai);
+    color: var(--color-white);
+    border-radius: 5px;
+    box-shadow:
+      inset 0 0 0 3px var(--color-akai),
+      inset 0 0 0 4.5px color-mix(in srgb, var(--color-white) 85%, transparent);
+    transform: rotate(-10deg);
+    filter: url(#akai-rough);
+  }
+  .hanko-speckle {
+    position: absolute;
+    inset: 0;
+    border-radius: 5px;
+    background:
+      radial-gradient(circle at 18% 22%, var(--color-paper) 0 1.1px, transparent 1.6px),
+      radial-gradient(circle at 74% 16%, var(--color-paper) 0 0.9px, transparent 1.4px),
+      radial-gradient(circle at 84% 60%, var(--color-paper) 0 1.2px, transparent 1.7px),
+      radial-gradient(circle at 28% 82%, var(--color-paper) 0 1px, transparent 1.5px),
+      radial-gradient(circle at 62% 86%, var(--color-paper) 0 0.8px, transparent 1.3px),
+      radial-gradient(circle at 50% 10%, var(--color-paper) 0 0.7px, transparent 1.2px);
+  }
+  .saiko {
+    position: absolute;
+    left: -10px;
+    top: 6px;
+    transform: rotate(-13deg);
+    font-family: var(--font-hand);
+    font-size: 32px;
+    line-height: 1;
+    color: var(--color-akai);
+    --p: var(--color-paper);
+    text-shadow:
+      2px 0 0 var(--p),
+      -2px 0 0 var(--p),
+      0 2px 0 var(--p),
+      0 -2px 0 var(--p),
+      1.5px 1.5px 0 var(--p),
+      -1.5px -1.5px 0 var(--p),
+      1.5px -1.5px 0 var(--p),
+      -1.5px 1.5px 0 var(--p);
+  }
+  .look {
+    justify-self: start;
+    display: inline-flex;
+    align-items: center;
+    min-height: 28px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--color-ink);
+    text-decoration: underline;
+    text-decoration-color: var(--color-akai);
+    text-decoration-thickness: 2px;
+    text-underline-offset: 4px;
+    opacity: 0;
+    transform: translateY(4px);
+    transition:
+      opacity 0.25s,
+      transform 0.25s;
+  }
+  .card:hover .look,
+  .card:focus-within .look {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  @media (max-width: 1100px) {
+    .track {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 40px 36px;
+      padding: 46px 26px 30px;
+    }
+    .card {
+      z-index: 1;
+      width: min(100%, 330px);
+      margin: var(--mt-t) 0 0;
+      justify-self: start;
+      transform: rotate(var(--rot-t));
+    }
+    .card:nth-child(even) {
+      justify-self: end;
+    }
+  }
+
+  @media (max-width: 760px) {
+    .scroller {
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      margin: 0 -16px;
+      padding: 0 16px;
+      scrollbar-width: none;
+    }
+    .track {
+      display: flex;
+      gap: 18px;
+      width: max-content;
+      padding: 36px 10px 30px;
+      justify-content: flex-start;
+    }
+    .card {
+      width: min(72vw, 280px);
+      margin: var(--mt-m) 0 0;
+      transform: rotate(var(--rot-m));
+    }
+    .look {
+      opacity: 1;
+      transform: none;
+    }
+  }
+</style>

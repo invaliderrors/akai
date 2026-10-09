@@ -1,0 +1,392 @@
+---
+import type { Money } from "@akai/contracts";
+import { formatMoney, multiply } from "@akai/money";
+
+import { t } from "@/i18n/messages";
+import { CATEGORY_SLUGS } from "@/lib/merch";
+
+interface Props {
+  /** A real tee price to illustrate "2 + 1 free" with. Null shows the equation without amounts. */
+  examplePrice: Money | null;
+  /** The store-wide free-shipping threshold. Null drops that promise from the trust bar. */
+  freeShipping: Money | null;
+}
+
+const o = t.home.offer;
+const { examplePrice, freeShipping } = Astro.props;
+const shop = "/products";
+const money = (multiple: number) =>
+  examplePrice === null ? "" : formatMoney(multiply(examplePrice.amount, multiple), examplePrice.currency);
+
+const trust = [
+  ...(freeShipping === null
+    ? []
+    : [{ glyph: "→", text: `${o.freeShipping} ${formatMoney(freeShipping.amount, freeShipping.currency)}` }]),
+  { glyph: "↺", text: o.returns },
+  { glyph: "■", text: o.cotton },
+  { glyph: "∞", text: o.lasting },
+];
+const tees = [
+  { name: `${o.tee} 01`, price: money(1), free: false, op: null },
+  { name: `${o.tee} 02`, price: money(1), free: false, op: "+" },
+  { name: `${o.tee} 03`, price: money(0), free: true, op: "+" },
+];
+---
+
+<section aria-label={o.label} class="offer">
+  <div class="relative z-[2] mx-auto box-border max-w-[1280px] px-4">
+    <div class="trust">
+      {
+        trust.map((item) => (
+          <div class="trust-item mono">
+            <span class="glyph">{item.glyph}</span>
+            {item.text}
+          </div>
+        ))
+      }
+    </div>
+    <i data-thread="Ro" aria-hidden="true" class="block h-0"></i>
+    <i data-thread="halo" aria-hidden="true" class="block h-0"></i>
+    <div class="layout">
+      <div class="head">
+        <div class="mono flex items-center gap-3 text-[11px] tracking-[.08em]">
+          <span class="whitespace-nowrap">{o.kicker}</span>
+          <span class="h-px w-16 bg-paper"></span>
+          <span class="kanji text-[15px]">特典</span>
+        </div>
+        <h2 class="title">
+          {o.line1}<br />{o.line2}{" "}
+          <span class="whitespace-nowrap"><span class="free">{o.free}</span>!!</span>
+        </h2>
+      </div>
+      <div role="img" aria-label={o.knightAlt} class="art">
+        <div class="art-clip">
+          <div data-knight class="knight">
+            <img src="/brand/akai-knight.png" alt="" width="614" height="922" loading="lazy" class="block h-full w-full" />
+            <i data-halo="c" class="halo left-1/2 top-[12%]"></i>
+            <i data-halo="r" class="halo left-[70.3%] top-[12%]"></i>
+            <i data-halo="t" class="halo left-1/2 top-[3.6%]"></i>
+          </div>
+        </div>
+      </div>
+      <div class="body">
+        <div class="eq mono">
+          {
+            tees.map((tee) => (
+              <>
+                {tee.op !== null && (
+                  <div aria-hidden="true" class="op only-desktop">
+                    {tee.op}
+                  </div>
+                )}
+                <div class:list={["tee", tee.free && "tee-free"]}>
+                  <span class="relative block">
+                    <span class="tee-img">
+                      <span aria-hidden="true" class="tee-tone"></span>
+                      <span class="tee-label">{o.teeFlat}</span>
+                    </span>
+                    {tee.free && (
+                      <span aria-hidden="true" class="stamp">
+                        <span class="kanji stamp-text">無料</span>
+                        <span class="stamp-speckle"></span>
+                      </span>
+                    )}
+                  </span>
+                  <span class="tee-name">{tee.name}</span>
+                  <span class="tee-price">{tee.price}</span>
+                  {tee.op !== null && (
+                    <span aria-hidden="true" class:list={["op-m only-mobile", tee.free ? "op-m-top" : "op-m-left"]}>
+                      {tee.op}
+                    </span>
+                  )}
+                </div>
+              </>
+            ))
+          }
+          <div aria-hidden="true" class="op only-desktop">=</div>
+          <div class="tee justify-end">
+            <span class="tee-name">{o.threeTees}</span>
+            <span class="tee-price">{money(2)}</span>
+            <span aria-hidden="true" class="op-m op-m-left only-mobile">=</span>
+          </div>
+        </div>
+        <p class="note mono">{o.note}</p>
+        <div class="flex flex-wrap gap-3">
+          <a href={`${shop}?category=${CATEGORY_SLUGS.tees}`} class="pill pill-red px-8 shop-tees">{o.shopTees}</a>
+          <a href={`${shop}?category=${CATEGORY_SLUGS.oversized}`} class="pill px-8 shop-over">{o.shopOversized}</a>
+        </div>
+      </div>
+    </div>
+    <i data-thread="Ro" aria-hidden="true" class="block h-0"></i>
+  </div>
+</section>
+
+<style>
+  .offer {
+    position: relative;
+    background: var(--color-ink);
+    color: var(--color-paper);
+  }
+  .trust {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1px;
+    background: color-mix(in srgb, var(--color-paper) 35%, transparent);
+    border-bottom: 1px solid color-mix(in srgb, var(--color-paper) 35%, transparent);
+    margin: 0 -16px;
+  }
+  .trust-item {
+    background: var(--color-ink);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    line-height: 1.4;
+  }
+  .glyph {
+    width: 26px;
+    height: 26px;
+    flex-shrink: 0;
+    border: 1px solid var(--color-paper);
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) clamp(320px, 38vw, 500px);
+    grid-template-areas: "head art" "body art";
+    grid-template-rows: auto 1fr;
+    column-gap: 40px;
+  }
+  .head {
+    grid-area: head;
+    position: relative;
+    z-index: 3;
+    min-width: 0;
+    padding-top: clamp(30px, 4vw, 52px);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 22px;
+  }
+  .title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: clamp(40px, 5.6vw, 78px);
+    line-height: 0.95;
+  }
+  .free {
+    display: inline-block;
+    background: var(--color-akai);
+    color: var(--color-white);
+    padding: 0 0.1em;
+    line-height: 1;
+    border-radius: 3px;
+  }
+  .art {
+    grid-area: art;
+    position: relative;
+    min-width: 0;
+    min-height: clamp(540px, 50vw, 700px);
+  }
+  .art-clip {
+    position: absolute;
+    left: -240px;
+    right: -240px;
+    top: -240px;
+    bottom: 0;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .knight {
+    position: absolute;
+    left: calc(100% - 240px);
+    top: 226px;
+    height: calc(100% - 226px);
+    aspect-ratio: 2 / 3;
+    transform: translateX(-100%) rotate(6deg) scaleX(-1);
+    transform-origin: 50% 60%;
+  }
+  .halo {
+    position: absolute;
+    width: 0;
+    height: 0;
+  }
+  .body {
+    grid-area: body;
+    position: relative;
+    z-index: 3;
+    min-width: 0;
+    padding: 26px 0 clamp(40px, 4.6vw, 60px);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 22px;
+  }
+  .eq {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 118px) 30px) minmax(0, 118px);
+    gap: 0;
+    align-items: stretch;
+    width: 100%;
+  }
+  .op {
+    display: grid;
+    place-items: center;
+    font-weight: 700;
+    font-size: 22px;
+  }
+  .tee {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px 8px 10px;
+    border: 1px solid var(--color-paper);
+    border-radius: 3px;
+    min-width: 0;
+    container-type: inline-size;
+  }
+  .tee-free {
+    border: 1.5px solid var(--color-akai);
+  }
+  .tee-img {
+    position: relative;
+    display: block;
+    aspect-ratio: 1;
+    border-radius: 2px;
+    background: color-mix(in srgb, var(--color-paper) 7%, transparent);
+    overflow: hidden;
+  }
+  .tee-tone {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle, color-mix(in srgb, var(--color-paper) 32%, transparent) 1px, transparent 1.35px) 0 0 / 5px 5px;
+    mask-image: linear-gradient(150deg, transparent 20%, black);
+  }
+  .tee-label {
+    position: absolute;
+    left: 6px;
+    bottom: 5px;
+    font-size: 9px;
+    letter-spacing: 0.06em;
+  }
+  .tee-name {
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+  }
+  .tee-price {
+    font-family: var(--font-display);
+    /* The design's size, shrunk only when a real price ("$ 158.000") would overflow the card. */
+    font-size: min(clamp(22px, 2.2vw, 30px), 13cqi);
+    white-space: nowrap;
+    line-height: 1;
+    text-transform: none;
+  }
+  .stamp {
+    position: absolute;
+    right: -9px;
+    top: -11px;
+    width: clamp(46px, 4.2vw, 58px);
+    aspect-ratio: 1;
+    display: grid;
+    place-items: center;
+    background: var(--color-akai);
+    color: var(--color-white);
+    border-radius: 6px;
+    box-shadow:
+      inset 0 0 0 3px var(--color-akai),
+      inset 0 0 0 4.5px color-mix(in srgb, var(--color-white) 85%, transparent);
+    transform: rotate(-11deg);
+    filter: url(#akai-rough);
+    z-index: 2;
+  }
+  .stamp-text {
+    writing-mode: vertical-rl;
+    font-size: clamp(15px, 1.4vw, 19px);
+    line-height: 1;
+  }
+  .stamp-speckle {
+    position: absolute;
+    inset: 0;
+    border-radius: 6px;
+    background:
+      radial-gradient(circle at 18% 22%, var(--color-paper) 0 1.1px, transparent 1.6px),
+      radial-gradient(circle at 74% 16%, var(--color-paper) 0 0.9px, transparent 1.4px),
+      radial-gradient(circle at 84% 60%, var(--color-paper) 0 1.2px, transparent 1.7px),
+      radial-gradient(circle at 28% 82%, var(--color-paper) 0 1px, transparent 1.5px),
+      radial-gradient(circle at 62% 86%, var(--color-paper) 0 0.8px, transparent 1.3px),
+      radial-gradient(circle at 10% 50%, var(--color-paper) 0 0.7px, transparent 1.2px),
+      radial-gradient(circle at 50% 10%, var(--color-paper) 0 0.7px, transparent 1.2px);
+  }
+  .op-m {
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--color-ink);
+    border: 1px solid var(--color-paper);
+    display: grid;
+    place-items: center;
+    font-weight: 700;
+    font-size: 13px;
+    line-height: 1;
+  }
+  .op-m-left {
+    left: -18px;
+    top: 50%;
+    margin-top: -12px;
+  }
+  .op-m-top {
+    left: 50%;
+    top: -19px;
+    margin-left: -12px;
+  }
+  .note {
+    margin: 0;
+    max-width: 440px;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    line-height: 1.6;
+  }
+  .shop-tees:hover {
+    background: var(--color-paper);
+    color: var(--color-ink);
+  }
+  .shop-over {
+    border: 1.5px solid var(--color-paper);
+    color: var(--color-paper);
+  }
+  .shop-over:hover {
+    background: var(--color-akai);
+    border-color: var(--color-akai);
+    color: var(--color-paper);
+  }
+
+  @media (max-width: 760px) {
+    .layout {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-areas: "head" "art" "body";
+    }
+    .art {
+      min-height: clamp(300px, 86vw, 420px);
+    }
+    .knight {
+      left: 50%;
+      top: 232px;
+      height: calc((100% - 240px) * 1.85);
+      transform: translateX(-50%) rotate(4deg) scaleX(-1);
+    }
+    .eq {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 26px 28px;
+    }
+  }
+</style>

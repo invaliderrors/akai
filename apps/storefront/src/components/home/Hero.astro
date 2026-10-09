@@ -1,0 +1,367 @@
+---
+import type { PublicProduct } from "@akai/contracts";
+
+import Countdown from "@/components/Countdown.astro";
+import HeroAdd from "@/components/islands/HeroAdd";
+import { t } from "@/i18n/messages";
+import { serverEnv } from "@/lib/env";
+import { NEXT_DROP } from "@/lib/merch";
+import { displayPrice, isSellable, mediaAlt, sortedMedia } from "@/lib/view";
+
+interface Props {
+  /** The product on the hero card: the newest one. Null hides the card. */
+  product: PublicProduct | null;
+}
+
+const h = t.home;
+const { product } = Astro.props;
+const year = new Date().getFullYear();
+const shop = "/products";
+
+const card =
+  product === null
+    ? null
+    : (() => {
+        const [front, back] = sortedMedia(product);
+        const active = product.variants.filter((variant) => variant.isActive);
+        // One-tap add only when there is nothing to choose; otherwise the
+        // shopper picks a size on the product page.
+        const only = active.length === 1 && active[0] !== undefined && isSellable(active[0]) ? active[0] : null;
+        return {
+          name: product.name,
+          link: `/products/${product.slug}`,
+          price: displayPrice(product),
+          front,
+          back,
+          variantId: only?.id ?? null,
+        };
+      })();
+---
+
+<section id="top" class="hero">
+  <i data-thread="L" aria-hidden="true" class="block h-0"></i>
+  <div class="flex items-end gap-2.5">
+    <svg viewBox="0 0 1000 250" width="100%" preserveAspectRatio="none" class="wordmark" aria-label="AKAI">
+      <text x="4" y="251" textLength="1000" lengthAdjust="spacingAndGlyphs" fill="var(--color-akai)" class="font-display" font-size="272">AKAI</text>
+      <text x="0" y="248" textLength="1000" lengthAdjust="spacingAndGlyphs" fill="var(--color-ink)" class="font-display" font-size="272">AKAI</text>
+    </svg>
+    <span aria-hidden="true" class="vertical kanji only-mobile text-[26px]">赤い<span class="text-akai">糸</span></span>
+  </div>
+
+  <div class="stage">
+    <div data-thread-avoid class="side-left mono only-desktop">
+      <span>{year}</span>
+      <span class="flex items-baseline gap-1.5"><span class="kanji text-[16px] leading-none text-akai">糸</span>01 · {h.limitedRun}</span>
+      <span class="next">
+        <span>{h.nextThread}</span>
+        <span class="next-cd"><Countdown target={NEXT_DROP} format="seconds" /></span>
+      </span>
+    </div>
+
+    <div class="center">
+      <img
+        data-thread-img
+        src="/brand/yume-hero.png"
+        alt={h.heroAlt}
+        width="639"
+        height="820"
+        class="hero-img"
+      />
+      {
+        card !== null && (
+          <div data-thread-card role="group" aria-label={card.name} class="card">
+            <a href={card.link} aria-label={card.name} class="card-img">
+              <span aria-hidden="true" class="halftone"></span>
+              {card.front !== undefined && (
+                <img src={card.front.url} alt={mediaAlt(card.front, card.name)} width={card.front.width} height={card.front.height} class="photo" />
+              )}
+              {card.back !== undefined && (
+                <img src={card.back.url} alt="" width={card.back.width} height={card.back.height} class="photo photo-back" />
+              )}
+              <span class="mono view view-front">{h.front}</span>
+              <span class="mono view view-back">{h.back}</span>
+            </a>
+            <div class="flex min-w-0 flex-col justify-between gap-2 py-[2px]">
+              <div class="grid gap-1">
+                <a href={card.link} class="text-[12px] font-extrabold uppercase leading-[1.25] tracking-[.02em] no-underline">{card.name}</a>
+                <span class="mono text-[12px] font-bold normal-case">{card.price}</span>
+              </div>
+              {card.variantId === null ? (
+                <a href={card.link} class="choose">{h.chooseSize}</a>
+              ) : (
+                <HeroAdd
+                  client:visible
+                  apiUrl={serverEnv().PUBLIC_API_URL}
+                  variantId={card.variantId}
+                  label={t.product.addToCart}
+                  addedLabel={h.addedShort}
+                  errors={t.errors}
+                />
+              )}
+            </div>
+            <svg aria-hidden="true" class="hover-ring">
+              <rect x="0.5%" y="0.5%" width="99%" height="99%" rx="10" pathLength="1" data-anim class="ring-a"></rect>
+              <rect x="0.5%" y="0.5%" width="99%" height="99%" rx="16" pathLength="1" data-anim class="ring-b"></rect>
+            </svg>
+          </div>
+        )
+      }
+    </div>
+
+    <div class="side-right only-desktop">
+      <div class="mono text-[11px] leading-[1.5] tracking-[.05em]">{h.designedBy}<br />{h.byAkai}</div>
+      <span aria-hidden="true" class="vertical kanji text-[clamp(40px,6.4vw,104px)]">赤い<span class="text-akai">糸</span></span>
+    </div>
+  </div>
+
+  <div class="mb-4 mt-3.5 h-px bg-ink"></div>
+
+  <div class="mono only-mobile mb-4 flex flex-wrap justify-between gap-x-4 gap-y-1.5 text-[10px] tracking-[.06em]">
+    <span class="flex items-baseline gap-[5px]">{year} · <span class="kanji text-[13px] leading-none text-akai">糸</span>01 · {h.limitedRun}</span>
+    <span>{h.nextThread} <b><Countdown target={NEXT_DROP} format="seconds" /></b></span>
+  </div>
+
+  <div class="flex flex-wrap items-end justify-between gap-x-10 gap-y-5">
+    <p class="lead">{h.lead}</p>
+    <div id="drop" class="ctas">
+      <a href={shop} class="pill pill-red cta">{h.shopDrop}</a>
+      <a href={`${shop}?sort=best_selling`} class="pill pill-ink cta">{h.bestsellers}</a>
+    </div>
+  </div>
+</section>
+
+<style>
+  .hero {
+    position: relative;
+    z-index: 2;
+    padding: 14px 16px 0;
+    max-width: 1280px;
+    margin: 0 auto;
+    box-sizing: border-box;
+  }
+  .wordmark {
+    display: block;
+    flex: 1;
+    min-width: 0;
+    height: clamp(90px, min(24vw, 22vh), 300px);
+    overflow: visible;
+  }
+  .vertical {
+    display: block;
+    writing-mode: vertical-rl;
+    line-height: 1.05;
+  }
+  .stage {
+    display: grid;
+    grid-template-columns: minmax(52px, 1fr) minmax(200px, 3.2fr) minmax(52px, 1fr);
+    gap: 8px;
+    margin-top: -1.5vw;
+  }
+  .side-left {
+    align-self: start;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding-top: clamp(10px, 3vw, 40px);
+    min-width: 0;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    line-height: 1.5;
+  }
+  .next {
+    display: grid;
+    gap: 4px;
+    padding-top: 12px;
+    border-top: 1px solid var(--color-ink);
+    max-width: 210px;
+  }
+  .next-cd {
+    font-weight: 700;
+    font-size: clamp(15px, 1.6vw, 21px);
+    letter-spacing: 0.02em;
+    line-height: 1.2;
+  }
+  .center {
+    position: relative;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: flex-end;
+    gap: 14px;
+    min-width: 0;
+    z-index: 3;
+    margin-top: calc(clamp(90px, min(24vw, 22vh), 300px) * -0.42);
+  }
+  .hero-img {
+    position: relative;
+    display: block;
+    flex-shrink: 0;
+    width: min(135%, 40vh, 460px);
+    max-width: 100%;
+    height: auto;
+  }
+  .card {
+    position: absolute;
+    z-index: 4;
+    right: 0;
+    bottom: 6%;
+    width: clamp(240px, 21vw, 290px);
+    display: grid;
+    grid-template-columns: clamp(80px, 7vw, 96px) minmax(0, 1fr);
+    gap: 12px;
+    padding: 8px;
+    background: var(--color-paper);
+    border: 1px solid var(--color-ink);
+    border-radius: 3px;
+    box-sizing: border-box;
+  }
+  .card-img {
+    position: relative;
+    display: block;
+    aspect-ratio: 4 / 5;
+    background: color-mix(in srgb, var(--color-ink) 5%, transparent);
+    overflow: hidden;
+    border-radius: 2px;
+    color: var(--color-ink);
+    text-decoration: none;
+  }
+  .halftone {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle, color-mix(in srgb, var(--color-ink) 22%, transparent) 1.1px, transparent 1.5px) 0 0 / 5px 5px;
+    mask-image: linear-gradient(155deg, transparent 15%, black);
+  }
+  .card:hover .halftone,
+  .card:focus-within .halftone {
+    mask-image: linear-gradient(335deg, transparent 15%, black);
+  }
+  .photo {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: opacity 0.3s;
+  }
+  .photo-back {
+    opacity: 0;
+  }
+  .card:hover .photo-back,
+  .card:focus-within .photo-back {
+    opacity: 1;
+  }
+  .view {
+    position: absolute;
+    left: 6px;
+    right: 6px;
+    bottom: 5px;
+    font-size: 9px;
+    letter-spacing: 0.06em;
+    line-height: 1.2;
+  }
+  .view-back,
+  .card:hover .view-front,
+  .card:focus-within .view-front {
+    display: none;
+  }
+  .card:hover .view-back,
+  .card:focus-within .view-back {
+    display: block;
+  }
+  .choose {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 44px;
+    border-radius: 999px;
+    background: var(--color-ink);
+    color: var(--color-paper);
+    font-weight: 800;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    text-decoration: none;
+    transition: background 0.2s;
+  }
+  .choose:hover {
+    background: var(--color-akai);
+    color: var(--color-white);
+  }
+  .hover-ring {
+    position: absolute;
+    left: -9px;
+    top: -9px;
+    width: calc(100% + 18px);
+    height: calc(100% + 18px);
+    overflow: visible;
+    pointer-events: none;
+    z-index: 6;
+  }
+  .hover-ring rect {
+    fill: none;
+    stroke: var(--color-akai);
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    transition: stroke-dashoffset 0.75s cubic-bezier(0.65, 0, 0.25, 1);
+  }
+  .ring-a {
+    stroke-width: 2.5;
+  }
+  .ring-b {
+    stroke-width: 1.5;
+    transform: rotate(-1.2deg);
+    transform-origin: center;
+    transform-box: fill-box;
+  }
+  .hover-ring .ring-b {
+    transition-delay: 0.18s;
+  }
+  .card:hover .hover-ring rect,
+  .card:focus-within .hover-ring rect {
+    stroke-dashoffset: 0;
+  }
+  .side-right {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    align-items: flex-end;
+    padding-top: clamp(10px, 3vw, 40px);
+    min-width: 0;
+    text-align: right;
+  }
+  .lead {
+    margin: 0;
+    max-width: 440px;
+    font-size: clamp(15px, 1.4vw, 19px);
+    font-weight: 700;
+    line-height: 1.35;
+    text-wrap: pretty;
+    flex: 1 1 260px;
+  }
+  .ctas {
+    display: flex;
+    gap: 10px;
+    flex: 1 1 320px;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+  .cta {
+    flex: 1 1 170px;
+    max-width: 250px;
+  }
+
+  @media (max-width: 760px) {
+    .stage {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .center {
+      flex-direction: column;
+      align-items: center;
+    }
+    .card {
+      position: relative;
+      bottom: auto;
+      width: min(100%, 420px);
+    }
+  }
+</style>

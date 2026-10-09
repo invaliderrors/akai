@@ -1,0 +1,211 @@
+---
+import type { PublicProduct } from "@akai/contracts";
+
+import { t } from "@/i18n/messages";
+
+import ProductTile from "./ProductTile.astro";
+
+interface Props {
+  newest: readonly PublicProduct[];
+  bestsellers: readonly PublicProduct[];
+}
+
+const g = t.home.grid;
+const { newest, bestsellers } = Astro.props;
+
+const tabs = [
+  { key: "new", kanji: "新作", label: g.tabNew, meta: g.metaNew, items: newest, wave: "M1 7 C 18 1, 34 11, 55 6 S 88 1, 104 6 S 116 9, 119 5" },
+  { key: "best", kanji: "人気", label: g.tabBest, meta: g.metaBest, items: bestsellers, wave: "M1 5 C 16 10, 36 1, 58 6 S 92 11, 106 5 S 117 3, 119 7" },
+] as const;
+---
+
+<section data-tabs class="products">
+  <div class="min-w-0">
+    <div class="flex flex-wrap items-end justify-between gap-3.5 border-b border-ink pb-2.5">
+      <div role="tablist" class="flex gap-8">
+        {
+          tabs.map((tab, index) => (
+            <button
+              type="button"
+              role="tab"
+              id={`tab-${tab.key}`}
+              aria-controls={`panel-${tab.key}`}
+              aria-selected={index === 0 ? "true" : "false"}
+              tabindex={index === 0 ? 0 : -1}
+              data-tab={tab.key}
+              class="tab mono"
+            >
+              <span class="kanji tab-kanji">{tab.kanji}</span>
+              {tab.label}
+              <svg aria-hidden="true" viewBox="0 0 120 12" preserveAspectRatio="none" class="wave">
+                <path d={tab.wave} pathLength="1" data-anim></path>
+              </svg>
+            </button>
+          ))
+        }
+      </div>
+      {
+        tabs.map((tab, index) => (
+          <div data-tab-meta={tab.key} hidden={index !== 0} class="mono pb-2 text-[11px] tracking-[.06em]">
+            {tab.meta}
+          </div>
+        ))
+      }
+    </div>
+    <i data-thread="L" aria-hidden="true" class="block h-0"></i>
+    {
+      tabs.map((tab, index) => (
+        <div id={`panel-${tab.key}`} role="tabpanel" aria-labelledby={`tab-${tab.key}`} hidden={index !== 0} class="tiles">
+          {tab.items.length === 0 ? (
+            <p class="mono text-[12px]">{t.shop.empty}</p>
+          ) : (
+            tab.items.map((product, i) => <ProductTile product={product} index={i} />)
+          )}
+        </div>
+      ))
+    }
+    <div class="mt-9 flex justify-center">
+      <a href="/products" class="view-all mono">{g.viewAll}</a>
+    </div>
+    <i data-thread="L" aria-hidden="true" class="block h-0"></i>
+  </div>
+  <div aria-hidden="true" class="only-desktop">
+    <span class="en kanji">縁</span>
+  </div>
+</section>
+
+<style>
+  .products {
+    position: relative;
+    z-index: 2;
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 16px;
+    box-sizing: border-box;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) clamp(56px, 6vw, 96px);
+    gap: 0 28px;
+  }
+  .tab {
+    position: relative;
+    height: 52px;
+    padding: 0 2px;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--color-ink);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+  }
+  .tab:hover {
+    color: var(--color-akai);
+  }
+  .tab-kanji {
+    font-size: 24px;
+    line-height: 1;
+    color: var(--color-ink);
+  }
+  .tab[aria-selected="true"] .tab-kanji {
+    color: var(--color-akai);
+  }
+  .wave {
+    display: none;
+    position: absolute;
+    left: -6px;
+    bottom: -9px;
+    width: calc(100% + 12px);
+    height: 12px;
+    overflow: visible;
+  }
+  .tab[aria-selected="true"] .wave {
+    display: block;
+  }
+  .wave path {
+    fill: none;
+    stroke: var(--color-akai);
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    vector-effect: non-scaling-stroke;
+    stroke-dasharray: 1;
+    animation: draw 0.6s cubic-bezier(0.65, 0, 0.25, 1) both;
+  }
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(clamp(150px, 22%, 280px), 1fr));
+    gap: 36px 22px;
+    margin-top: 30px;
+  }
+  .tiles[hidden] {
+    display: none;
+  }
+  .view-all {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 52px;
+    padding: 0 34px;
+    border: 1px solid var(--color-ink);
+    border-radius: 999px;
+    text-decoration: none;
+    color: var(--color-ink);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    background: var(--color-paper);
+    transition:
+      background 0.2s,
+      color 0.2s,
+      border-color 0.2s;
+  }
+  .view-all:hover {
+    background: var(--color-akai);
+    color: var(--color-white);
+    border-color: var(--color-akai);
+  }
+  .en {
+    position: sticky;
+    top: 120px;
+    display: block;
+    writing-mode: vertical-rl;
+    font-size: clamp(64px, 7vw, 112px);
+    line-height: 1;
+  }
+
+  @media (max-width: 760px) {
+    .products {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+</style>
+
+<script>
+  // Tabs: click or arrow keys. Re-showing a tab replays its underline stroke.
+  for (const root of document.querySelectorAll<HTMLElement>("[data-tabs]")) {
+    const tabs = [...root.querySelectorAll<HTMLButtonElement>("[role=tab]")];
+    const select = (tab: HTMLButtonElement) => {
+      for (const other of tabs) {
+        const on = other === tab;
+        other.setAttribute("aria-selected", String(on));
+        other.tabIndex = on ? 0 : -1;
+        const panel = document.getElementById(other.getAttribute("aria-controls") ?? "");
+        if (panel !== null) panel.hidden = !on;
+        const meta = root.querySelector<HTMLElement>(`[data-tab-meta="${other.dataset.tab ?? ""}"]`);
+        if (meta !== null) meta.hidden = !on;
+      }
+      window.dispatchEvent(new Event("akai:layout-changed"));
+    };
+    tabs.forEach((tab, index) => {
+      tab.addEventListener("click", () => select(tab));
+      tab.addEventListener("keydown", (event) => {
+        if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+        const next = tabs[(index + (event.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length];
+        if (next === undefined) return;
+        next.focus();
+        select(next);
+      });
+    });
+  }
+</script>

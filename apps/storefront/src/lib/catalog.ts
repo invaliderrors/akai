@@ -1,8 +1,10 @@
 import {
   categoryListResponseSchema,
+  freeShippingThresholdResponseSchema,
   paginatedSchema,
   publicProductSchema,
   type CategoryListItem,
+  type Money,
   type ProductSortMode,
   type PublicProduct,
 } from "@akai/contracts";
@@ -58,4 +60,22 @@ export async function listCategories(): Promise<readonly CategoryListItem[]> {
     schema: categoryListResponseSchema,
   });
   return data.items;
+}
+
+/**
+ * The free-shipping threshold every destination shares, or null when there is
+ * none. A promotional hint only: if the API cannot answer, the page shows no
+ * hint rather than failing.
+ */
+export async function getFreeShippingThreshold(): Promise<Money | null> {
+  try {
+    const { data } = await apiRequest({
+      baseUrl: serverEnv().API_INTERNAL_URL,
+      path: "/shipping/free-shipping",
+      schema: freeShippingThresholdResponseSchema,
+    });
+    return data.threshold;
+  } catch {
+    return null;
+  }
 }

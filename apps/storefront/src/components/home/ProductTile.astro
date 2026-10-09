@@ -1,0 +1,225 @@
+---
+import type { PublicProduct } from "@akai/contracts";
+
+import SizeQuickAdd from "@/components/islands/SizeQuickAdd";
+import { t } from "@/i18n/messages";
+import { serverEnv } from "@/lib/env";
+import { BADGE_RULES } from "@/lib/merch";
+import {
+  categoryLabel,
+  colorSwatches,
+  displayPrice,
+  mediaAlt,
+  productBadge,
+  sizeOptions,
+  sortedMedia,
+} from "@/lib/view";
+
+interface Props {
+  product: PublicProduct;
+  /** Position in the grid; picks the tilt of the second hover ring. */
+  index: number;
+}
+
+const g = t.home.grid;
+const { product, index } = Astro.props;
+const name = product.name;
+const link = `/products/${product.slug}`;
+const [front, back] = sortedMedia(product);
+const badge = productBadge(product, { ...BADGE_RULES, now: Date.now() });
+const tilt = ["-0.8deg", "0.7deg", "-0.5deg", "1deg"][index % 4];
+---
+
+<article class="tile" style={`--tilt:${tilt}`}>
+  <a href={link} aria-label={name} class="tile-img">
+    <span aria-hidden="true" class="halftone"></span>
+    {
+      front === undefined ? (
+        <>
+          <span class="mono img-label label-front">{g.artworkFlat}</span>
+          <span class="mono img-label label-back">{g.onModel}</span>
+        </>
+      ) : (
+        <>
+          <img
+            src={front.url}
+            alt={mediaAlt(front, name)}
+            width={front.width}
+            height={front.height}
+            loading="lazy"
+            class="photo"
+          />
+          {back !== undefined && (
+            <img src={back.url} alt="" width={back.width} height={back.height} loading="lazy" class="photo photo-back" />
+          )}
+        </>
+      )
+    }
+    {badge === "new" && <span class="badge mono badge-new">{g.badgeNew}</span>}
+    {
+      badge === "limited" && (
+        <span class="badge mono badge-ink">
+          <span class="kanji text-[11px]">限定</span>
+          {g.badgeLimited}
+        </span>
+      )
+    }
+    {
+      badge === "low" && (
+        <span class="badge mono badge-low">
+          <span class="dot"></span>
+          {g.badgeLow}
+        </span>
+      )
+    }
+    {badge === "soldOut" && <span class="badge mono badge-ink">{t.product.soldOut}</span>}
+  </a>
+  <div class="grid gap-[5px] px-[2px] pb-1 pt-3">
+    <div class="flex items-baseline justify-between gap-2">
+      <a href={link} class="text-[13px] font-extrabold uppercase leading-[1.2] tracking-[.02em] no-underline">{name}</a>
+      <span class="mono whitespace-nowrap text-[13px] font-bold">{displayPrice(product)}</span>
+    </div>
+    <div class="flex items-center justify-between">
+      <span class="mono text-[10px] tracking-[.04em]">{categoryLabel(product)}</span>
+      <span class="flex gap-1">
+        {colorSwatches(product).map((color) => <span class="swatch" style={`background:${color}`}></span>)}
+      </span>
+    </div>
+  </div>
+  <SizeQuickAdd
+    client:visible
+    apiUrl={serverEnv().PUBLIC_API_URL}
+    sizes={sizeOptions(product)}
+    t={{ addSize: g.addSize, addedToCart: g.addedToCart }}
+    errors={t.errors}
+  />
+  <svg aria-hidden="true" class="hover-ring">
+    <rect x="0.5%" y="0.5%" width="99%" height="99%" rx="12" pathLength="1" data-anim class="ring-a"></rect>
+    <rect x="0.5%" y="0.5%" width="99%" height="99%" rx="18" pathLength="1" data-anim class="ring-b"></rect>
+  </svg>
+</article>
+
+<style>
+  .tile {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    background: var(--color-paper);
+  }
+  .tile-img {
+    position: relative;
+    display: block;
+    aspect-ratio: 4 / 5;
+    background: color-mix(in srgb, var(--color-ink) 5%, transparent);
+    overflow: hidden;
+    text-decoration: none;
+    color: var(--color-ink);
+    border-radius: 2px;
+  }
+  .halftone {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle, color-mix(in srgb, var(--color-ink) 20%, transparent) 1.1px, transparent 1.5px) 0 0 / 6px 6px;
+    mask-image: linear-gradient(155deg, transparent 20%, black);
+  }
+  .tile:hover .halftone {
+    mask-image: linear-gradient(335deg, transparent 20%, black);
+  }
+  .photo {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: opacity 0.3s;
+  }
+  .photo-back {
+    opacity: 0;
+  }
+  .tile:hover .photo-back {
+    opacity: 1;
+  }
+  .img-label {
+    position: absolute;
+    left: 10px;
+    bottom: 9px;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+  }
+  .label-back,
+  .tile:hover .label-front {
+    display: none;
+  }
+  .tile:hover .label-back {
+    display: inline;
+  }
+  .badge {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    font-weight: 700;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    padding: 5px 7px;
+    border-radius: 2px;
+    line-height: 1;
+    color: var(--color-white);
+  }
+  .badge-new {
+    background: var(--color-akai);
+  }
+  .badge-ink {
+    background: var(--color-ink);
+  }
+  .badge-low {
+    background: var(--color-paper);
+    color: var(--color-ink);
+  }
+  .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--color-akai);
+  }
+  .swatch {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    box-shadow: inset 0 0 0 1px var(--color-ink);
+  }
+  .hover-ring {
+    position: absolute;
+    left: -10px;
+    top: -10px;
+    width: calc(100% + 20px);
+    height: calc(100% + 20px);
+    overflow: visible;
+    pointer-events: none;
+    z-index: 6;
+  }
+  .hover-ring rect {
+    fill: none;
+    stroke: var(--color-akai);
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    transition: stroke-dashoffset 0.75s cubic-bezier(0.65, 0, 0.25, 1);
+  }
+  .ring-a {
+    stroke-width: 2.5;
+  }
+  .ring-b {
+    stroke-width: 1.5;
+    transform: rotate(var(--tilt));
+    transform-origin: center;
+    transform-box: fill-box;
+  }
+  .hover-ring .ring-b {
+    transition-delay: 0.18s;
+  }
+  .tile:hover .hover-ring rect {
+    stroke-dashoffset: 0;
+  }
+</style>

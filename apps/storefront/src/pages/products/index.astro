@@ -1,5 +1,5 @@
 ---
-import { idSchema, slugSchema } from "@akai/contracts";
+import { idSchema, productSortSchema, slugSchema } from "@akai/contracts";
 
 import ProductCard from "@/components/ProductCard.astro";
 import { t } from "@/i18n/messages";
@@ -8,9 +8,10 @@ import { listCategories, listProducts } from "@/lib/catalog";
 
 const category = slugSchema.safeParse(Astro.url.searchParams.get("category")).data;
 const cursor = idSchema.safeParse(Astro.url.searchParams.get("cursor")).data;
+const sort = productSortSchema.safeParse(Astro.url.searchParams.get("sort")).data;
 
 const [page, categories] = await Promise.all([
-  listProducts({ category, cursor, sort: "manual", limit: 24 }),
+  listProducts({ category, cursor, sort: sort ?? "manual", limit: 24 }),
   listCategories(),
 ]);
 
@@ -59,7 +60,7 @@ const withQuery = (query: Record<string, string | undefined>) => {
     {
       page.hasMore && page.nextCursor !== null && (
         <div class="mt-12 text-center">
-          <a href={withQuery({ category, cursor: page.nextCursor })} class="btn-outline">
+          <a href={withQuery({ category, sort, cursor: page.nextCursor })} class="btn-outline">
             {t.shop.loadMore}
           </a>
         </div>

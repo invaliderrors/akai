@@ -25,7 +25,7 @@ export default function CartCount({ apiUrl }: Props) {
   }, [apiUrl]);
 
   return (
-    <span className="inline-flex h-5 min-w-5 items-center justify-center bg-akai px-1 text-[10px] text-paper tabular-nums">
+    <span className="absolute -right-[7px] -top-[7px] box-border grid h-5 min-w-5 place-items-center rounded-full bg-akai px-[5px] text-[10px] font-bold text-white tabular-nums">
       {count}
     </span>
   );
